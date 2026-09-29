@@ -1,0 +1,85 @@
+/* Console scura, come gli strumenti reali del settore (OBS, QLab,
+   ProPresenter, Resolume sono tutti scuri di default): non e' un tema fra
+   altri, e' la palette dell'app. */
+:root {
+  --bg: #0b0d12;
+  --panel: #14171f;
+  --panel-2: #1b1f2a;
+  --border: #272c39;
+  --fg: #e7e9ee;
+  --fg-dim: #8b93a7;
+  --fg-faint: #565d70;
+  --accent: #e8a33d;
+  --accent-ink: #1a1305;
+  --accent-dim: #3a2f1a;
+  --live: #e2483f;
+  --live-dim: #38191a;
+
+  --font-display: 'Barlow Condensed', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  margin: 0;
+}
+
+button,
+select,
+input,
+textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+button {
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--fg);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+button.primary:hover {
+  filter: brightness(1.08);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--fg-faint);
+}

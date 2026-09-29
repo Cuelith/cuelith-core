@@ -1,0 +1,938 @@
+<title>Cuelith, con i plugin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  /* Layout: recap breve della console gia' costruita, poi il pezzo nuovo -
+     negozio plugin, cosa cambia nell'interfaccia quando installi uno,
+     gestione di quelli installati. Stessa palette della console reale. */
+  :root{
+    --bg:#0b0d12;
+    --panel:#14171f;
+    --panel-2:#1b1f2a;
+    --panel-3:#232838;
+    --border:#272c39;
+    --fg:#e7e9ee;
+    --fg-dim:#8b93a7;
+    --fg-faint:#565d70;
+    --accent:#e8a33d;
+    --accent-ink:#1a1305;
+    --accent-dim:#3a2f1a;
+    --live:#e2483f;
+    --live-dim:#38191a;
+    --ok:#5fc98d;
+    --cat-religioso:#a78bfa;
+    --cat-generico:#60a5fa;
+    --cat-proav:#2dd4bf;
+    --cat-broadcast:#f472b6;
+    --font-display:'Barlow Condensed',system-ui,sans-serif;
+    --font-body:'IBM Plex Sans',system-ui,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+    color-scheme: dark;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg);
+    color:var(--fg);
+    font-family:var(--font-body);
+    margin:0;
+    padding-inline:20px;
+    padding-block:3rem;
+    line-height:1.55;
+  }
+
+  .page{max-width:960px;margin:0 auto}
+
+  .eyebrow{
+    font-family:var(--font-display);
+    font-weight:600;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    font-size:0.78rem;
+    color:var(--accent);
+  }
+
+  h1{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:clamp(2.1rem,5vw,3.1rem);
+    line-height:1.05;
+    margin:0.4rem 0 0.6rem;
+    text-wrap:balance;
+  }
+
+  h2{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:clamp(1.5rem,3.4vw,1.9rem);
+    margin:0 0 0.3rem;
+    text-wrap:balance;
+  }
+
+  h3{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:1rem;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--fg-dim);
+    margin:0 0 0.5rem;
+  }
+
+  p{margin:0 0 1rem;max-width:64ch}
+  .lead{color:var(--fg-dim);font-size:1.05rem;max-width:62ch}
+
+  section.block{margin-block:3.2rem}
+  section.block + section.block{border-top:1px solid var(--border);padding-top:3rem}
+
+  .block-head .lead{margin-top:0.5rem}
+
+  .frame-wrap{overflow-x:auto;margin:0 -20px 1.4rem;padding:0 20px}
+  .screen{
+    width:860px;max-width:none;
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    overflow:hidden;box-shadow:0 20px 50px -20px rgba(0,0,0,0.6);
+  }
+  .titlebar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0.55rem 0.9rem;background:var(--panel-2);border-bottom:1px solid var(--border);
+    font-family:var(--font-display);font-size:0.82rem;letter-spacing:0.04em;color:var(--fg-dim);
+  }
+  .titlebar .file{color:var(--fg)}
+
+  /* ---- recap console ---- */
+  .recap-body{padding:1rem}
+  .recap-panes{display:grid;grid-template-columns:1fr auto 1fr;gap:0.8rem}
+  .r-pane{border-radius:9px;overflow:hidden;border:1px solid var(--border);background:#000}
+  .r-label{display:flex;align-items:center;gap:0.4rem;font-family:var(--font-display);font-weight:600;letter-spacing:0.08em;font-size:0.72rem;text-transform:uppercase;padding:0.4rem 0.65rem;background:var(--panel-2);color:var(--fg-dim)}
+  .r-pane.live .r-label{background:var(--live-dim);color:#ff8f87}
+  .r-pane.live{border-color:var(--live)}
+  .r-stage{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;padding:1rem;text-align:center;color:#f2f2f2;font-size:1rem;font-weight:600;background:#050505}
+  .r-go{display:flex;align-items:center}
+  .r-go span{background:var(--accent);color:var(--accent-ink);border-radius:8px;font-family:var(--font-display);font-weight:700;font-size:0.85rem;padding:0.8rem 0.5rem;writing-mode:vertical-rl;text-orientation:mixed}
+
+  /* ---- plugin store ---- */
+  .store-toolbar{display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem}
+  .chip{
+    font-family:var(--font-display);font-weight:600;font-size:0.78rem;letter-spacing:0.03em;
+    background:var(--panel-2);border:1px solid var(--border);color:var(--fg-dim);
+    border-radius:20px;padding:0.35rem 0.85rem;cursor:pointer;
+  }
+  .chip.active{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+
+  .store-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.8rem}
+  .plugin-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:0.9rem;display:flex;flex-direction:column;gap:0.5rem}
+  .p-head{display:flex;align-items:center;gap:0.6rem}
+  .p-icon{width:34px;height:34px;border-radius:8px;background:var(--panel-3);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:1rem;flex:none}
+  .p-name{font-weight:600;font-size:0.92rem}
+  .p-cat{display:flex;align-items:center;gap:0.3rem;font-size:0.66rem;color:var(--fg-faint);text-transform:uppercase;letter-spacing:0.05em}
+  .p-cat .cdot{width:6px;height:6px;border-radius:50%}
+  .p-desc{font-size:0.78rem;color:var(--fg-dim);margin:0;flex:1}
+  .p-install{align-self:flex-start;font-size:0.76rem;padding:0.35rem 0.8rem;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--fg);cursor:pointer;font-family:var(--font-body)}
+  .p-install.installed{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+
+  .p-badges{display:flex;gap:0.35rem;flex-wrap:wrap}
+  .kind-badge,.compat-badge{font-size:0.64rem;font-family:var(--font-display);font-weight:600;letter-spacing:0.03em;padding:0.15rem 0.45rem;border-radius:4px;white-space:nowrap}
+  .kind-badge.kind-panel{background:var(--panel-3);color:var(--fg-dim)}
+  .kind-badge.kind-service{background:var(--panel-3);color:var(--cat-proav)}
+  .compat-badge.compat-ok{background:transparent;color:var(--ok);border:1px solid var(--ok)}
+  .compat-badge.compat-unverified{background:transparent;color:var(--fg-faint);border:1px solid var(--border)}
+
+  .doc-btn{font-size:0.74rem;padding:0.3rem 0.6rem;background:transparent;border-color:var(--border);color:var(--fg-dim)}
+
+  /* ---- overlay onboarding/documentazione ---- */
+  .overlay-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;z-index:20}
+  .overlay-backdrop.show{display:block}
+  .overlay{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:min(420px,90vw);background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:1.3rem;display:none;z-index:21;box-shadow:0 30px 60px -20px rgba(0,0,0,0.7);
+  }
+  .overlay.show{display:block}
+  .overlay-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem}
+  .overlay-close{background:transparent;border:none;color:var(--fg-dim);padding:0.2rem 0.4rem}
+  .overlay-dots{display:flex;gap:0.35rem;margin:0.8rem 0}
+  .overlay-dots span{width:6px;height:6px;border-radius:50%;background:var(--border)}
+  .overlay-dots span.active{background:var(--accent)}
+  .overlay-actions{display:flex;justify-content:space-between;gap:0.6rem}
+  .overlay-actions button{font-size:0.85rem;padding:0.5rem 1.1rem;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-family:var(--font-body)}
+  .overlay-actions #overlay-prev{background:transparent;color:var(--fg-dim)}
+
+  /* ---- composer demo ---- */
+  .composer-demo{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:1rem;margin-bottom:1rem}
+  .composer-bar{display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap}
+  .composer-bar input{flex:1;min-width:140px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.7rem;color:var(--fg-faint);font-size:0.85rem}
+  .composer-bar button{font-size:0.82rem;padding:0.5rem 0.8rem;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--fg)}
+  .composer-bar button.plugin-added{border-color:var(--accent);color:var(--accent);animation:pop 0.3s ease}
+  @keyframes pop{from{transform:scale(0.85);opacity:0}to{transform:scale(1);opacity:1}}
+  .sim-toggle{margin-top:0.9rem;font-size:0.8rem;background:var(--accent);color:var(--accent-ink);border:none;border-radius:6px;padding:0.5rem 0.9rem;font-family:var(--font-display);font-weight:700;letter-spacing:0.02em;cursor:pointer}
+
+  .composer-note{font-size:0.85rem;color:var(--fg-dim);margin-top:0.8rem}
+  .composer-note a{color:var(--accent)}
+
+  .vp-options{display:flex;flex-direction:column;gap:0.4rem}
+  .vp-options-label{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--fg-faint)}
+  .vp-radio,.vp-check{display:flex;align-items:center;gap:0.45rem;font-size:0.82rem;color:var(--fg-dim);cursor:pointer}
+
+  .manifest-box{background:#000;border-radius:8px;padding:0.9rem 1rem;font-family:var(--font-mono);font-size:0.76rem;color:#9fe6b0;overflow-x:auto;margin-top:0.9rem}
+  .manifest-box .k{color:#7fb8ff}
+  .manifest-box .c{color:var(--fg-faint)}
+
+  /* ---- pannello dedicato Bibbia ---- */
+  .bp-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.9rem}
+  .bp-modes{display:flex;gap:0.3rem;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:0.2rem}
+  .bp-mode{background:transparent;border:none;color:var(--fg-dim);font-family:var(--font-display);font-weight:600;font-size:0.78rem;padding:0.4rem 0.8rem;border-radius:6px}
+  .bp-mode.active{background:var(--accent);color:var(--accent-ink)}
+  .bp-compare{display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--fg-dim);cursor:pointer}
+
+  .bp-picker{display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.8rem}
+  .bp-picker select{min-width:6rem}
+  .bp-picker .bp-translation-b{color:var(--fg-dim)}
+  .bp-hint{font-size:0.72rem;color:var(--fg-faint);margin:0 0 0.4rem}
+
+  .bp-verse-list{
+    display:flex;flex-direction:column;gap:0.2rem;max-height:260px;overflow-y:auto;
+    border:1px solid var(--border);border-radius:8px;padding:0.4rem;background:#000;
+  }
+  .bp-verse-row{display:grid;grid-template-columns:1.4rem 2rem 1fr;gap:0.5rem;align-items:start;padding:0.4rem 0.5rem;border-radius:6px;cursor:pointer;user-select:none}
+  .bp-verse-row:hover{background:var(--panel-2)}
+  .bp-verse-row.selected{background:var(--accent-dim)}
+  .bp-verse-row input{margin-top:0.2rem}
+  .bp-verse-row .vnum{font-family:var(--font-mono);color:var(--fg-faint);font-size:0.75rem}
+  .bp-verse-row .vtext{font-size:0.85rem;color:var(--fg);line-height:1.45}
+  .bp-verse-row.compare .vtext{display:grid;grid-template-columns:1fr 1fr;gap:0.7rem}
+  .bp-verse-row.compare .vtext span{border-left:2px solid var(--border);padding-left:0.6rem}
+  .bp-verse-row.compare .vtext span:first-child{border-left:none;padding-left:0}
+
+  .bp-search input{width:100%;padding:0.6rem 0.8rem;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--fg);font-size:0.88rem;margin-bottom:0.7rem}
+  .bp-empty{color:var(--fg-faint);font-size:0.82rem;padding:0.8rem;text-align:center}
+
+  .bp-tray{margin-top:1rem;padding-top:0.9rem;border-top:1px solid var(--border)}
+  .bp-tray-chips{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.8rem;min-height:1.6rem}
+  .bp-chip{display:flex;align-items:center;gap:0.4rem;background:var(--accent-dim);color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:0.2rem 0.4rem 0.2rem 0.7rem;font-size:0.76rem;font-family:var(--font-mono)}
+  .bp-chip button{background:transparent;border:none;color:inherit;padding:0 0.2rem;cursor:pointer;font-size:0.8rem}
+  .bp-tray-bottom{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.8rem}
+
+  /* ---- gestione plugin ---- */
+  .installed-list{display:flex;flex-direction:column;gap:0.5rem}
+  .installed-row{display:flex;align-items:center;gap:0.8rem;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem}
+  .installed-row .p-icon{width:28px;height:28px;font-size:0.82rem}
+  .ir-meta{flex:1;min-width:0}
+  .ir-name{font-size:0.88rem;font-weight:600}
+  .ir-version{font-family:var(--font-mono);font-size:0.7rem;color:var(--fg-faint)}
+  .switch{position:relative;width:34px;height:19px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;background:var(--panel-3);border-radius:20px;cursor:pointer;transition:0.15s}
+  .slider::before{content:"";position:absolute;width:14px;height:14px;left:2.5px;top:2.5px;background:var(--fg-faint);border-radius:50%;transition:0.15s}
+  input:checked + .slider{background:var(--accent-dim)}
+  input:checked + .slider::before{transform:translateX(15px);background:var(--accent)}
+  .remove-btn{font-size:0.74rem;padding:0.3rem 0.6rem;background:transparent;border-color:var(--border);color:var(--fg-faint)}
+
+  .closing{color:var(--fg-dim)}
+  .closing strong{color:var(--fg)}
+  footer{margin-top:3rem;padding-top:1.4rem;border-top:1px solid var(--border);color:var(--fg-faint);font-size:0.82rem}
+
+  button{font-family:inherit}
+  button:disabled{opacity:0.4;cursor:not-allowed}
+
+  @media (max-width:760px){
+    .store-grid{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width:520px){
+    .store-grid{grid-template-columns:1fr}
+  }
+</style>
+
+<div class="page">
+
+  <p class="eyebrow">Cuelith · visione completa</p>
+  <h1>La console, poi i plugin</h1>
+  <p class="lead">Le tre modalità che hai già visto in funzione sono la superficie. Qui sotto la parte che le rende un "contenitore" davvero: come si scopre, installa e disinstalla un plugin, come si gestisce il suo contenuto interno (es. quali traduzioni della Bibbia scaricare), e cosa cambia concretamente nell'interfaccia una volta pronto — senza riavviare l'app.</p>
+
+  <!-- RECAP -->
+  <section class="block">
+    <div class="block-head">
+      <p class="eyebrow">Già costruito</p>
+      <h2>La console che hai visto</h2>
+      <p class="lead">Doppio schermo, Lista, Griglia: tre modi di guardare lo stesso show, già funzionanti nell'app. Qui un richiamo con contenuto vero dentro, per tenerlo a mente mentre guardi il resto.</p>
+    </div>
+    <div class="frame-wrap">
+      <div class="screen">
+        <div class="titlebar"><span class="file">evento-autunno.cuelith</span><span>Doppio schermo</span></div>
+        <div class="recap-body">
+          <div class="recap-panes">
+            <div class="r-pane"><div class="r-label"><span>●</span>Preview</div><div class="r-stage">Il tema di stasera</div></div>
+            <div class="r-go"><span>IN ONDA →</span></div>
+            <div class="r-pane live"><div class="r-label"><span>●</span>In onda</div><div class="r-stage">Benvenuti</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STORE -->
+  <section class="block">
+    <div class="block-head">
+      <p class="eyebrow">Nuovo</p>
+      <h2>Il negozio dei plugin</h2>
+      <p class="lead">Si apre dal pannello Impostazioni. Ogni plugin dichiara una categoria: se non fai eventi religiosi, "Bibbia" e "Canzoniere" non li vedi nemmeno se non li cerchi — il core resta vuoto, tu scarichi solo quello che ti serve.</p>
+    </div>
+
+    <div class="frame-wrap">
+      <div class="screen">
+        <div class="titlebar"><span class="file">Impostazioni → Plugin</span><span id="store-count">6 disponibili</span></div>
+        <div class="recap-body">
+          <div class="store-toolbar" id="store-filters"></div>
+          <div class="store-grid" id="store-grid"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRADUZIONI -->
+  <section class="block">
+    <div class="block-head">
+      <p class="eyebrow">Dentro il plugin, non nel negozio</p>
+      <h2>Prima si scaricano le traduzioni che ti servono</h2>
+      <p class="lead">Il plugin "Bibbia" arriva vuoto di testi. Le sue impostazioni hanno un catalogo separato — testi di dominio pubblico o con permesso esplicito di distribuzione (lo stesso principio di OpenLP e del progetto CrossWire/SWORD) — da cui scarichi solo le versioni che userai davvero.</p>
+    </div>
+
+    <div class="frame-wrap">
+      <div class="screen">
+        <div class="titlebar"><span class="file">Plugin "Bibbia" → Traduzioni</span></div>
+        <div class="recap-body">
+          <h3 style="margin-top:0">Scaricate</h3>
+          <div class="installed-list" id="downloaded-list"></div>
+
+          <h3 style="margin-top:1.2rem">Catalogo disponibile</h3>
+          <div class="installed-list" id="catalog-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPOSER -->
+  <section class="block">
+    <div class="block-head">
+      <p class="eyebrow">Uso quotidiano</p>
+      <h2>La barra "aggiungi contenuto" si estende da sola</h2>
+      <p class="lead">Il manifest di un plugin dichiara i pulsanti e i pannelli che contribuisce. La shell li monta a runtime: nessuna ricompilazione, nessun riavvio.</p>
+    </div>
+
+    <div class="composer-demo">
+      <div class="composer-bar" id="composer-bar">
+        <input type="text" placeholder="Scrivi il testo di una slide..." disabled />
+        <button disabled>+ Slide</button>
+        <button disabled>+ Immagine</button>
+      </div>
+      <button class="sim-toggle" id="sim-toggle">Simula: installa "Bibbia" e "Timer"</button>
+
+      <p class="composer-note" id="composer-note" style="display:none">"+ Versetto" non apre un piccolo popup: apre <a href="#bible-panel-section">il pannello dedicato qui sotto</a> — a schermo pieno, perché cercare un passo biblico è un lavoro a sé, non una casella in più nella barra.</p>
+
+      <div class="manifest-box" id="manifest-box" style="display:none">
+<span class="c">// quello che il plugin "Bibbia" dichiara nel suo manifest.json</span>
+{
+  <span class="k">"id"</span>: "it.lzrhive.cuelith.plugin.bible",
+  <span class="k">"category"</span>: ["religioso"],
+  <span class="k">"composer_button"</span>: { <span class="k">"label"</span>: "Versetto", <span class="k">"opens"</span>: "ui.entry" },
+  <span class="k">"ui"</span>: { <span class="k">"entry"</span>: "index.html" }
+}
+      </div>
+    </div>
+  </section>
+
+  <!-- PANNELLO DEDICATO BIBBIA -->
+  <section class="block" id="bible-panel-section">
+    <div class="block-head">
+      <p class="eyebrow">L'interfaccia studiata per questo plugin</p>
+      <h2>Il pannello di Bibbia, a schermo intero</h2>
+      <p class="lead">Non un popup con tre caselle: uno spazio pensato per come si cerca davvero un passo — sfogliando un capitolo intero, cercando una frase, o confrontando due traduzioni — con tutto quello che scegli via via raccolto in basso prima di mandarlo in scaletta.</p>
+    </div>
+
+    <div class="frame-wrap">
+      <div class="screen">
+        <div class="titlebar"><span class="file">Plugin "Bibbia" — cerca e aggiungi</span></div>
+        <div class="recap-body">
+          <div class="bp-toolbar">
+            <div class="bp-modes">
+              <button class="bp-mode active" data-mode="browse" id="bp-mode-browse">Sfoglia</button>
+              <button class="bp-mode" data-mode="search" id="bp-mode-search">Ricerca rapida</button>
+            </div>
+            <label class="bp-compare"><input type="checkbox" id="bp-compare-toggle" /> Confronta due traduzioni</label>
+          </div>
+
+          <div id="bp-browse">
+            <div class="bp-picker">
+              <select id="bp-book"></select>
+              <select id="bp-chapter"></select>
+              <select id="bp-translation-a"></select>
+              <select id="bp-translation-b" class="bp-translation-b" style="display:none"></select>
+            </div>
+            <p class="bp-hint">Click per un versetto, Shift+click per selezionare tutto l'intervallo fino all'ultimo cliccato.</p>
+            <div class="bp-verse-list" id="bp-verse-list"></div>
+          </div>
+
+          <div id="bp-search" style="display:none">
+            <input type="text" id="bp-search-input" placeholder='Scrivi un riferimento ("Giovanni 3:16") o una parola ("amato il mondo")' />
+            <p class="bp-hint">Shift+click funziona anche qui, sui risultati della ricerca.</p>
+            <div class="bp-verse-list" id="bp-search-results"></div>
+          </div>
+
+          <div class="bp-tray">
+            <div class="bp-tray-chips" id="bp-tray-chips"></div>
+            <div class="bp-tray-bottom">
+              <div class="vp-options">
+                <label class="vp-radio"><input type="radio" name="bp-split" value="one" checked /> Un unico cue con tutto il passo</label>
+                <label class="vp-radio"><input type="radio" name="bp-split" value="each" /> Un cue per ogni versetto</label>
+                <label class="vp-check"><input type="checkbox" id="bp-show-ref" checked /> Mostra il riferimento</label>
+              </div>
+              <button class="p-install" id="bp-add" disabled>Seleziona almeno un versetto</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GESTIONE -->
+  <section class="block">
+    <div class="block-head">
+      <p class="eyebrow">Gestione</p>
+      <h2>Plugin installati</h2>
+      <p class="lead">Si disattivano senza disinstallarli (utile per uno show specifico), o si rimuovono del tutto — la barra "aggiungi contenuto" torna com'era.</p>
+    </div>
+    <div class="installed-list" id="installed-list"></div>
+  </section>
+
+  <div class="overlay-backdrop" id="overlay-backdrop"></div>
+  <div class="overlay" id="plugin-overlay" role="dialog" aria-modal="true">
+    <div class="overlay-head">
+      <span class="eyebrow" id="overlay-eyebrow">Guida rapida</span>
+      <button class="overlay-close" id="overlay-close" aria-label="Chiudi">✕</button>
+    </div>
+    <h3 id="overlay-title" style="font-size:1.1rem;text-transform:none;letter-spacing:0;color:var(--fg)"></h3>
+    <p id="overlay-body" style="color:var(--fg-dim);min-height:4.5em"></p>
+    <div class="overlay-dots" id="overlay-dots"></div>
+    <div class="overlay-actions">
+      <button id="overlay-prev">Indietro</button>
+      <button class="p-install" id="overlay-next">Avanti</button>
+    </div>
+  </div>
+
+  <p class="closing">Questa parte — negozio, installazione a runtime, manifest — è la <strong>Fase 3/4</strong> della roadmap già scritta in <code>docs/plugin-manifest-spec.md</code>: qui la vedi prima di costruirla, per essere sicuri che l'idea regga visivamente prima di scrivere il codice del plugin host.</p>
+
+  <footer>Mockup interattivo a scopo esplorativo — non è la vera app.</footer>
+</div>
+
+<script>
+(function(){
+  var CATS = {
+    religioso: {label:'Religioso', color:'var(--cat-religioso)'},
+    generico: {label:'Generico', color:'var(--cat-generico)'},
+    proav: {label:'Pro-AV', color:'var(--cat-proav)'},
+    broadcast: {label:'Broadcast', color:'var(--cat-broadcast)'}
+  };
+
+  var PLUGINS = [
+    { id:'bible', name:'Bibbia', cat:'religioso', letter:'B', kind:'panel', compat:'ok', desc:'Cerca e inserisci versetti come cue, in decine di traduzioni.', installed:false },
+    { id:'songs', name:'Canzoniere', cat:'religioso', letter:'C', kind:'panel', compat:'ok', desc:'Testi e accordi per canti e inni, ricerca per titolo.', installed:false },
+    { id:'timer', name:'Timer & Countdown', cat:'generico', letter:'T', kind:'panel', compat:'ok', desc:'Conto alla rovescia e cronometro da proiettare.', installed:true },
+    { id:'pptx', name:'Import Presentazioni', cat:'generico', letter:'P', kind:'panel', compat:'unverified', desc:'Importa slide da PowerPoint e PDF come cue.', installed:false },
+    { id:'ndi', name:'Output NDI', cat:'proav', letter:'N', kind:'service', compat:'ok', desc:"Manda l'uscita anche in rete via NDI, per regie video.", installed:false },
+    { id:'midiosc', name:'Trigger MIDI/OSC', cat:'proav', letter:'M', kind:'service', compat:'ok', desc:'Avanza i cue da una console luci/audio esterna.', installed:false },
+    { id:'lower', name:'Sottopancia', cat:'broadcast', letter:'S', kind:'panel', compat:'ok', desc:'Grafiche a fascia bassa per nomi e titoli.', installed:false }
+  ];
+
+  var KIND_LABEL = { panel: 'Interfaccia', service: 'Servizio' };
+  var KIND_ICON = { panel: '▤', service: '⚙' };
+  var COMPAT_LABEL = { ok: 'Compatibile', unverified: 'Non ancora verificato' };
+
+  var ONBOARDING = {
+    bible: [
+      { title:'1 · Scarica una traduzione', body:'Prima di cercare un versetto, apri le impostazioni del plugin e scarica almeno una traduzione dal catalogo.' },
+      { title:'2 · Cerca un passo', body:'Usa "+ Versetto" nella barra sopra la scaletta: scegli libro, capitolo e versetti, con l’anteprima del testo in tempo reale.' },
+      { title:'3 · Decidi come appare', body:'Scegli se dividerlo in più slide (una per versetto) e se mostrare il riferimento sulla proiezione, poi aggiungilo alla scaletta.' }
+    ],
+    midiosc: [
+      { title:'1 · Collega la sorgente', body:'Apri Impostazioni → Trigger MIDI/OSC e indica la porta MIDI o l’indirizzo/porta OSC della tua console.' },
+      { title:'2 · Assegna i comandi', body:'Per ogni messaggio in arrivo scegli un’azione: cue successivo, cue precedente, vai in diretta, ferma diretta.' },
+      { title:'3 · Nessun pannello da aprire', body:'Da qui in poi lavora in background: non compare nessun pulsante nella barra contenuti, la console esterna guida lo show.' }
+    ],
+    _default: [
+      { title:'1 · Installato', body:'Il plugin è pronto. Controlla Impostazioni → Plugin per la sua configurazione, se ne ha una.' },
+      { title:'2 · Documentazione sempre a portata', body:'Puoi riaprire questa guida in qualsiasi momento dal pulsante "Documentazione" nella pagina di gestione plugin.' }
+    ]
+  };
+
+  var TRANSLATIONS = [
+    { id:'diodati', name:'Diodati 1885', note:'dominio pubblico', downloaded:true, default:true },
+    { id:'riveduta', name:'Riveduta 1927', note:'dominio pubblico', downloaded:false },
+    { id:'kjv', name:'King James Version', note:'dominio pubblico', downloaded:false },
+    { id:'cei', name:'CEI 2008', note:'serve una licenza, non in catalogo', downloaded:false, locked:true }
+  ];
+
+  function renderTranslations(){
+    var downloadedEl = document.getElementById('downloaded-list');
+    var catalogEl = document.getElementById('catalog-list');
+    var downloaded = TRANSLATIONS.filter(function(t){ return t.downloaded; });
+    var available = TRANSLATIONS.filter(function(t){ return !t.downloaded; });
+
+    downloadedEl.innerHTML = downloaded.length ? downloaded.map(function(t){
+      return '<div class="installed-row">' +
+        '<div class="ir-meta"><div class="ir-name">'+t.name+(t.default?' <span style="color:var(--accent);font-size:0.7rem">· predefinita</span>':'')+'</div>' +
+        '<div class="ir-version">'+t.note+'</div></div>' +
+        '<button class="remove-btn" data-id="'+t.id+'" data-action="remove-tr">Rimuovi</button>' +
+      '</div>';
+    }).join('') : '<p style="color:var(--fg-faint);font-size:0.85rem">Nessuna traduzione scaricata: il pulsante "+ Versetto" non avra\' nulla da cercare.</p>';
+
+    catalogEl.innerHTML = available.map(function(t){
+      return '<div class="installed-row">' +
+        '<div class="ir-meta"><div class="ir-name">'+t.name+'</div><div class="ir-version">'+t.note+'</div></div>' +
+        (t.locked
+          ? '<button class="remove-btn" disabled>Non disponibile</button>'
+          : '<button class="p-install" data-id="'+t.id+'" data-action="download-tr">Scarica</button>');
+    }).join('');
+
+    Array.prototype.forEach.call(downloadedEl.querySelectorAll('[data-action="remove-tr"]'), function(btn){
+      btn.addEventListener('click', function(){
+        var t = TRANSLATIONS.filter(function(x){return x.id===btn.dataset.id})[0];
+        t.downloaded = false; t.default = false;
+        renderTranslations();
+        renderBpTranslationSelects();
+        renderBpTray();
+      });
+    });
+    Array.prototype.forEach.call(catalogEl.querySelectorAll('[data-action="download-tr"]'), function(btn){
+      btn.addEventListener('click', function(){
+        var t = TRANSLATIONS.filter(function(x){return x.id===btn.dataset.id})[0];
+        t.downloaded = true;
+        renderTranslations();
+        renderBpTranslationSelects();
+        renderBpTray();
+      });
+    });
+  }
+
+  var SAMPLE_BOOKS = ['Genesi', 'Salmi', 'Matteo', 'Giovanni', 'Romani'];
+  var CHAPTER_COUNTS = { Genesi: 50, Salmi: 150, Matteo: 28, Giovanni: 21, Romani: 16 };
+  var VERSE_TEXT = {
+    'Giovanni-3': {
+      1: 'Or v’era tra i Farisei un uomo di nome Nicodemo, un capo dei Giudei.',
+      2: 'Egli venne da Gesù, di notte, e gli disse: Maestro, sappiamo che sei un dottore venuto da Dio.',
+      3: 'Gesù rispose: In verità, in verità ti dico che se uno non nasce di nuovo, non può vedere il regno di Dio.',
+      14: 'E come Mosè innalzò il serpente nel deserto, così bisogna che il Figlio dell’uomo sia innalzato,',
+      15: 'affinché chiunque crede in lui abbia vita eterna.',
+      16: 'Poiché Iddio ha tanto amato il mondo, che ha dato il suo unigenito Figliuolo, affinché chiunque crede in lui non perisca, ma abbia vita eterna.',
+      17: 'Iddio non ha mandato il Figlio nel mondo per giudicare il mondo, ma perché il mondo sia salvato per mezzo di lui.',
+      18: 'Chi crede in lui non è giudicato; chi non crede è già giudicato, perché non ha creduto nel nome dell’unigenito Figliuol di Dio.'
+    }
+  };
+
+  function verseText(book, chapter, verse){
+    var key = book + '-' + chapter;
+    if(VERSE_TEXT[key] && VERSE_TEXT[key][verse]) return VERSE_TEXT[key][verse];
+    return 'Testo del versetto ' + verse + ' (contenuto di esempio per il mockup).';
+  }
+
+  function fillSelect(el, from, to, selected){
+    var html = '';
+    for(var i = from; i <= to; i++){
+      html += '<option value="'+i+'"'+(i===selected?' selected':'')+'>'+i+'</option>';
+    }
+    el.innerHTML = html;
+  }
+
+  var CHAPTER_VERSE_COUNTS = { 'Giovanni-3': 36 };
+  var VERSE_TEXT_B = {
+    'Giovanni-3': {
+      16: 'Iddio infatti ha tanto amato il mondo da dare il suo unico Figlio, perché chiunque crede in lui non muoia, ma abbia la vita eterna.'
+    }
+  };
+
+  function verseTextB(book, chapter, verse){
+    var key = book + '-' + chapter;
+    if(VERSE_TEXT_B[key] && VERSE_TEXT_B[key][verse]) return VERSE_TEXT_B[key][verse];
+    return verseText(book, chapter, verse);
+  }
+
+  function versesInChapter(book, chapter){
+    return CHAPTER_VERSE_COUNTS[book + '-' + chapter] || 20;
+  }
+
+  var bpMode = 'browse';
+  var bpCompare = false;
+  var bpSelected = [];
+  var bpAnchor = null;
+
+  function bpKey(book, chapter, verse){ return book + '|' + chapter + '|' + verse; }
+
+  function bpIsSelected(book, chapter, verse){
+    var k = bpKey(book, chapter, verse);
+    return bpSelected.some(function(s){ return bpKey(s.book, s.chapter, s.verse) === k; });
+  }
+
+  function bpToggle(book, chapter, verse){
+    var k = bpKey(book, chapter, verse);
+    var idx = bpSelected.findIndex(function(s){ return bpKey(s.book, s.chapter, s.verse) === k; });
+    if(idx >= 0) bpSelected.splice(idx, 1);
+    else bpSelected.push({ book: book, chapter: chapter, verse: verse });
+    if(bpMode === 'browse') renderBpVerseList(); else renderBpSearchResults();
+    renderBpTray();
+  }
+
+  function bpVerseRowHtml(book, chapter, verse){
+    var selected = bpIsSelected(book, chapter, verse);
+    var textHtml = bpCompare
+      ? '<span>' + verseText(book, chapter, verse) + '</span><span>' + verseTextB(book, chapter, verse) + '</span>'
+      : verseText(book, chapter, verse);
+    return '<div class="bp-verse-row'+(bpCompare?' compare':'')+(selected?' selected':'')+'" data-book="'+book+'" data-chapter="'+chapter+'" data-verse="'+verse+'">' +
+      '<input type="checkbox" '+(selected?'checked':'')+' tabindex="-1" />' +
+      '<span class="vnum">'+verse+'</span>' +
+      '<span class="vtext">'+textHtml+'</span>' +
+    '</div>';
+  }
+
+  function bpAddRange(container, fromIdx, toIdx){
+    var rows = container.querySelectorAll('.bp-verse-row');
+    var lo = Math.min(fromIdx, toIdx), hi = Math.max(fromIdx, toIdx);
+    for(var i = lo; i <= hi; i++){
+      var row = rows[i];
+      if(!row) continue;
+      var book = row.dataset.book, chapter = Number(row.dataset.chapter), verse = Number(row.dataset.verse);
+      if(!bpIsSelected(book, chapter, verse)){
+        bpSelected.push({ book: book, chapter: chapter, verse: verse });
+      }
+    }
+  }
+
+  function wireVerseRows(container){
+    Array.prototype.forEach.call(container.querySelectorAll('.bp-verse-row'), function(row, idx){
+      row.addEventListener('click', function(e){
+        e.preventDefault();
+        var book = row.dataset.book, chapter = Number(row.dataset.chapter), verse = Number(row.dataset.verse);
+
+        if(e.shiftKey && bpAnchor && bpAnchor.container === container){
+          bpAddRange(container, bpAnchor.index, idx);
+          if(bpMode === 'browse') renderBpVerseList(); else renderBpSearchResults();
+          renderBpTray();
+          // l'anchor resta lo stesso: shift+click ripetuto allarga o restringe
+          // l'intervallo invece di spostare il punto di partenza.
+        } else {
+          bpToggle(book, chapter, verse);
+          bpAnchor = { container: container, index: idx };
+        }
+      });
+    });
+  }
+
+  function renderBpPickers(){
+    var bookEl = document.getElementById('bp-book');
+    if(!bookEl.options.length){
+      bookEl.innerHTML = SAMPLE_BOOKS.map(function(b){ return '<option'+(b==='Giovanni'?' selected':'')+'>'+b+'</option>'; }).join('');
+    }
+    var chapterEl = document.getElementById('bp-chapter');
+    var book = bookEl.value;
+    var maxCh = CHAPTER_COUNTS[book] || 10;
+    var wantedCh = (book === 'Giovanni' && !chapterEl.value) ? 3 : Number(chapterEl.value) || 1;
+    fillSelect(chapterEl, 1, maxCh, Math.min(wantedCh, maxCh));
+    renderBpTranslationSelects();
+  }
+
+  function renderBpTranslationSelects(){
+    var selA = document.getElementById('bp-translation-a');
+    var selB = document.getElementById('bp-translation-b');
+    var downloaded = TRANSLATIONS.filter(function(t){ return t.downloaded; });
+    if(downloaded.length === 0){
+      selA.innerHTML = '<option>nessuna traduzione</option>';
+      selA.disabled = true;
+    } else {
+      selA.disabled = false;
+      selA.innerHTML = downloaded.map(function(t){ return '<option value="'+t.id+'">'+t.name+'</option>'; }).join('');
+    }
+    selB.innerHTML = downloaded.map(function(t){ return '<option value="'+t.id+'">'+t.name+'</option>'; }).join('');
+    if(downloaded.length > 1) selB.selectedIndex = 1;
+  }
+
+  function renderBpVerseList(){
+    var book = document.getElementById('bp-book').value;
+    var chapter = Number(document.getElementById('bp-chapter').value);
+    var count = versesInChapter(book, chapter);
+    var list = document.getElementById('bp-verse-list');
+    var html = '';
+    for(var v = 1; v <= count; v++){ html += bpVerseRowHtml(book, chapter, v); }
+    list.innerHTML = html;
+    wireVerseRows(list);
+  }
+
+  function renderBpSearchResults(){
+    var query = document.getElementById('bp-search-input').value.trim();
+    var results = document.getElementById('bp-search-results');
+    if(!query){
+      results.innerHTML = '<p class="bp-empty">Scrivi un riferimento o una parola da cercare.</p>';
+      return;
+    }
+    var refMatch = query.match(/^([a-zA-ZÀ-ÿ]+)\s+(\d+)\s*:\s*(\d+)(?:\s*-\s*(\d+))?$/);
+    var rows = [];
+    if(refMatch){
+      var book = SAMPLE_BOOKS.filter(function(b){ return b.toLowerCase() === refMatch[1].toLowerCase(); })[0];
+      if(book){
+        var chapter = Number(refMatch[2]);
+        var from = Number(refMatch[3]);
+        var to = refMatch[4] ? Number(refMatch[4]) : from;
+        for(var v = from; v <= to; v++){ rows.push({ book: book, chapter: chapter, verse: v }); }
+      }
+    }
+    if(rows.length === 0){
+      var q = query.toLowerCase();
+      Object.keys(VERSE_TEXT).forEach(function(key){
+        var parts = key.split('-');
+        Object.keys(VERSE_TEXT[key]).forEach(function(v){
+          if(VERSE_TEXT[key][v].toLowerCase().indexOf(q) !== -1){
+            rows.push({ book: parts[0], chapter: Number(parts[1]), verse: Number(v) });
+          }
+        });
+      });
+    }
+    results.innerHTML = rows.length
+      ? rows.map(function(r){ return bpVerseRowHtml(r.book, r.chapter, r.verse); }).join('')
+      : '<p class="bp-empty">Nessun risultato. Prova "Giovanni 3:16" o una parola come "amato".</p>';
+    wireVerseRows(results);
+  }
+
+  function renderBpTray(){
+    var chips = document.getElementById('bp-tray-chips');
+    chips.innerHTML = bpSelected.length
+      ? bpSelected.map(function(s, i){
+          return '<span class="bp-chip">'+s.book+' '+s.chapter+':'+s.verse+'<button data-i="'+i+'" aria-label="Rimuovi">✕</button></span>';
+        }).join('')
+      : '';
+    Array.prototype.forEach.call(chips.querySelectorAll('button'), function(btn){
+      btn.addEventListener('click', function(){
+        var s = bpSelected[Number(btn.dataset.i)];
+        bpToggle(s.book, s.chapter, s.verse);
+      });
+    });
+
+    var addBtn = document.getElementById('bp-add');
+    var split = document.querySelector('input[name="bp-split"]:checked').value;
+    var downloaded = TRANSLATIONS.filter(function(t){ return t.downloaded; });
+    if(downloaded.length === 0){
+      addBtn.textContent = 'Scarica prima una traduzione';
+      addBtn.disabled = true;
+    } else if(bpSelected.length === 0){
+      addBtn.textContent = 'Seleziona almeno un versetto';
+      addBtn.disabled = true;
+    } else {
+      addBtn.disabled = false;
+      addBtn.textContent = (split === 'each' && bpSelected.length > 1)
+        ? 'Aggiungi ' + bpSelected.length + ' cue alla scaletta'
+        : 'Aggiungi alla scaletta';
+    }
+  }
+
+  var activeCat = 'all';
+
+  function renderFilters(){
+    var el = document.getElementById('store-filters');
+    var cats = ['all'].concat(Object.keys(CATS));
+    el.innerHTML = cats.map(function(c){
+      var label = c === 'all' ? 'Tutti' : CATS[c].label;
+      return '<button class="chip'+(activeCat===c?' active':'')+'" data-c="'+c+'">'+label+'</button>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.chip'), function(btn){
+      btn.addEventListener('click', function(){
+        activeCat = btn.dataset.c;
+        renderFilters();
+        renderGrid();
+      });
+    });
+  }
+
+  function renderGrid(){
+    var grid = document.getElementById('store-grid');
+    var list = PLUGINS.filter(function(p){ return activeCat === 'all' || p.cat === activeCat; });
+    document.getElementById('store-count').textContent = list.length + ' disponibili';
+    grid.innerHTML = list.map(function(p){
+      var cat = CATS[p.cat];
+      return '<div class="plugin-card">' +
+        '<div class="p-head"><div class="p-icon">'+p.letter+'</div><div><div class="p-name">'+p.name+'</div>' +
+        '<div class="p-cat"><span class="cdot" style="background:'+cat.color+'"></span>'+cat.label+'</div></div></div>' +
+        '<div class="p-badges">' +
+          '<span class="kind-badge kind-'+p.kind+'">'+KIND_ICON[p.kind]+' '+KIND_LABEL[p.kind]+'</span>' +
+          '<span class="compat-badge compat-'+p.compat+'">'+COMPAT_LABEL[p.compat]+'</span>' +
+        '</div>' +
+        '<p class="p-desc">'+p.desc+'</p>' +
+        '<button class="p-install'+(p.installed?' installed':'')+'" data-id="'+p.id+'">'+(p.installed?'Installato ✓':'Installa')+'</button>' +
+      '</div>';
+    }).join('');
+    Array.prototype.forEach.call(grid.querySelectorAll('.p-install'), function(btn){
+      btn.addEventListener('click', function(){
+        var plugin = PLUGINS.filter(function(p){return p.id===btn.dataset.id})[0];
+        var wasInstalled = plugin.installed;
+        plugin.installed = !plugin.installed;
+        renderGrid();
+        renderInstalled();
+        if(!wasInstalled && plugin.installed){
+          openPluginOverlay(plugin, 'onboarding');
+        }
+      });
+    });
+  }
+
+  function renderInstalled(){
+    var list = document.getElementById('installed-list');
+    var installed = PLUGINS.filter(function(p){ return p.installed; });
+    if(installed.length === 0){
+      list.innerHTML = '<p style="color:var(--fg-faint);font-size:0.85rem">Nessun plugin installato.</p>';
+      return;
+    }
+    list.innerHTML = installed.map(function(p){
+      return '<div class="installed-row">' +
+        '<div class="p-icon">'+p.letter+'</div>' +
+        '<div class="ir-meta"><div class="ir-name">'+p.name+' <span class="kind-badge kind-'+p.kind+'" style="margin-left:0.4rem">'+KIND_ICON[p.kind]+' '+KIND_LABEL[p.kind]+'</span></div><div class="ir-version">v1.0.0</div></div>' +
+        '<label class="switch"><input type="checkbox" checked data-id="'+p.id+'" class="toggle"/><span class="slider"></span></label>' +
+        '<button class="doc-btn" data-id="'+p.id+'">Documentazione</button>' +
+        '<button class="remove-btn" data-id="'+p.id+'">Rimuovi</button>' +
+      '</div>';
+    }).join('');
+    Array.prototype.forEach.call(list.querySelectorAll('.remove-btn'), function(btn){
+      btn.addEventListener('click', function(){
+        var plugin = PLUGINS.filter(function(p){return p.id===btn.dataset.id})[0];
+        plugin.installed = false;
+        renderGrid();
+        renderInstalled();
+      });
+    });
+    Array.prototype.forEach.call(list.querySelectorAll('.doc-btn'), function(btn){
+      btn.addEventListener('click', function(){
+        var plugin = PLUGINS.filter(function(p){return p.id===btn.dataset.id})[0];
+        openPluginOverlay(plugin, 'docs');
+      });
+    });
+  }
+
+  renderFilters();
+  renderGrid();
+  renderInstalled();
+  renderTranslations();
+
+  // ---- pannello dedicato Bibbia ----
+  renderBpPickers();
+  renderBpVerseList();
+  renderBpTray();
+
+  document.getElementById('bp-mode-browse').addEventListener('click', function(){
+    bpMode = 'browse';
+    this.classList.add('active');
+    document.getElementById('bp-mode-search').classList.remove('active');
+    document.getElementById('bp-browse').style.display = 'block';
+    document.getElementById('bp-search').style.display = 'none';
+  });
+  document.getElementById('bp-mode-search').addEventListener('click', function(){
+    bpMode = 'search';
+    this.classList.add('active');
+    document.getElementById('bp-mode-browse').classList.remove('active');
+    document.getElementById('bp-search').style.display = 'block';
+    document.getElementById('bp-browse').style.display = 'none';
+    renderBpSearchResults();
+  });
+  document.getElementById('bp-compare-toggle').addEventListener('change', function(){
+    bpCompare = this.checked;
+    document.getElementById('bp-translation-b').style.display = bpCompare ? 'inline-block' : 'none';
+    renderBpVerseList();
+  });
+  document.getElementById('bp-book').addEventListener('change', function(){ renderBpPickers(); renderBpVerseList(); });
+  document.getElementById('bp-chapter').addEventListener('change', renderBpVerseList);
+  document.getElementById('bp-translation-a').addEventListener('change', renderBpVerseList);
+  document.getElementById('bp-translation-b').addEventListener('change', renderBpVerseList);
+  document.getElementById('bp-search-input').addEventListener('input', renderBpSearchResults);
+  document.getElementById('bp-show-ref').addEventListener('change', renderBpTray);
+  Array.prototype.forEach.call(document.querySelectorAll('input[name="bp-split"]'), function(r){
+    r.addEventListener('change', renderBpTray);
+  });
+  document.getElementById('bp-add').addEventListener('click', function(){
+    if(this.disabled) return;
+    this.textContent = 'Aggiunto ✓';
+    var self = this;
+    setTimeout(function(){
+      bpSelected = [];
+      if(bpMode === 'browse') renderBpVerseList(); else renderBpSearchResults();
+      renderBpTray();
+    }, 900);
+  });
+
+  // ---- overlay onboarding / documentazione ----
+  var overlaySteps = [];
+  var overlayIndex = 0;
+
+  function renderOverlayStep(){
+    var step = overlaySteps[overlayIndex];
+    document.getElementById('overlay-title').textContent = step.title;
+    document.getElementById('overlay-body').textContent = step.body;
+    document.getElementById('overlay-dots').innerHTML = overlaySteps.map(function(_, i){
+      return '<span class="'+(i===overlayIndex?'active':'')+'"></span>';
+    }).join('');
+    document.getElementById('overlay-prev').style.visibility = overlayIndex === 0 ? 'hidden' : 'visible';
+    document.getElementById('overlay-next').textContent = overlayIndex === overlaySteps.length - 1 ? 'Ho capito' : 'Avanti';
+  }
+
+  function openPluginOverlay(plugin, mode){
+    overlaySteps = ONBOARDING[plugin.id] || ONBOARDING._default;
+    overlayIndex = 0;
+    document.getElementById('overlay-eyebrow').textContent =
+      (mode === 'docs' ? 'Documentazione · ' : 'Guida rapida · ') + plugin.name;
+    renderOverlayStep();
+    document.getElementById('overlay-backdrop').classList.add('show');
+    document.getElementById('plugin-overlay').classList.add('show');
+  }
+
+  function closeOverlay(){
+    document.getElementById('overlay-backdrop').classList.remove('show');
+    document.getElementById('plugin-overlay').classList.remove('show');
+  }
+
+  document.getElementById('overlay-close').addEventListener('click', closeOverlay);
+  document.getElementById('overlay-backdrop').addEventListener('click', closeOverlay);
+  document.getElementById('overlay-prev').addEventListener('click', function(){
+    if(overlayIndex > 0){ overlayIndex--; renderOverlayStep(); }
+  });
+  document.getElementById('overlay-next').addEventListener('click', function(){
+    if(overlayIndex < overlaySteps.length - 1){ overlayIndex++; renderOverlayStep(); }
+    else { closeOverlay(); }
+  });
+
+  // ---- composer demo ----
+  var simmed = false;
+  document.getElementById('sim-toggle').addEventListener('click', function(){
+    simmed = !simmed;
+    var bar = document.getElementById('composer-bar');
+    var manifest = document.getElementById('manifest-box');
+    var note = document.getElementById('composer-note');
+    this.textContent = simmed ? 'Disinstalla di nuovo' : 'Simula: installa "Bibbia" e "Timer"';
+
+    var extra = bar.querySelectorAll('.plugin-btn');
+    Array.prototype.forEach.call(extra, function(b){ b.remove(); });
+
+    if(simmed){
+      ['+ Versetto','+ Timer'].forEach(function(label){
+        var b = document.createElement('button');
+        b.textContent = label;
+        b.className = 'plugin-added plugin-btn';
+        if(label === '+ Versetto'){
+          b.addEventListener('click', function(){
+            document.getElementById('bible-panel-section').scrollIntoView({behavior:'smooth', block:'start'});
+          });
+        }
+        bar.appendChild(b);
+      });
+      manifest.style.display = 'block';
+      note.style.display = 'block';
+    } else {
+      manifest.style.display = 'none';
+      note.style.display = 'none';
+    }
+  });
+})();
+</script>
