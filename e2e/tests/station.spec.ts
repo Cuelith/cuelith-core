@@ -1,18 +1,10 @@
 import path from "node:path";
-import { expect, test } from "@playwright/test";
-import { launchApp, screenshotsDir, type RunningApp } from "./app.js";
+import { expect } from "@playwright/test";
+import { screenshotsDir, test } from "./app.js";
 
-let running: RunningApp;
-
-test.beforeEach(async () => {
-  running = await launchApp();
-});
-
-test.afterEach(async () => {
-  await running.close();
-});
-
-test("la postazione vuota mostra barra, dock col + e le tre colonne di Presenta", async () => {
+test("la postazione vuota mostra barra, dock col + e le tre colonne di Presenta", async ({
+  running,
+}) => {
   const { station, problems } = running;
   const mode = station.locator('main[data-mode="core.present"]');
   await expect(mode).toBeVisible();
@@ -60,7 +52,7 @@ test("la postazione vuota mostra barra, dock col + e le tre colonne di Presenta"
   expect(problems).toEqual([]);
 });
 
-test("il + apre il gestore moduli con la lingua italiana necessaria", async () => {
+test("il + apre il gestore moduli con la lingua italiana necessaria", async ({ running }) => {
   const { station, problems } = running;
   await station.getByRole("button", { name: "Aggiungi moduli" }).click();
   const dialog = station.getByRole("dialog", { name: "Moduli" });

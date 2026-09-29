@@ -55,7 +55,7 @@ jobs:
           # Ubuntu 24.04 limita i namespace richiesti dalla sandbox di Chromium.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           node apps/desktop/node_modules/electron/install.js
-          xvfb-run -a pnpm -C e2e test
+          xvfb-run -a pnpm -C e2e e2e
       - name: Screenshot delle prove
         if: always()
         uses: actions/upload-artifact@v7

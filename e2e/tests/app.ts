@@ -3,7 +3,12 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
+import {
+  test as base,
+  _electron as electron,
+  type ElectronApplication,
+  type Page,
+} from "@playwright/test";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const desktopDir = path.resolve(here, "../../apps/desktop");
@@ -27,11 +32,17 @@ export async function launchApp(): Promise<RunningApp> {
     // Farebbe partire Electron come semplice Node (lo impostano p.es. le estensioni di VS Code).
     if (value !== undefined && key !== "ELECTRON_RUN_AS_NODE") env[key] = value;
   }
-  const app = await electron.launch({
-    executablePath: electronPath,
-    args: [desktopDir],
-    env: { ...env, CUELITH_USER_DATA: userData, CUELITH_PORT: "0" },
-  });
+  let app: ElectronApplication;
+  try {
+    app = await electron.launch({
+      executablePath: electronPath,
+      args: [desktopDir],
+      env: { ...env, CUELITH_USER_DATA: userData, CUELITH_PORT: "0" },
+    });
+  } catch (error) {
+    await rm(userData, { recursive: true, force: true });
+    throw error;
+  }
   const station = await app.firstWindow();
   const problems: string[] = [];
   station.on("console", (message) => {
@@ -54,3 +65,16 @@ export async function launchApp(): Promise<RunningApp> {
     },
   };
 }
+
+/** Ogni prova riceve la sua istanza di Cuelith, chiusa alla fine. */
+export const test = base.extend<{ running: RunningApp }>({
+  // eslint-disable-next-line no-empty-pattern -- Playwright richiede la destrutturazione
+  running: async ({}, use) => {
+    const running = await launchApp();
+    try {
+      await use(running);
+    } finally {
+      await running.close();
+    }
+  },
+});

@@ -15,7 +15,7 @@
     "test": "turbo run test",
     "check": "turbo run typecheck lint test",
     "start": "pnpm -C apps/desktop start",
-    "e2e": "pnpm build && pnpm -C e2e test",
+    "e2e": "pnpm build && pnpm -C e2e e2e",
     "format": "prettier --write ."
   },
   "devDependencies": {
