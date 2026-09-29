@@ -199,6 +199,9 @@ importers:
 
   apps/client:
     dependencies:
+      '@cuelith-core/core-looks':
+        specifier: workspace:*
+        version: link:../../packages/core-looks
       '@cuelith/protocol':
         specifier: link:../../../cuelith-sdk/packages/protocol
         version: link:../../../cuelith-sdk/packages/protocol

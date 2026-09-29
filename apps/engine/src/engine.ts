@@ -8,6 +8,8 @@ import { consoleLogger, type Logger } from "./log.js";
 import { Locales } from "./modules/locales.js";
 import { ModuleRegistry } from "./modules/registry.js";
 import type { HandlerMap } from "./rpc/dispatch.js";
+import { cueHandlers } from "./rpc/handlers/cue.js";
+import { editHandlers } from "./rpc/handlers/edit.js";
 import { readHandlers } from "./rpc/handlers/read.js";
 import { sessionHandlers } from "./rpc/handlers/session.js";
 import { attachRpcServer } from "./rpc/server.js";
@@ -39,7 +41,12 @@ export interface Engine {
   stop(): Promise<void>;
 }
 
-const handlers: HandlerMap = { ...sessionHandlers, ...readHandlers };
+const handlers: HandlerMap = {
+  ...sessionHandlers,
+  ...readHandlers,
+  ...cueHandlers,
+  ...editHandlers,
+};
 
 export async function startEngine(options: EngineOptions): Promise<Engine> {
   const logger = options.logger ?? consoleLogger;

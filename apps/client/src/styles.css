@@ -59,6 +59,30 @@ body {
   outline-offset: 2px;
 }
 
+/* Dissolvenze di programma e anteprima: la durata arriva dal look (stile inline). */
+@keyframes cl-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes cl-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.cl-fade-in {
+  animation: cl-fade-in 0ms linear both;
+}
+.cl-fade-out {
+  animation: cl-fade-out 0ms linear both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

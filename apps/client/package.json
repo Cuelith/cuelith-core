@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@cuelith-core/core-looks": "workspace:*",
     "@cuelith/protocol": "link:../../../cuelith-sdk/packages/protocol",
     "@cuelith/ui": "link:../../../cuelith-sdk/packages/ui",
     "react": "19.3.0",

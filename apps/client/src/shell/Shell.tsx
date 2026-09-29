@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useEngine, useT } from "../engine/react.js";
 import { CORE_MODES, PRESENT_MODE, type Mode } from "../modes/core.js";
+import { useCueShortcuts } from "../station/shortcuts.js";
+import { StationProvider, useStation } from "../station/station.js";
 import { Dock } from "./Dock.js";
 import { ModeView } from "./ModeView.js";
 import { ModulesDialog } from "./ModulesDialog.js";
+import { Notices } from "./Notices.js";
+import { TextEditorDialog } from "./TextEditorDialog.js";
 import { TopBar } from "./TopBar.js";
 
 const MODE_KEY = "cuelith.mode";
@@ -31,8 +35,18 @@ function matchesShortcut(event: KeyboardEvent, shortcut: string): boolean {
 }
 
 export function Shell() {
+  return (
+    <StationProvider>
+      <ShellBody />
+    </StationProvider>
+  );
+}
+
+function ShellBody() {
   const t = useT();
   const { status } = useEngine();
+  const { editor } = useStation();
+  useCueShortcuts();
   const modes = CORE_MODES;
   const [mode, setMode] = useState<Mode>(() => readSavedMode(modes));
   const [modulesOpen, setModulesOpen] = useState(false);
@@ -76,6 +90,10 @@ export function Shell() {
           setModulesOpen(false);
         }}
       />
+      {editor !== undefined && (
+        <TextEditorDialog key={editor.mode === "edit" ? editor.itemId : "new"} request={editor} />
+      )}
+      <Notices />
       {status.kind === "lost" && (
         <div
           role="status"

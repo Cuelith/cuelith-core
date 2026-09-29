@@ -1,0 +1,193 @@
+import { isDeepStrictEqual } from "node:util";
+import {
+  ErrorCode,
+  newId,
+  providerOf,
+  RpcError,
+  type Item,
+  type Slide,
+  type SlideInput,
+  type StateDocument,
+} from "@cuelith/protocol";
+import type { EngineContext } from "../../context.js";
+import { normalizeLive } from "../../show/live.js";
+import type { HandlerMap } from "../dispatch.js";
+
+/** Tipi di elemento che il nucleo sa disegnare; gli altri arrivano dai moduli. */
+export const CORE_ITEM_TYPES: readonly string[] = ["core.text"];
+
+/**
+ * Ogni modifica allo show passa da qui: dopo la modifica cursore e anteprima
+ * vengono riportati su slide esistenti e lo show risulta da salvare.
+ */
+function edit(ctx: EngineContext, mutate: (draft: StateDocument) => void): number {
+  return ctx.store.update((draft) => {
+    mutate(draft);
+    normalizeLive(draft);
+    if (!ctx.store.read((doc) => isDeepStrictEqual(doc.show, draft.show))) {
+      draft.live.dirty = true;
+    }
+  });
+}
+
+const invalid = (key: string): RpcError => new RpcError(ErrorCode.InvalidParameters, key);
+
+function itemOf(draft: StateDocument, id: string): Item {
+  const item = draft.show.items[id];
+  if (item === undefined) throw new RpcError(ErrorCode.NotFound, "core.error.itemNotFound");
+  return item;
+}
+
+function slideIndexOf(item: Item, slideId: string): number {
+  const index = item.slides.findIndex((s) => s.id === slideId);
+  if (index === -1) throw new RpcError(ErrorCode.NotFound, "core.error.slideNotFound");
+  return index;
+}
+
+function entryIndexOf(draft: StateDocument, entryId: string): number {
+  const index = draft.show.playlist.findIndex((e) => e.id === entryId);
+  if (index === -1) throw new RpcError(ErrorCode.NotFound, "core.error.entryNotFound");
+  return index;
+}
+
+function toSlide(input: SlideInput): Slide {
+  return { id: newId(), ...input };
+}
+
+/** L'arrangiamento puo' usare solo gruppi che qualche slide ha. */
+function checkArrangement(item: Item): void {
+  if (item.arrangement === undefined) return;
+  const groups = new Set(item.slides.map((s) => s.group));
+  if (item.arrangement.some((g) => !groups.has(g))) throw invalid("core.error.groupMissing");
+}
+
+function checkIndex(index: number, max: number): void {
+  if (index > max) throw invalid("core.error.indexOutOfRange");
+}
+
+export const editHandlers: HandlerMap = {
+  "item.create": (ctx, _session, params) => {
+    const id = newId();
+    const rev = edit(ctx, (draft) => {
+      const provider = providerOf(params.type, Object.keys(draft.show.plugins));
+      if (
+        provider === undefined ||
+        (provider === "core" && !CORE_ITEM_TYPES.includes(params.type))
+      ) {
+        throw invalid("core.error.itemTypeUnknown");
+      }
+      draft.show.items[id] = {
+        id,
+        type: params.type,
+        title: params.title,
+        slides: (params.slides ?? []).map(toSlide),
+        meta: params.meta ?? {},
+      };
+    });
+    return { id, rev };
+  },
+
+  "item.update": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      const item = itemOf(draft, params.id);
+      if (params.title !== undefined) item.title = params.title;
+      if (params.meta !== undefined) item.meta = params.meta;
+      if (params.arrangement === null) delete item.arrangement;
+      else if (params.arrangement !== undefined) item.arrangement = params.arrangement;
+      checkArrangement(item);
+    }),
+  }),
+
+  "item.delete": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      itemOf(draft, params.id);
+      const { [params.id]: _deleted, ...items } = draft.show.items;
+      draft.show.items = items;
+      draft.show.playlist = draft.show.playlist.filter((e) => e.itemId !== params.id);
+    }),
+  }),
+
+  "slide.insert": (ctx, _session, params) => {
+    const slide = toSlide(params.slide);
+    const rev = edit(ctx, (draft) => {
+      const item = itemOf(draft, params.itemId);
+      const index = params.index ?? item.slides.length;
+      checkIndex(index, item.slides.length);
+      item.slides.splice(index, 0, slide);
+    });
+    return { id: slide.id, rev };
+  },
+
+  "slide.update": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      const item = itemOf(draft, params.itemId);
+      const slide = item.slides[slideIndexOf(item, params.slideId)];
+      if (slide === undefined) return;
+      if (params.fields !== undefined) slide.fields = params.fields;
+      if (params.group === null) delete slide.group;
+      else if (params.group !== undefined) slide.group = params.group;
+      if (params.media === null) delete slide.media;
+      else if (params.media !== undefined) slide.media = params.media;
+      if (params.background === null) delete slide.background;
+      else if (params.background !== undefined) slide.background = params.background;
+      checkArrangement(item);
+    }),
+  }),
+
+  "slide.delete": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      const item = itemOf(draft, params.itemId);
+      item.slides.splice(slideIndexOf(item, params.slideId), 1);
+      checkArrangement(item);
+    }),
+  }),
+
+  "slide.move": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      const item = itemOf(draft, params.itemId);
+      checkIndex(params.toIndex, item.slides.length - 1);
+      const [slide] = item.slides.splice(slideIndexOf(item, params.slideId), 1);
+      if (slide !== undefined) item.slides.splice(params.toIndex, 0, slide);
+    }),
+  }),
+
+  "playlist.add": (ctx, _session, params) => {
+    const id = newId();
+    const rev = edit(ctx, (draft) => {
+      itemOf(draft, params.itemId);
+      const playlist = draft.show.playlist;
+      const index = params.index ?? playlist.length;
+      checkIndex(index, playlist.length);
+      playlist.splice(index, 0, {
+        id,
+        itemId: params.itemId,
+        ...(params.audience === undefined ? {} : { audience: params.audience }),
+      });
+    });
+    return { id, rev };
+  },
+
+  "playlist.remove": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      draft.show.playlist.splice(entryIndexOf(draft, params.entryId), 1);
+    }),
+  }),
+
+  "playlist.move": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      const playlist = draft.show.playlist;
+      checkIndex(params.toIndex, playlist.length - 1);
+      const [entry] = playlist.splice(entryIndexOf(draft, params.entryId), 1);
+      if (entry !== undefined) playlist.splice(params.toIndex, 0, entry);
+    }),
+  }),
+
+  "playlist.setAudience": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      const entry = draft.show.playlist[entryIndexOf(draft, params.entryId)];
+      if (entry === undefined) return;
+      if (params.audience === null) delete entry.audience;
+      else entry.audience = params.audience;
+    }),
+  }),
+};
