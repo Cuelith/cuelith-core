@@ -1,0 +1,69 @@
+@import "tailwindcss";
+/* Font e token del linguaggio visivo (cap. 17), inclusi nel pacchetto: nessuna risorsa esterna. */
+@import "@cuelith/ui/fonts.css";
+@import "@cuelith/ui/tokens.css";
+
+@theme inline {
+  --color-bg: var(--cl-bg);
+  --color-bg-2: var(--cl-bg-2);
+  --color-bg-3: var(--cl-bg-3);
+  --color-line: var(--cl-line);
+  --color-line-2: var(--cl-line-2);
+  --color-fg: var(--cl-fg);
+  --color-muted: var(--cl-muted);
+  --color-faint: var(--cl-faint);
+  --color-live: var(--cl-live);
+  --color-live-bg: var(--cl-live-bg);
+  --color-live-soft: var(--cl-live-soft);
+  --color-live-ink: var(--cl-live-ink);
+  --color-cue: var(--cl-cue);
+  --color-cue-bg: var(--cl-cue-bg);
+  --color-cue-soft: var(--cl-cue-soft);
+  --color-cue-ink: var(--cl-cue-ink);
+  --color-stage: var(--cl-stage);
+  --color-stage-bg: var(--cl-stage-bg);
+  --color-stage-line: var(--cl-stage-line);
+  --color-blue: var(--cl-blue);
+  --color-blue-bg: var(--cl-blue-bg);
+  --color-pink: var(--cl-pink);
+  --color-mod: var(--cl-mod);
+  --color-mod-bg: var(--cl-mod-bg);
+  --color-mod-chip: var(--cl-mod-chip);
+  --color-mod-line: var(--cl-mod-line);
+  --color-screen: var(--cl-screen);
+  --color-screen-live: var(--cl-screen-live);
+  --font-display: var(--cl-display);
+  --font-body: var(--cl-body);
+  --font-mono: var(--cl-mono);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--cl-bg);
+  color: var(--cl-fg);
+  font-family: var(--cl-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cl-cue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@cuelith-core/desktop",
+  "productName": "Cuelith",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Applicazione desktop di Cuelith: avvia il motore e apre la postazione e le uscite.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src scripts",
+    "start": "node scripts/start.js"
+  },
+  "dependencies": {
+    "@cuelith-core/client": "workspace:*",
+    "@cuelith-core/engine": "workspace:*",
+    "@cuelith/protocol": "link:../../../cuelith-sdk/packages/protocol",
+    "@cuelith/ui": "link:../../../cuelith-sdk/packages/ui"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.0",
+    "electron": "44.5.0",
+    "eslint": "10.11.0",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # I repo vanno affiancati come in locale: cuelith-core usa cuelith-sdk
+      # con link:../../../cuelith-sdk e legge la lingua da ../plugin-locale-it.
+      - uses: actions/checkout@v7
+        with:
+          path: cuelith-core
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/cuelith-sdk
+          ref: ${{ github.base_ref || github.ref_name }}
+          path: cuelith-sdk
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/plugin-locale-it
+          ref: ${{ github.base_ref || github.ref_name }}
+          path: plugin-locale-it
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: cuelith-core/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: SDK
+        working-directory: cuelith-sdk
+        run: pnpm install --frozen-lockfile && pnpm build
+
+      - name: Installazione
+        working-directory: cuelith-core
+        run: pnpm install --frozen-lockfile
+      - name: Formattazione
+        working-directory: cuelith-core
+        run: pnpm exec prettier --check .
+      - name: Build
+        working-directory: cuelith-core
+        run: pnpm build
+      - name: Typecheck, lint, test
+        working-directory: cuelith-core
+        run: pnpm check
+
+      - name: Prove con l'app vera (Electron)
+        working-directory: cuelith-core
+        run: |
+          # Ubuntu 24.04 limita i namespace richiesti dalla sandbox di Chromium.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          node apps/desktop/node_modules/electron/install.js
+          xvfb-run -a pnpm -C e2e test
+      - name: Screenshot delle prove
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots
+          path: |
+            cuelith-core/e2e/screenshots
+            cuelith-core/e2e/test-results
+          if-no-files-found: ignore

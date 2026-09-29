@@ -1,0 +1,104 @@
+import type { AddressInfo } from "node:net";
+import { DEFAULT_ENGINE_PORT, type Lang } from "@cuelith/protocol";
+import { Tokens } from "./auth.js";
+import type { EngineContext } from "./context.js";
+import type { DisplayProvider } from "./displays.js";
+import { createHttpServer, type StaticPaths } from "./http/server.js";
+import { consoleLogger, type Logger } from "./log.js";
+import { Locales } from "./modules/locales.js";
+import { ModuleRegistry } from "./modules/registry.js";
+import type { HandlerMap } from "./rpc/dispatch.js";
+import { readHandlers } from "./rpc/handlers/read.js";
+import { sessionHandlers } from "./rpc/handlers/session.js";
+import { attachRpcServer } from "./rpc/server.js";
+import { createLiveState, createShow } from "./state/defaults.js";
+import { StateStore } from "./state/store.js";
+
+export interface EngineOptions {
+  /** Versione del nucleo (package.json), confrontata con engines.cuelith dei moduli. */
+  readonly version: string;
+  /** Solo 127.0.0.1 finche' l'utente non sceglie una rete (cap. 27). */
+  readonly host?: string;
+  /** 0 = porta libera qualsiasi (test). */
+  readonly port?: number;
+  readonly paths: StaticPaths & {
+    /** Cartelle dei moduli preinstallati, es. la lingua italiana. */
+    readonly bundledPlugins: readonly string[];
+  };
+  readonly displays: DisplayProvider;
+  readonly lang?: Lang;
+  readonly logger?: Logger;
+}
+
+export interface Engine {
+  readonly host: string;
+  readonly port: number;
+  /** Credenziali delle finestre locali; da passare solo a Electron, mai in rete. */
+  readonly tokens: { readonly station: string; readonly renderer: string };
+  readonly context: EngineContext;
+  stop(): Promise<void>;
+}
+
+const handlers: HandlerMap = { ...sessionHandlers, ...readHandlers };
+
+export async function startEngine(options: EngineOptions): Promise<Engine> {
+  const logger = options.logger ?? consoleLogger;
+  const host = options.host ?? "127.0.0.1";
+
+  const modules = new ModuleRegistry(logger);
+  await modules.loadBundled(options.paths.bundledPlugins, options.version);
+  const locales = new Locales(() => modules.active(), options.lang ?? "it");
+  if (locales.available().length === 0)
+    logger.error("nessuna lingua installata: l'interfaccia mostrerà le chiavi");
+
+  const store = new StateStore(
+    {
+      show: createShow({
+        show: locales.t("core.show.newName"),
+        roomLook: locales.t("core.look.room"),
+        stageLook: locales.t("core.look.stage"),
+      }),
+      live: { ...createLiveState(), plugins: modules.statuses() },
+    },
+    logger,
+  );
+
+  const context: EngineContext = {
+    version: options.version,
+    store,
+    locales,
+    modules,
+    displays: options.displays,
+    tokens: new Tokens(),
+    logger,
+  };
+
+  const http = createHttpServer(options.paths, logger);
+  const rpc = attachRpcServer(http, context, handlers);
+
+  await new Promise<void>((resolve, reject) => {
+    http.once("error", reject);
+    http.listen(options.port ?? DEFAULT_ENGINE_PORT, host, () => {
+      http.off("error", reject);
+      resolve();
+    });
+  });
+  const port = (http.address() as AddressInfo).port;
+  logger.info(`motore in ascolto su http://${host}:${port}`);
+
+  return {
+    host,
+    port,
+    tokens: { station: context.tokens.station, renderer: context.tokens.renderer },
+    context,
+    stop: async () => {
+      await rpc.close();
+      await new Promise<void>((resolve) => {
+        http.close(() => {
+          resolve();
+        });
+        http.closeAllConnections();
+      });
+    },
+  };
+}

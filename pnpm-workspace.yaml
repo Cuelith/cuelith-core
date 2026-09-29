@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "e2e"
+
+# Nessuna dipendenza esegue script di installazione. Electron 44 scarica il
+# suo eseguibile al primo avvio (o con `node node_modules/electron/install.js`).
+
+minimumReleaseAgeExclude:
+  - "@types/ws@8.18.2"
+  - electron@44.5.0
