@@ -91,7 +91,11 @@ I permessi seguono lo schema `area.azione`. Elenco iniziale previsto:
 - `storage.write` — scrivere dati nel proprio namespace
 - `network.fetch` — effettuare richieste HTTP verso host dichiarati esplicitamente nel manifest
 
-Un plugin non può mai accedere ai dati o al namespace di storage di un altro plugin, né al filesystem al di fuori della propria cartella dati.
+Un plugin non può mai accedere ai dati o al namespace di storage di un altro plugin, né al filesystem al di fuori della propria cartella dati. Ogni richiesta di un plugin passa dal comando `plugin_invoke(plugin_id, action, payload)`, che rilegge il manifest da disco e verifica il permesso richiesto **lato Rust** prima di eseguire qualunque azione — un controllo fatto solo nel bridge JavaScript sarebbe aggirabile da un plugin che parla direttamente `postMessage` senza passare dal bridge fornito.
+
+**Limite onesto su `network.fetch`**: un iframe sandboxato senza `allow-same-origin` non può leggere lo stato dell'app host, ma il sandboxing di un iframe **non blocca di per sé le richieste di rete** fatte dal codice del plugin (`fetch`/`XMLHttpRequest` restano disponibili al suo interno). Il permesso `network.fetch` dichiarato nel manifest è quindi, ad oggi, un **segnale di trasparenza verificato in fase di revisione del registro** (Fase 4), non un confine tecnico imposto dal sandboxing dell'iframe. I plugin `logic.wasm` sono invece davvero senza alcuna capacità di rete finché il plugin host non gliela concede esplicitamente tramite un import — quella è la sandbox forte del sistema, non l'iframe.
+
+**Cosa manda in diretta un cue prodotto da un plugin**: oggi il renderer del cue (`CueRenderer.svelte`, usato sia nell'editor sia sulla finestra di output) riconosce solo i `kind` "core bundle" (`core.slide`, `core.image`). Un plugin può già creare cue con questi `kind` tramite `plugin_invoke` (è quello che fa il plugin Bibbia — produce `core.slide`), ma un `kind` completamente nuovo con un proprio modo di essere disegnato sullo schermo non viene ancora renderizzato: quell'estensione (rendering dinamico per `kind` arbitrari) resta da costruire quando servirà davvero un plugin che non può limitarsi a produrre slide/immagini.
 
 ## Comunicazione plugin UI ↔ core
 

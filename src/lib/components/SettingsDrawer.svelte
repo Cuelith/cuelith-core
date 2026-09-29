@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import ThemeEditor from "$lib/components/ThemeEditor.svelte";
+  import { pluginStore } from "$lib/pluginStore.svelte";
   import type { MonitorInfo } from "$lib/types";
 
   let { open = $bindable(false) }: { open: boolean } = $props();
@@ -15,6 +16,7 @@
     } catch (e) {
       error = String(e);
     }
+    await pluginStore.refresh();
   });
 
   async function openOutput(index: number) {
@@ -56,6 +58,35 @@
       {/if}
       <button class="secondary" onclick={closeOutput}>Chiudi output</button>
       {#if error}<p class="error">{error}</p>{/if}
+    </section>
+
+    <section>
+      <h3>Plugin</h3>
+      {#if pluginStore.plugins.length === 0}
+        <p class="hint">Nessun plugin installato.</p>
+      {:else}
+        <div class="plugin-list">
+          {#each pluginStore.plugins as plugin (plugin.id)}
+            <div class="plugin-row">
+              <div class="plugin-meta">
+                <span class="plugin-name">{plugin.name}</span>
+                <span class="plugin-kind">{plugin.kind === "service" ? "⚙ Servizio" : "▤ Interfaccia"} · v{plugin.version}</span>
+              </div>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  checked={plugin.enabled}
+                  onchange={(e) => pluginStore.setEnabled(plugin.id, (e.target as HTMLInputElement).checked)}
+                />
+                <span class="slider"></span>
+              </label>
+              <button class="remove-btn" onclick={() => pluginStore.uninstall(plugin.id)}>Rimuovi</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+      <button class="secondary" onclick={() => pluginStore.installFromFile()}>Installa da file…</button>
+      {#if pluginStore.error}<p class="error">{pluginStore.error}</p>{/if}
     </section>
 
     <section>
@@ -129,5 +160,93 @@
   .error {
     color: var(--live);
     font-size: 0.85rem;
+  }
+
+  .plugin-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .plugin-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.7rem;
+  }
+
+  .plugin-meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .plugin-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .plugin-kind {
+    font-size: 0.7rem;
+    color: var(--fg-faint);
+  }
+
+  .remove-btn {
+    font-size: 0.74rem;
+    padding: 0.3rem 0.55rem;
+    background: transparent;
+    border-color: var(--border);
+    color: var(--fg-faint);
+  }
+
+  .switch {
+    position: relative;
+    width: 34px;
+    height: 19px;
+    flex: none;
+  }
+
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+
+  .slider::before {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: 2.5px;
+    top: 2.5px;
+    background: var(--fg-faint);
+    border-radius: 50%;
+    transition: 0.15s;
+  }
+
+  .switch input:checked + .slider {
+    background: var(--accent-dim);
+  }
+
+  .switch input:checked + .slider::before {
+    transform: translateX(15px);
+    background: var(--accent);
   }
 </style>

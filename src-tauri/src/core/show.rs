@@ -241,7 +241,7 @@ pub fn set_theme(app: AppHandle, state: Shared, theme: Theme) {
     let _ = app.emit("live-changed", LivePayload { cue: live_cue, theme });
 }
 
-fn new_id(prefix: &str) -> String {
+pub(crate) fn new_id(prefix: &str) -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)

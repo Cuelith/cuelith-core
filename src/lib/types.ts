@@ -41,3 +41,28 @@ export type MonitorInfo = {
   width: number;
   height: number;
 };
+
+export type PluginManifest = {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string | null;
+  license: string | null;
+  min_host_version: string;
+  max_host_version: string | null;
+  kind: "service" | "panel";
+  category: string[];
+  permissions: string[];
+  ui: { entry: string } | null;
+  composer_button: { label: string } | null;
+  settings: { entry: string } | null;
+  onboarding: { title: string; body: string }[];
+  docs: { entry: string } | null;
+  logic: { wasm: string } | null;
+};
+
+export type PluginInfo = PluginManifest & {
+  enabled: boolean;
+  dir: string;
+};
