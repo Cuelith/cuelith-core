@@ -17,7 +17,7 @@ async function engineOn(port = 0): Promise<Engine> {
   return startEngine({
     version: "0.1.0",
     port,
-    paths: { client, ui: root, bundledPlugins: [LOCALE_IT_DIR] },
+    paths: { client, ui: root, bundledPlugins: [LOCALE_IT_DIR], data: join(root, "data") },
     displays: { list: () => [] },
     logger: silentLogger,
   });

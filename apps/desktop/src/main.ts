@@ -5,6 +5,7 @@ import { consoleLogger, startEngine, type Engine } from "@cuelith-core/engine";
 import { DEFAULT_ENGINE_PORT } from "@cuelith/protocol";
 import { app, BrowserWindow, ipcMain, Menu, session } from "electron";
 import { electronDisplays } from "./displays.js";
+import { chooseShowFile, confirmUnsaved } from "./files.js";
 import { OutputWindows } from "./outputs.js";
 import { resolveAppPaths } from "./paths.js";
 
@@ -16,6 +17,7 @@ const userDataOverride = process.env["CUELITH_USER_DATA"];
 if (userDataOverride !== undefined && userDataOverride !== "")
   app.setPath("userData", userDataOverride);
 const portOverride = process.env["CUELITH_PORT"];
+const autosaveOverride = process.env["CUELITH_AUTOSAVE_MS"];
 
 app.enableSandbox();
 
@@ -41,7 +43,8 @@ async function launchEngine(): Promise<Engine> {
   });
   const options = {
     version: app.getVersion(),
-    paths,
+    paths: { ...paths, data: app.getPath("userData") },
+    ...(autosaveOverride === undefined ? {} : { autosaveIntervalMs: Number(autosaveOverride) }),
     displays: electronDisplays,
     logger: consoleLogger,
   };
@@ -104,10 +107,15 @@ function openStation(): BrowserWindow {
   window.once("ready-to-show", () => {
     window.show();
   });
-  // La postazione e' il programma: chiuderla chiude Cuelith.
+  // La postazione e' il programma: chiuderla chiude Cuelith (dopo aver chiesto
+  // se salvare le modifiche).
+  window.on("close", (event) => {
+    if (quitAllowed) return;
+    event.preventDefault();
+    void requestQuit();
+  });
   window.on("closed", () => {
     station = undefined;
-    app.quit();
   });
   void window.loadURL(`${engineOrigin()}/`);
   return window;
@@ -142,6 +150,14 @@ async function main(): Promise<void> {
     return { name: os.hostname(), token: role === "station" ? tokens.station : tokens.renderer };
   });
 
+  ipcMain.handle("cuelith:choose-show-file", async (event, kind: unknown) => {
+    const role = trusted.get(event.sender.id);
+    if (role !== "station" || station === undefined || engine === undefined) {
+      throw new Error("richiesta non autorizzata");
+    }
+    return chooseShowFile(station, engine, kind === "save" ? "save" : "open");
+  });
+
   station = openStation();
   outputs = new OutputWindows({
     engine,
@@ -152,11 +168,35 @@ async function main(): Promise<void> {
   outputs.start();
 }
 
-// Le finestre di uscita non si chiudono a mano (closable: false): alla chiusura
-// di Cuelith vanno distrutte per prime, o bloccherebbero l'uscita dal programma.
-app.on("before-quit", () => {
-  outputs?.stop();
-  outputs = undefined;
+/** Vero quando la chiusura e' confermata: da li' nessuna finestra la blocca. */
+let quitAllowed = false;
+let quitRequested = false;
+
+/**
+ * Chiusura di Cuelith da qualsiasi parte (finestra, menu, sistema): prima si
+ * chiede se salvare; poi si distruggono le uscite, che non si chiudono a mano
+ * (closable: false) e altrimenti bloccherebbero la chiusura.
+ */
+async function requestQuit(): Promise<void> {
+  if (quitRequested) return;
+  quitRequested = true;
+  try {
+    const proceed =
+      station === undefined || engine === undefined ? true : await confirmUnsaved(station, engine);
+    if (!proceed) return;
+    quitAllowed = true;
+    outputs?.stop();
+    outputs = undefined;
+    app.quit();
+  } finally {
+    quitRequested = false;
+  }
+}
+
+app.on("before-quit", (event) => {
+  if (quitAllowed) return;
+  event.preventDefault();
+  void requestQuit();
 });
 
 let stopping = false;

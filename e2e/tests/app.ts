@@ -22,12 +22,21 @@ export interface RunningApp {
   readonly station: Page;
   /** Messaggi di errore della console e richieste verso host esterni. */
   readonly problems: string[];
+  /** Cartella dati dell'app (profilo): riusabile per simulare un riavvio. */
+  readonly userData: string;
+  /** Chiusura normale; se ci sono modifiche non salvate risponde "Non salvare". */
   close(): Promise<void>;
 }
 
+export interface LaunchOptions {
+  /** Profilo da riusare (riavvio); se assente se ne crea uno nuovo. */
+  readonly userData?: string;
+  readonly env?: Readonly<Record<string, string>>;
+}
+
 /** Avvia Cuelith con un profilo nuovo e una porta libera, come al primo avvio. */
-export async function launchApp(): Promise<RunningApp> {
-  const userData = await mkdtemp(path.join(os.tmpdir(), "cuelith-e2e-"));
+export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp> {
+  const userData = options.userData ?? (await mkdtemp(path.join(os.tmpdir(), "cuelith-e2e-")));
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     // Farebbe partire Electron come semplice Node (lo impostano p.es. le estensioni di VS Code).
@@ -38,7 +47,7 @@ export async function launchApp(): Promise<RunningApp> {
     app = await electron.launch({
       executablePath: electronPath,
       args: [desktopDir],
-      env: { ...env, CUELITH_USER_DATA: userData, CUELITH_PORT: "0" },
+      env: { ...env, ...options.env, CUELITH_USER_DATA: userData, CUELITH_PORT: "0" },
     });
   } catch (error) {
     await rm(userData, { recursive: true, force: true });
@@ -69,9 +78,12 @@ export async function launchApp(): Promise<RunningApp> {
     app,
     station,
     problems,
+    userData,
     close: async () => {
-      await app.close();
-      await rm(userData, { recursive: true, force: true });
+      // Se l'app e' gia' uscita (es. prova di arresto) non c'e' nulla da chiedere.
+      await answerQuestions(app, "Non salvare").catch(() => undefined);
+      await app.close().catch(() => undefined);
+      await rm(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     },
   };
 }
@@ -97,4 +109,46 @@ export async function createText(station: Page, title: string, slides: string[])
   await editor.getByLabel("Testo").fill(slides.join("\n\n"));
   await editor.getByRole("button", { name: "Salva" }).click();
   await expect(editor).toBeHidden();
+}
+
+/**
+ * Le finestre native (domande, Apri, Salva) non si possono cliccare dalle
+ * prove: si sostituiscono nel processo principale con risposte decise qui.
+ * Le domande ricevute si leggono con asked().
+ */
+export async function answerQuestions(app: ElectronApplication, button: string): Promise<void> {
+  await app.evaluate(({ dialog }, label) => {
+    const asked: string[] = [];
+    (globalThis as unknown as { asked: string[] }).asked = asked;
+    dialog.showMessageBox = (...args: unknown[]) => {
+      const options = args[args.length - 1] as { message: string; buttons?: string[] };
+      asked.push(options.message);
+      const index = options.buttons?.indexOf(label) ?? -1;
+      return Promise.resolve({ response: Math.max(0, index), checkboxChecked: false });
+    };
+  }, button);
+}
+
+export async function asked(app: ElectronApplication): Promise<string[]> {
+  return app.evaluate(() => (globalThis as unknown as { asked?: string[] }).asked ?? []);
+}
+
+/** Le finestre Apri e Salva rispondono con questo percorso (o annullano se undefined). */
+export async function chooseFiles(
+  app: ElectronApplication,
+  filePath: string | undefined,
+): Promise<void> {
+  await app.evaluate(({ dialog }, chosen) => {
+    dialog.showSaveDialog = () =>
+      Promise.resolve(
+        chosen === undefined
+          ? { canceled: true, filePath: "" }
+          : { canceled: false, filePath: chosen },
+      );
+    dialog.showOpenDialog = () =>
+      Promise.resolve({
+        canceled: chosen === undefined,
+        filePaths: chosen === undefined ? [] : [chosen],
+      });
+  }, filePath);
 }

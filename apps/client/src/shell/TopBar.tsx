@@ -1,7 +1,9 @@
 import { useEngine, useT } from "../engine/react.js";
 import type { Mode } from "../modes/core.js";
+import type { ShowFiles } from "../station/files.js";
 import { useRun } from "../station/station.js";
 import { Button } from "../ui/Button.js";
+import { ShowMenu } from "./ShowMenu.js";
 
 /** Marchio: quadrato ciano (prossimo) con il punto rosso (in onda). */
 export function BrandMark({ size = 28 }: { size?: number }) {
@@ -21,11 +23,13 @@ export function TopBar({
   active,
   onSelect,
   onManageOutputs,
+  files,
 }: {
   modes: readonly Mode[];
   active: Mode;
   onSelect: (mode: Mode) => void;
   onManageOutputs: () => void;
+  files: ShowFiles;
 }) {
   const t = useT();
 
@@ -35,6 +39,9 @@ export function TopBar({
         <BrandMark />
         <span className="text-[13px] font-bold tracking-[0.2em]">CUELITH</span>
       </div>
+
+      <ShowMenu files={files} />
+      <span aria-hidden="true" className="h-5 w-px bg-line-2" />
 
       <nav aria-label={t("core.modes.label")} className="flex items-center gap-1.5">
         {modes.map((mode) => {

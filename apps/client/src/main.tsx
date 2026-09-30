@@ -10,6 +10,8 @@ declare global {
     /** Esposto dal preload di Electron solo nelle finestre locali del motore. */
     readonly cuelithDesktop?: {
       readonly getLocalSession: () => Promise<{ name: string; token: string }>;
+      /** Finestra nativa Apri/Salva: percorso scelto o undefined se annullato. */
+      readonly chooseShowFile: (kind: "open" | "save") => Promise<string | undefined>;
     };
   }
 }

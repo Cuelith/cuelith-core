@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useEngine, useT } from "../engine/react.js";
 import { CORE_MODES, PRESENT_MODE, type Mode } from "../modes/core.js";
+import { useShowFiles, type ShowFiles } from "../station/files.js";
 import { useCueShortcuts } from "../station/shortcuts.js";
 import { StationProvider, useStation } from "../station/station.js";
 import { Dock } from "./Dock.js";
@@ -8,6 +9,8 @@ import { ModeView } from "./ModeView.js";
 import { ModulesDialog } from "./ModulesDialog.js";
 import { Notices } from "./Notices.js";
 import { OutputsDialog } from "./OutputsDialog.js";
+import { RecoveryBanner } from "./RecoveryBanner.js";
+import { UnsavedDialog } from "./UnsavedDialog.js";
 import { TextEditorDialog } from "./TextEditorDialog.js";
 import { TopBar } from "./TopBar.js";
 
@@ -46,8 +49,10 @@ export function Shell() {
 function ShellBody() {
   const t = useT();
   const { status } = useEngine();
-  const { editor } = useStation();
+  const { editor, unsavedPending } = useStation();
+  const files = useShowFiles();
   useCueShortcuts();
+  useFileShortcuts(files);
   const modes = CORE_MODES;
   const [mode, setMode] = useState<Mode>(() => readSavedMode(modes));
   const [modulesOpen, setModulesOpen] = useState(false);
@@ -78,21 +83,25 @@ function ShellBody() {
   }, [modes, selectMode]);
 
   return (
-    <div className="grid h-full grid-cols-[48px_1fr] grid-rows-[44px_1fr]">
-      <TopBar
-        modes={modes}
-        active={mode}
-        onSelect={selectMode}
-        onManageOutputs={() => {
-          setOutputsOpen(true);
-        }}
-      />
-      <Dock
-        onManageModules={() => {
-          setModulesOpen(true);
-        }}
-      />
-      <ModeView mode={mode} />
+    <div className="flex h-full flex-col">
+      <RecoveryBanner files={files} />
+      <div className="grid min-h-0 flex-1 grid-cols-[48px_1fr] grid-rows-[44px_1fr]">
+        <TopBar
+          modes={modes}
+          active={mode}
+          onSelect={selectMode}
+          onManageOutputs={() => {
+            setOutputsOpen(true);
+          }}
+          files={files}
+        />
+        <Dock
+          onManageModules={() => {
+            setModulesOpen(true);
+          }}
+        />
+        <ModeView mode={mode} />
+      </div>
       <ModulesDialog
         open={modulesOpen}
         onClose={() => {
@@ -108,6 +117,7 @@ function ShellBody() {
           setOutputsOpen(false);
         }}
       />
+      {unsavedPending && <UnsavedDialog />}
       <Notices />
       {status.kind === "lost" && (
         <div
@@ -119,4 +129,32 @@ function ShellBody() {
       )}
     </div>
   );
+}
+
+/** Ctrl/⌘+N nuovo, +O apri, +S salva, +Maiusc+S salva con nome. */
+function useFileShortcuts(files: ShowFiles): void {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.repeat) return;
+      if (document.querySelector("dialog[open]") !== null) return;
+      const key = event.key.toLowerCase();
+      const action =
+        key === "s"
+          ? event.shiftKey
+            ? files.saveAs
+            : files.save
+          : key === "o" && !event.shiftKey
+            ? files.open
+            : key === "n" && !event.shiftKey
+              ? files.newShow
+              : undefined;
+      if (action === undefined) return;
+      event.preventDefault();
+      void action();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [files]);
 }

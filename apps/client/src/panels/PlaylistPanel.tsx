@@ -38,17 +38,24 @@ export function PlaylistPanel() {
     }
   };
 
+  /** Punto d'inserimento sopra o sotto la voce, dalla posizione del puntatore. */
+  const insertionAt = (event: DragEvent<HTMLLIElement>, index: number): number => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? index : index + 1;
+  };
+
   const onDragOver = (event: DragEvent<HTMLLIElement>, index: number) => {
     if (!event.dataTransfer.types.includes(DRAG_TYPE)) return;
     event.preventDefault();
-    const rect = event.currentTarget.getBoundingClientRect();
-    setDropIndex(event.clientY < rect.top + rect.height / 2 ? index : index + 1);
+    setDropIndex(insertionAt(event, index));
   };
 
-  const onDrop = (event: DragEvent) => {
+  // Il punto di rilascio si calcola dall'evento stesso: lo stato della linea
+  // guida potrebbe non essere ancora aggiornato se si rilascia molto in fretta.
+  const onDrop = (event: DragEvent, target: number | undefined) => {
     event.preventDefault();
+    event.stopPropagation();
     const entryId = event.dataTransfer.getData(DRAG_TYPE);
-    const target = dropIndex;
     setDropIndex(undefined);
     if (entryId === "" || target === undefined) return;
     const from = playlist.findIndex((e) => e.id === entryId);
@@ -85,7 +92,9 @@ export function PlaylistPanel() {
               setDropIndex(undefined);
             }
           }}
-          onDrop={onDrop}
+          onDrop={(event) => {
+            onDrop(event, dropIndex);
+          }}
         >
           {playlist.map((entry, index) => {
             const item = items[entry.itemId];
@@ -109,6 +118,9 @@ export function PlaylistPanel() {
                 }}
                 onDragOver={(event) => {
                   onDragOver(event, index);
+                }}
+                onDrop={(event) => {
+                  onDrop(event, insertionAt(event, index));
                 }}
                 className={`group relative flex items-center gap-2 rounded-md border-l-[3px] py-1.5 pr-1.5 pl-2.5 ${
                   isLive

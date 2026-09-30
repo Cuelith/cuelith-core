@@ -13,6 +13,9 @@ export interface Notice {
 /** Richiesta di apertura dell'editor di testo: nuovo elemento o esistente. */
 export type EditorRequest = { readonly mode: "create" } | { readonly mode: "edit"; itemId: string };
 
+/** Risposta alla domanda "salvare le modifiche?". */
+export type UnsavedChoice = "save" | "discard" | "cancel";
+
 interface StationContextValue {
   /** Voce della scaletta scelta in questa postazione (non e' stato del motore). */
   readonly selectedEntryId: string | undefined;
@@ -23,6 +26,10 @@ interface StationContextValue {
   readonly notices: readonly Notice[];
   readonly notify: (key: string, params?: Readonly<Record<string, string>>) => void;
   readonly dismiss: (id: number) => void;
+  /** Domanda in corso "salvare le modifiche?", se c'e'. */
+  readonly unsavedPending: boolean;
+  readonly askUnsaved: () => Promise<UnsavedChoice>;
+  readonly answerUnsaved: (choice: UnsavedChoice) => void;
 }
 
 const StationContext = createContext<StationContextValue | undefined>(undefined);
@@ -34,6 +41,24 @@ export function StationProvider({ children }: { children: ReactNode }) {
   const [selectedEntryId, setSelected] = useState<string | undefined>();
   const [editor, setEditor] = useState<EditorRequest | undefined>();
   const [notices, setNotices] = useState<readonly Notice[]>([]);
+  const [unsaved, setUnsaved] = useState<
+    { resolve: (choice: UnsavedChoice) => void } | undefined
+  >();
+
+  const askUnsaved = useCallback(
+    () =>
+      new Promise<UnsavedChoice>((resolve) => {
+        setUnsaved({ resolve });
+      }),
+    [],
+  );
+  const answerUnsaved = useCallback(
+    (choice: UnsavedChoice) => {
+      unsaved?.resolve(choice);
+      setUnsaved(undefined);
+    },
+    [unsaved],
+  );
 
   const dismiss = useCallback((id: number) => {
     setNotices((list) => list.filter((n) => n.id !== id));
@@ -55,8 +80,11 @@ export function StationProvider({ children }: { children: ReactNode }) {
       notices,
       notify,
       dismiss,
+      unsavedPending: unsaved !== undefined,
+      askUnsaved,
+      answerUnsaved,
     }),
-    [selectedEntryId, editor, notices, notify, dismiss],
+    [selectedEntryId, editor, notices, notify, dismiss, unsaved, askUnsaved, answerUnsaved],
   );
   return <StationContext.Provider value={value}>{children}</StationContext.Provider>;
 }

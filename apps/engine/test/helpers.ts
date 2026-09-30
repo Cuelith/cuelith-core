@@ -19,7 +19,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** Il modulo lingua vero, dal repo affiancato. */
 export const LOCALE_IT_DIR = resolve(here, "../../../../plugin-locale-it");
 
-export async function startTestEngine(): Promise<Engine> {
+export interface TestEngineOptions {
+  /** Cartella dati da riusare (per simulare un riavvio). */
+  readonly data?: string;
+  readonly autosaveIntervalMs?: number;
+}
+
+export async function startTestEngine(options: TestEngineOptions = {}): Promise<Engine> {
   const root = mkdtempSync(join(tmpdir(), "cuelith-engine-"));
   const client = join(root, "client");
   const ui = join(root, "ui");
@@ -32,7 +38,15 @@ export async function startTestEngine(): Promise<Engine> {
   return startEngine({
     version: "0.1.0",
     port: 0,
-    paths: { client, ui, bundledPlugins: [LOCALE_IT_DIR] },
+    paths: {
+      client,
+      ui,
+      bundledPlugins: [LOCALE_IT_DIR],
+      data: options.data ?? join(root, "data"),
+    },
+    ...(options.autosaveIntervalMs === undefined
+      ? {}
+      : { autosaveIntervalMs: options.autosaveIntervalMs }),
     displays: {
       list: () => [
         {

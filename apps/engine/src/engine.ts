@@ -1,4 +1,5 @@
 import type { AddressInfo } from "node:net";
+import { join } from "node:path";
 import { DEFAULT_ENGINE_PORT, type Lang } from "@cuelith/protocol";
 import { Tokens } from "./auth.js";
 import type { EngineContext } from "./context.js";
@@ -13,7 +14,9 @@ import { editHandlers } from "./rpc/handlers/edit.js";
 import { outputHandlers } from "./rpc/handlers/outputs.js";
 import { readHandlers } from "./rpc/handlers/read.js";
 import { sessionHandlers } from "./rpc/handlers/session.js";
+import { showHandlers } from "./rpc/handlers/show.js";
 import { attachRpcServer } from "./rpc/server.js";
+import { ShowService } from "./show/service.js";
 import { createLiveState, createShow } from "./state/defaults.js";
 import { StateStore } from "./state/store.js";
 
@@ -27,7 +30,11 @@ export interface EngineOptions {
   readonly paths: StaticPaths & {
     /** Cartelle dei moduli preinstallati, es. la lingua italiana. */
     readonly bundledPlugins: readonly string[];
+    /** Cartella dati dell'app (copie automatiche, e dal passo 6b librerie e media). */
+    readonly data: string;
   };
+  /** Solo per le prove: intervallo della copia automatica (predefinito 2 minuti). */
+  readonly autosaveIntervalMs?: number;
   readonly displays: DisplayProvider;
   readonly lang?: Lang;
   readonly logger?: Logger;
@@ -53,6 +60,7 @@ const handlers: HandlerMap = {
   ...cueHandlers,
   ...editHandlers,
   ...outputHandlers,
+  ...showHandlers,
 };
 
 export async function startEngine(options: EngineOptions): Promise<Engine> {
@@ -77,11 +85,23 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     logger,
   );
 
+  const shows = new ShowService({
+    store,
+    locales,
+    modules,
+    logger,
+    autosaveDir: join(options.paths.data, "autosave"),
+    ...(options.autosaveIntervalMs === undefined
+      ? {}
+      : { autosaveIntervalMs: options.autosaveIntervalMs }),
+  });
+
   const context: EngineContext = {
     version: options.version,
     store,
     locales,
     modules,
+    shows,
     displays: options.displays,
     tokens: new Tokens(),
     logger,
@@ -98,6 +118,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     });
   });
   const port = (http.address() as AddressInfo).port;
+  await shows.start();
   logger.info(`motore in ascolto su http://${host}:${port}`);
 
   return {
@@ -115,6 +136,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
       });
     },
     stop: async () => {
+      await shows.stop();
       await rpc.close();
       await new Promise<void>((resolve) => {
         http.close(() => {
