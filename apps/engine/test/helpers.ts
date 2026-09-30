@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  EngineMethods,
   PROTOCOL_VERSION,
+  type EngineMethodName,
+  type EngineMethodParams,
+  type EngineMethodResult,
   rpcRequest,
   type RpcNotification,
   type RpcResponse,
@@ -115,4 +119,26 @@ export async function waitFor(check: () => boolean, timeoutMs = 2000): Promise<v
     if (Date.now() - start > timeoutMs) throw new Error("condizione non verificata in tempo");
     await new Promise((r) => setTimeout(r, 10));
   }
+}
+
+/** Chiamata che deve riuscire; il risultato e' validato con lo schema del protocollo. */
+export async function expectOk<N extends EngineMethodName>(
+  client: TestClient,
+  method: N,
+  params: EngineMethodParams<N>,
+): Promise<EngineMethodResult<N>> {
+  const response = await client.call(method, params);
+  if ("error" in response) throw new Error(`${method}: ${JSON.stringify(response.error)}`);
+  return EngineMethods[method].result.parse(response.result) as EngineMethodResult<N>;
+}
+
+/** Chiamata che deve fallire: restituisce [codice, chiave del messaggio]. */
+export async function expectError(
+  client: TestClient,
+  method: EngineMethodName,
+  params: unknown,
+): Promise<[number, string]> {
+  const response = await client.call(method, params);
+  if (!("error" in response)) throw new Error(`${method} doveva fallire`);
+  return [response.error.code, response.error.message];
 }

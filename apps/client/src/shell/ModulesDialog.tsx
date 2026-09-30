@@ -1,6 +1,6 @@
 import type { InstalledPlugin } from "@cuelith/protocol";
 import { useEffect, useRef, useState } from "react";
-import { EngineCallError } from "../engine/connection.js";
+import { EngineCallError } from "@cuelith-core/engine-client";
 import { useConnection, useT } from "../engine/react.js";
 
 type Load =

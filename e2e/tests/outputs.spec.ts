@@ -1,0 +1,105 @@
+import path from "node:path";
+import { expect, type Page } from "@playwright/test";
+import { createText, screenshotsDir, test, type RunningApp } from "./app.js";
+
+/** Aggiunge un'uscita in finestra (in prova c'e' un solo monitor) col look scelto. */
+async function addOutput(station: Page, name: string, look: string): Promise<void> {
+  const bar = station.getByRole("group", { name: "Uscite" }).first();
+  await bar.getByRole("button", { name: /Aggiungi uscita|Uscite…/ }).click();
+  const dialog = station.getByRole("dialog", { name: "Uscite" });
+  await dialog.getByRole("button", { name: "+ Aggiungi uscita" }).click();
+  const form = dialog.getByRole("form", { name: "Aggiungi uscita" });
+  await form.getByLabel("Nome").fill(name);
+  await form.getByLabel("Finestra").check();
+  await form.getByLabel("Look").selectOption({ label: look });
+  await form.getByRole("button", { name: "Salva" }).click();
+  await expect(dialog.getByRole("listitem").filter({ hasText: name })).toBeVisible();
+  await dialog.getByRole("button", { name: "Chiudi" }).click();
+  await expect(dialog).toBeHidden();
+}
+
+/** La finestra di un'uscita, trovata dall'id che la postazione mostra nella barra. */
+async function outputWindow(running: RunningApp, name: string): Promise<Page> {
+  const id = await running.station
+    .getByRole("group", { name, exact: true })
+    .getAttribute("data-output");
+  if (id === null) throw new Error(`uscita ${name} non trovata`);
+  await expect
+    .poll(() => running.app.windows().some((w) => w.url().includes(`output=${id}`)))
+    .toBe(true);
+  const window = running.app.windows().find((w) => w.url().includes(`output=${id}`));
+  if (window === undefined) throw new Error(`finestra di ${name} non trovata`);
+  await expect(window.locator("body")).toHaveAttribute("data-state", "ready");
+  return window;
+}
+
+// Criterio del cap. 28: due uscite con look diversi; blackout e freeze per uscita.
+test("due uscite con look Sala e Palco, blackout e freeze per singola uscita", async ({
+  running,
+}) => {
+  const { station, problems } = running;
+  await createText(station, "Luce del mattino", ["Vieni su di noi", "Resta con noi", "Amen"]);
+
+  await addOutput(station, "Proiettore", "Sala");
+  await addOutput(station, "Palco", "Palco");
+  const projector = await outputWindow(running, "Proiettore");
+  const stage = await outputWindow(running, "Palco");
+  const text = (page: Page) => page.locator("body");
+
+  // Invio: la stessa slide va su entrambe, ognuna col suo look.
+  await station.keyboard.press("Enter");
+  await expect(text(projector)).toHaveAttribute("data-text", "Vieni su di noi");
+  await expect(text(stage)).toHaveAttribute("data-text", "Vieni su di noi");
+  await projector.waitForTimeout(400); // fine della dissolvenza di Sala
+  await projector.screenshot({ path: path.join(screenshotsDir, "uscita-sala.png") });
+  await stage.screenshot({ path: path.join(screenshotsDir, "uscita-palco.png") });
+
+  // Nero solo sul proiettore.
+  const projectorBar = station.getByRole("group", { name: "Proiettore", exact: true });
+  const stageBar = station.getByRole("group", { name: "Palco", exact: true });
+  await projectorBar.getByRole("button", { name: "Nero" }).click();
+  await expect(projectorBar.getByRole("button", { name: "Nero" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(text(projector)).toHaveAttribute("data-blackout", "true");
+  await expect(text(stage)).toHaveAttribute("data-blackout", "false");
+  await projectorBar.getByRole("button", { name: "Nero" }).click();
+  await expect(text(projector)).toHaveAttribute("data-blackout", "false");
+
+  // Blocca solo il palco: avanti cambia il proiettore, il palco resta fermo.
+  await stageBar.getByRole("button", { name: "Blocca" }).click();
+  await expect(text(stage)).toHaveAttribute("data-freeze", "true");
+  await station.locator("body").click({ position: { x: 700, y: 600 } });
+  await station.keyboard.press("ArrowRight");
+  await expect(text(projector)).toHaveAttribute("data-text", "Resta con noi");
+  await expect(text(stage)).toHaveAttribute("data-text", "Vieni su di noi");
+  await stageBar.getByRole("button", { name: "Blocca" }).click();
+  await expect(text(stage)).toHaveAttribute("data-text", "Resta con noi");
+
+  // Le uscite disegnano davvero: fotogrammi in corso e nessuna pausa lunga.
+  const stats = await projector.evaluate(
+    () =>
+      (window as unknown as { cuelithOutput?: { stats: { frames: number } } }).cuelithOutput?.stats,
+  );
+  expect(stats?.frames).toBeGreaterThan(30);
+
+  await expect(station.locator('[data-screen="live"] .cl-fade-out')).toHaveCount(0);
+  await station.screenshot({ path: path.join(screenshotsDir, "presenta-due-uscite.png") });
+  expect(problems).toEqual([]);
+});
+
+test("eliminare un'uscita ne chiude la finestra", async ({ running }) => {
+  const { station, problems } = running;
+  await addOutput(station, "Proiettore", "Sala");
+  const projector = await outputWindow(running, "Proiettore");
+
+  await station.getByRole("button", { name: "Uscite…" }).click();
+  const dialog = station.getByRole("dialog", { name: "Uscite" });
+  const row = dialog.getByRole("listitem").filter({ hasText: "Proiettore" });
+  await row.getByRole("button", { name: "Rimuovi" }).click();
+  await row.getByRole("button", { name: "Elimina davvero" }).click();
+  await expect(row).toHaveCount(0);
+  await expect.poll(() => projector.isClosed()).toBe(true);
+  expect(problems).toEqual([]);
+});

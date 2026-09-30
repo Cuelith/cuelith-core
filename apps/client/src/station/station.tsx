@@ -1,6 +1,6 @@
 import type { EngineMethodName, EngineMethodParams, EngineMethodResult } from "@cuelith/protocol";
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { EngineCallError } from "../engine/connection.js";
+import { EngineCallError } from "@cuelith-core/engine-client";
 import { useConnection } from "../engine/react.js";
 
 /** Avviso mostrato all'operatore: chiave di traduzione + parametri. */

@@ -1,13 +1,7 @@
-import {
-  EngineMethods,
-  type EngineMethodName,
-  type EngineMethodParams,
-  type EngineMethodResult,
-  type StateDocument,
-} from "@cuelith/protocol";
+import type { EngineMethodName, EngineMethodParams, StateDocument } from "@cuelith/protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Engine } from "../src/index.js";
-import { startTestEngine, TestClient } from "./helpers.js";
+import { expectError, expectOk, startTestEngine, TestClient } from "./helpers.js";
 
 let engine: Engine;
 let client: TestClient;
@@ -23,21 +17,9 @@ afterEach(async () => {
   await engine.stop();
 });
 
-/** Chiamata che deve riuscire; il risultato e' validato con lo schema del protocollo. */
-async function ok<N extends EngineMethodName>(
-  method: N,
-  params: EngineMethodParams<N>,
-): Promise<EngineMethodResult<N>> {
-  const response = await client.call(method, params);
-  if ("error" in response) throw new Error(`${method}: ${JSON.stringify(response.error)}`);
-  return EngineMethods[method].result.parse(response.result) as EngineMethodResult<N>;
-}
-
-async function fails(method: EngineMethodName, params: unknown): Promise<[number, string]> {
-  const response = await client.call(method, params);
-  if (!("error" in response)) throw new Error(`${method} doveva fallire`);
-  return [response.error.code, response.error.message];
-}
+const ok = <N extends EngineMethodName>(method: N, params: EngineMethodParams<N>) =>
+  expectOk(client, method, params);
+const fails = (method: EngineMethodName, params: unknown) => expectError(client, method, params);
 
 const state = (): StateDocument => engine.context.store.snapshot();
 const text = (value: string) => ({ fields: { text: { kind: "text" as const, value } } });

@@ -7,6 +7,7 @@ import { Dock } from "./Dock.js";
 import { ModeView } from "./ModeView.js";
 import { ModulesDialog } from "./ModulesDialog.js";
 import { Notices } from "./Notices.js";
+import { OutputsDialog } from "./OutputsDialog.js";
 import { TextEditorDialog } from "./TextEditorDialog.js";
 import { TopBar } from "./TopBar.js";
 
@@ -50,6 +51,7 @@ function ShellBody() {
   const modes = CORE_MODES;
   const [mode, setMode] = useState<Mode>(() => readSavedMode(modes));
   const [modulesOpen, setModulesOpen] = useState(false);
+  const [outputsOpen, setOutputsOpen] = useState(false);
 
   const selectMode = useCallback((next: Mode) => {
     setMode(next);
@@ -77,7 +79,14 @@ function ShellBody() {
 
   return (
     <div className="grid h-full grid-cols-[48px_1fr] grid-rows-[44px_1fr]">
-      <TopBar modes={modes} active={mode} onSelect={selectMode} />
+      <TopBar
+        modes={modes}
+        active={mode}
+        onSelect={selectMode}
+        onManageOutputs={() => {
+          setOutputsOpen(true);
+        }}
+      />
       <Dock
         onManageModules={() => {
           setModulesOpen(true);
@@ -93,6 +102,12 @@ function ShellBody() {
       {editor !== undefined && (
         <TextEditorDialog key={editor.mode === "edit" ? editor.itemId : "new"} request={editor} />
       )}
+      <OutputsDialog
+        open={outputsOpen}
+        onClose={() => {
+          setOutputsOpen(false);
+        }}
+      />
       <Notices />
       {status.kind === "lost" && (
         <div

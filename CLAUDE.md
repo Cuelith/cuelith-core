@@ -7,9 +7,11 @@ Il contenitore di Cuelith: motore live, applicazione desktop (Electron), postazi
 ## Struttura
 
 - `apps/engine` — motore (Node puro, senza Electron): stato dello show, comandi, moduli, server HTTP + WebSocket (`/rpc`) su `127.0.0.1:7420`. Unica fonte di verità.
-- `apps/desktop` — Electron: avvia il motore, apre la postazione (`http://127.0.0.1:<porta>/`) e, dal passo 5, le finestre di uscita. Preload in sandbox che consegna le credenziali locali solo alle finestre del motore.
+- `apps/desktop` — Electron: avvia il motore, apre la postazione (`http://127.0.0.1:<porta>/`) e una finestra per ogni uscita display (`src/outputs.ts`: monitor scelto, schermo intero o finestra; monitor scollegato = uscita in errore e riapertura automatica al ritorno). Preload in sandbox che consegna le credenziali solo alle finestre del motore: regia alla postazione, sola lettura alle uscite.
+- `apps/renderer` — finestre di uscita (PixiJS, WebGL): `src/frame.ts` decide cosa mostrare (logica pura, provata a parte), `src/painter.ts` disegna. Eseguono solo lo stato ricevuto; mai messaggi d'errore al pubblico.
 - `apps/client` — postazione React + Vite + Tailwind 4, servita dal motore (anche da browser in rete locale).
 - `packages/core-looks` — look Sala e Palco del nucleo.
+- `packages/engine-client` — collegamento al motore (presentazione, accesso, patch in ordine, ricollegamento) condiviso da postazione e uscite.
 - `e2e` — Playwright avvia l'app Electron vera, agisce come l'operatore e salva screenshot in `e2e/screenshots/`.
 
 ## Regole
@@ -20,6 +22,7 @@ Il contenitore di Cuelith: motore live, applicazione desktop (Electron), postazi
 - **Le modalità sono layout dichiarativi** (`src/modes/core.ts`) validati con lo schema dei moduli; il nucleo non ha percorsi privilegiati.
 - **Verifica dell'interfaccia**: ogni cambiamento visibile si prova con `pnpm e2e` e si guardano gli screenshot, confrontandoli col documento.
 - `ELECTRON_RUN_AS_NODE` (impostato dai processi delle estensioni di VS Code) fa partire Electron come Node: `pnpm start` ed e2e lo tolgono da soli.
+- Le decisioni prese durante il lavoro stanno in `cuelith-docs/decisioni/` e valgono come il documento.
 - Prima di ogni commit: `pnpm check` e `pnpm exec prettier --check .` verdi, e `pnpm e2e` se è cambiata l'interfaccia o l'app desktop.
 - Lavoro su `dev`; `main` riceve solo release taggate (SemVer).
 

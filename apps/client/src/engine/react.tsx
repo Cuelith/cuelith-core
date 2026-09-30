@@ -6,7 +6,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import type { EngineConnection, EngineSnapshot } from "./connection.js";
+import type { EngineConnection, EngineSnapshot } from "@cuelith-core/engine-client";
 
 const ConnectionContext = createContext<EngineConnection | undefined>(undefined);
 

@@ -16,6 +16,7 @@
   "dependencies": {
     "@cuelith-core/client": "workspace:*",
     "@cuelith-core/engine": "workspace:*",
+    "@cuelith-core/renderer": "workspace:*",
     "@cuelith/protocol": "link:../../../cuelith-sdk/packages/protocol",
     "@cuelith/ui": "link:../../../cuelith-sdk/packages/ui"
   },

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  expect,
   test as base,
   _electron as electron,
   type ElectronApplication,
@@ -43,18 +44,27 @@ export async function launchApp(): Promise<RunningApp> {
     await rm(userData, { recursive: true, force: true });
     throw error;
   }
-  const station = await app.firstWindow();
   const problems: string[] = [];
-  station.on("console", (message) => {
-    if (message.type() === "error") problems.push(`console: ${message.text()}`);
-  });
-  station.on("pageerror", (error) => problems.push(`pagina: ${error.message}`));
-  station.on("request", (request) => {
-    const url = new URL(request.url());
-    if (url.hostname !== "127.0.0.1" && url.protocol !== "data:" && url.protocol !== "blob:") {
-      problems.push(`richiesta esterna: ${request.url()}`);
-    }
-  });
+  // Ogni finestra (postazione e uscite): errori in console e richieste verso l'esterno.
+  const watched = new WeakSet<Page>();
+  const watch = (page: Page) => {
+    if (watched.has(page)) return;
+    watched.add(page);
+    page.on("console", (message) => {
+      if (message.type() === "error") problems.push(`console: ${message.text()}`);
+    });
+    page.on("pageerror", (error) => problems.push(`pagina: ${error.message}`));
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (url.hostname !== "127.0.0.1" && url.protocol !== "data:" && url.protocol !== "blob:") {
+        problems.push(`richiesta esterna: ${request.url()}`);
+      }
+    });
+  };
+  app.on("window", watch);
+  const station = await app.firstWindow();
+  // La postazione puo' essere nata prima dell'ascoltatore: la si segue comunque.
+  watch(station);
   return {
     app,
     station,
@@ -78,3 +88,13 @@ export const test = base.extend<{ running: RunningApp }>({
     }
   },
 });
+
+/** Crea un testo dalla scaletta e aspetta che l'editor si chiuda. */
+export async function createText(station: Page, title: string, slides: string[]): Promise<void> {
+  await station.getByRole("button", { name: "+ Testo" }).click();
+  const editor = station.getByRole("dialog", { name: "Nuovo testo" });
+  await editor.getByLabel("Titolo").fill(title);
+  await editor.getByLabel("Testo").fill(slides.join("\n\n"));
+  await editor.getByRole("button", { name: "Salva" }).click();
+  await expect(editor).toBeHidden();
+}

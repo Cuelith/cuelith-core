@@ -1,0 +1,30 @@
+{
+  "name": "@cuelith-core/engine-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Collegamento al motore per postazioni e finestre di uscita: presentazione, accesso, stato con patch in ordine, ricollegamento.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cuelith/protocol": "link:../../../cuelith-sdk/packages/protocol"
+  },
+  "devDependencies": {
+    "@cuelith-core/engine": "workspace:*",
+    "@types/node": "24.19.0",
+    "eslint": "10.11.0",
+    "typescript": "6.0.3",
+    "vitest": "5.0.2"
+  }
+}

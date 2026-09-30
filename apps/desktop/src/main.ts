@@ -5,6 +5,7 @@ import { consoleLogger, startEngine, type Engine } from "@cuelith-core/engine";
 import { DEFAULT_ENGINE_PORT } from "@cuelith/protocol";
 import { app, BrowserWindow, ipcMain, Menu, session } from "electron";
 import { electronDisplays } from "./displays.js";
+import { OutputWindows } from "./outputs.js";
 import { resolveAppPaths } from "./paths.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -20,8 +21,12 @@ app.enableSandbox();
 
 let engine: Engine | undefined;
 let station: BrowserWindow | undefined;
-/** webContents delle finestre locali a cui si consegnano le credenziali. */
-const trusted = new Set<number>();
+let outputs: OutputWindows | undefined;
+/**
+ * Finestre locali a cui si consegnano le credenziali: la postazione riceve
+ * quelle di regia, le uscite quelle di sola lettura.
+ */
+const trusted = new Map<number, "station" | "output">();
 
 function engineOrigin(): string {
   if (engine === undefined) throw new Error("motore non avviato");
@@ -52,19 +57,41 @@ async function launchEngine(): Promise<Engine> {
   }
 }
 
-function lockDown(window: BrowserWindow): void {
+/** Finestra con le preferenze sicure comuni, registrata col suo ruolo. */
+function createWindow(
+  role: "station" | "output",
+  options: Electron.BrowserWindowConstructorOptions,
+): BrowserWindow {
+  const window = new BrowserWindow({
+    ...options,
+    webPreferences: {
+      preload: path.join(here, "preload.cjs"),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      spellcheck: false,
+      // Le uscite devono disegnare a 60 fps anche quando non hanno il fuoco.
+      backgroundThrottling: role === "station",
+    },
+  });
+  lockDown(window, role);
+  return window;
+}
+
+function lockDown(window: BrowserWindow, role: "station" | "output"): void {
   const origin = engineOrigin();
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, url) => {
     if (new URL(url).origin !== origin) event.preventDefault();
   });
   const id = window.webContents.id;
-  trusted.add(id);
+  trusted.set(id, role);
   window.on("closed", () => trusted.delete(id));
 }
 
 function openStation(): BrowserWindow {
-  const window = new BrowserWindow({
+  const window = createWindow("station", {
     title: "Cuelith",
     width: 1440,
     height: 900,
@@ -73,16 +100,7 @@ function openStation(): BrowserWindow {
     show: false,
     backgroundColor: BACKGROUND,
     autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(here, "preload.cjs"),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-      spellcheck: false,
-    },
   });
-  lockDown(window);
   window.once("ready-to-show", () => {
     window.show();
   });
@@ -117,14 +135,29 @@ async function main(): Promise<void> {
 
   ipcMain.handle("cuelith:local-session", (event) => {
     const frameUrl = event.senderFrame?.url ?? "";
-    if (!trusted.has(event.sender.id) || !frameUrl.startsWith(`${engineOrigin()}/`)) {
+    const role = trusted.get(event.sender.id);
+    if (role === undefined || !frameUrl.startsWith(`${engineOrigin()}/`)) {
       throw new Error("richiesta non autorizzata");
     }
-    return { name: os.hostname(), token: tokens.station };
+    return { name: os.hostname(), token: role === "station" ? tokens.station : tokens.renderer };
   });
 
   station = openStation();
+  outputs = new OutputWindows({
+    engine,
+    origin: engineOrigin(),
+    logger: consoleLogger,
+    createWindow: (options) => createWindow("output", options),
+  });
+  outputs.start();
 }
+
+// Le finestre di uscita non si chiudono a mano (closable: false): alla chiusura
+// di Cuelith vanno distrutte per prime, o bloccherebbero l'uscita dal programma.
+app.on("before-quit", () => {
+  outputs?.stop();
+  outputs = undefined;
+});
 
 let stopping = false;
 app.on("will-quit", (event) => {

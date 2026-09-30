@@ -7,6 +7,7 @@ function packageDir(specifier: string): string {
 
 export interface AppPaths {
   readonly client: string;
+  readonly renderer: string;
   readonly ui: string;
   readonly bundledPlugins: readonly string[];
 }
@@ -26,6 +27,7 @@ export function resolveAppPaths(options: {
     : [path.resolve(options.appPath, "../../../plugin-locale-it")];
   return {
     client: path.join(packageDir("@cuelith-core/client/package.json"), "dist"),
+    renderer: path.join(packageDir("@cuelith-core/renderer/package.json"), "dist"),
     ui: packageDir("@cuelith/ui/tokens.css"),
     bundledPlugins,
   };

@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
-import { EngineConnection, type Credentials } from "./engine/connection.js";
+import { EngineConnection, type Credentials } from "@cuelith-core/engine-client";
 import { ConnectionProvider } from "./engine/react.js";
 import "./styles.css";
 

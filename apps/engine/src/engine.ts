@@ -10,6 +10,7 @@ import { ModuleRegistry } from "./modules/registry.js";
 import type { HandlerMap } from "./rpc/dispatch.js";
 import { cueHandlers } from "./rpc/handlers/cue.js";
 import { editHandlers } from "./rpc/handlers/edit.js";
+import { outputHandlers } from "./rpc/handlers/outputs.js";
 import { readHandlers } from "./rpc/handlers/read.js";
 import { sessionHandlers } from "./rpc/handlers/session.js";
 import { attachRpcServer } from "./rpc/server.js";
@@ -38,6 +39,11 @@ export interface Engine {
   /** Credenziali delle finestre locali; da passare solo a Electron, mai in rete. */
   readonly tokens: { readonly station: string; readonly renderer: string };
   readonly context: EngineContext;
+  /**
+   * Stato di un'uscita riportato da chi la esegue (le finestre Electron):
+   * "error" con la chiave del problema, es. monitor scollegato.
+   */
+  setOutputStatus(outputId: string, status: "ok" | "error", error?: string): void;
   stop(): Promise<void>;
 }
 
@@ -46,6 +52,7 @@ const handlers: HandlerMap = {
   ...readHandlers,
   ...cueHandlers,
   ...editHandlers,
+  ...outputHandlers,
 };
 
 export async function startEngine(options: EngineOptions): Promise<Engine> {
@@ -98,6 +105,15 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     port,
     tokens: { station: context.tokens.station, renderer: context.tokens.renderer },
     context,
+    setOutputStatus: (outputId, status, error) => {
+      store.update((draft) => {
+        const live = draft.live.outputs[outputId];
+        if (live === undefined) return;
+        live.status = status;
+        if (status === "error" && error !== undefined) live.error = error;
+        else delete live.error;
+      });
+    },
     stop: async () => {
       await rpc.close();
       await new Promise<void>((resolve) => {
