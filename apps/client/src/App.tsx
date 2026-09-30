@@ -26,6 +26,14 @@ export function App() {
     document.documentElement.lang = lang;
   }, [lang]);
 
+  // Collegata e disegnata (o ferma su un problema da mostrare): la finestra di
+  // avvio di Electron lascia il posto alla postazione.
+  const settled =
+    state !== undefined || status.kind === "incompatible" || status.kind === "unpaired";
+  useEffect(() => {
+    if (settled) requestAnimationFrame(() => window.cuelithDesktop?.stationReady());
+  }, [settled]);
+
   if (status.kind === "incompatible") {
     return (
       <Splash

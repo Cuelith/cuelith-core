@@ -41,7 +41,7 @@ function belongsToFocused(event: KeyboardEvent): boolean {
 }
 
 /**
- * Tasti delle sezioni (come in OpenLP), con in onda un elemento a gruppi (un
+ * Tasti delle sezioni, con in onda un elemento a gruppi (un
  * canto). Si ragiona per sezioni nell'ordine di proiezione, non per slide:
  * - V C P B I E O = inizio della prossima strofa, ritornello, pre-ritornello,
  *   bridge, intro, finale o altro; se dopo non ce n'e', si torna all'inizio

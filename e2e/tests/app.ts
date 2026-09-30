@@ -73,7 +73,12 @@ export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp
     });
   };
   app.on("window", watch);
-  const station = await app.firstWindow();
+  // La prima finestra e' quella di avvio (pagina locale): la postazione e' la
+  // finestra servita dal motore.
+  const isStation = (page: Page) => page.url().startsWith("http://127.0.0.1");
+  const station =
+    app.windows().find(isStation) ??
+    (await app.waitForEvent("window", { predicate: isStation, timeout: 30_000 }));
   // La postazione puo' essere nata prima dell'ascoltatore: la si segue comunque.
   watch(station);
   return {

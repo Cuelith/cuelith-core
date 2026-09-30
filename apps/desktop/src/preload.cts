@@ -18,4 +18,8 @@ electron.contextBridge.exposeInMainWorld("cuelithDesktop", {
     electron.ipcRenderer.invoke("cuelith:open-external", typeof url === "string" ? url : ""),
   chooseMediaFiles: (kind: unknown): Promise<unknown> =>
     electron.ipcRenderer.invoke("cuelith:choose-media-files", kind === "image" ? "image" : "audio"),
+  /** L'interfaccia e' pronta: la finestra di avvio lascia il posto alla postazione. */
+  stationReady: (): void => {
+    electron.ipcRenderer.send("cuelith:station-ready");
+  },
 });

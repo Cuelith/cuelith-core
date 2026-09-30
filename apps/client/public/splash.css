@@ -75,3 +75,9 @@ body {
     animation: none;
   }
 }
+
+/* Nella finestra di avvio (senza cornice) un bordo sottile la stacca dal desktop. */
+.cl-splash-window .cl-splash {
+  box-sizing: border-box;
+  border: 1px solid #262a31;
+}

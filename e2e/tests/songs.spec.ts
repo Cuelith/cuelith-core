@@ -30,7 +30,7 @@ async function install(station: Page, app: Parameters<typeof chooseFiles>[0], fi
 
   // La guida al primo uso, coi testi del modulo.
   const guide = station.getByRole("dialog", { name: "Primi passi con «Canti»" });
-  await expect(guide).toContainText("I canti, come in OpenLP");
+  await expect(guide).toContainText("I canti in Cuelith");
   await guide.getByRole("button", { name: "Avanti" }).click();
   await guide.getByRole("button", { name: "Avanti" }).click();
   await expect(guide).toContainText("V C P B I E O");
@@ -81,7 +81,7 @@ test("modulo Canti: nuovo canto con sezioni e ordine, in scaletta, tasti delle s
   await editor.getByRole("button", { name: "Salva e metti in scaletta" }).click();
   await expect(station.getByText("«Santo» salvato e messo in scaletta.")).toBeVisible();
 
-  // Esportazione di un canto in OpenLyrics (per OpenLP e gli altri programmi).
+  // Esportazione di un canto in OpenLyrics (formato aperto, per gli altri programmi).
   const exported = path.join(mkdtempSync(path.join(os.tmpdir(), "cuelith-canto-")), "Santo.xml");
   await chooseFiles(app, exported);
   await editor.getByRole("button", { name: "Esporta OpenLyrics" }).click();

@@ -97,8 +97,7 @@ function createWindow(
 
 function lockDown(window: BrowserWindow, role: "station" | "output"): void {
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  // La postazione nasce prima del motore (schermata di avvio): l'origine si
-  // controlla al momento; finche' il motore non c'e' nessuna navigazione passa.
+  // L'origine si controlla al momento: senza motore nessuna navigazione passa.
   window.webContents.on("will-navigate", (event, url) => {
     if (engine === undefined || new URL(url).origin !== engineOrigin()) event.preventDefault();
   });
@@ -110,12 +109,67 @@ function lockDown(window: BrowserWindow, role: "station" | "output"): void {
 /** Icona della finestra e della barra delle applicazioni (originale 1024 px). */
 const ICON = path.join(here, "..", "build", "icon.png");
 
+/** Dimensioni della finestra di avvio (proporzioni del logo con un po' d'aria). */
+const SPLASH = { width: 600, height: 340 };
+/** Se l'interfaccia non si dichiara pronta, la postazione si mostra comunque. */
+const STATION_READY_TIMEOUT_MS = 20_000;
+
+let splash: BrowserWindow | undefined;
+
 /**
- * La postazione si apre subito con la schermata di avvio (logo), mentre parte
- * il motore; poi `showStation` carica l'interfaccia, che mostra la stessa
- * schermata finche' non e' collegata.
+ * Finestra di avvio: piccola, senza bordi, al centro dello schermo, col logo.
+ * Compare subito, mentre partono motore e interfaccia; sparisce quando la
+ * postazione e' pronta. Solo una pagina locale fissa: niente preload, niente
+ * navigazione, nessuna credenziale.
  */
-function openStation(paths: AppPaths): BrowserWindow {
+function openSplash(paths: AppPaths): BrowserWindow {
+  const window = new BrowserWindow({
+    ...SPLASH,
+    title: "Cuelith",
+    icon: ICON,
+    frame: false,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    center: true,
+    show: false,
+    backgroundColor: BACKGROUND,
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event) => {
+    event.preventDefault();
+  });
+  window.once("ready-to-show", () => {
+    window.show();
+  });
+  window.on("closed", () => {
+    splash = undefined;
+    // Chiusa a mano prima che la postazione esista: si esce.
+    if (station === undefined) app.quit();
+  });
+  void window.loadFile(path.join(paths.client, "splash.html"));
+  return window;
+}
+
+/** Vero se la finestra di avvio e' stata chiusa prima che nascesse la postazione. */
+function startupCancelled(): boolean {
+  return splash === undefined && station === undefined;
+}
+
+/** La postazione pronta prende il posto della finestra di avvio. */
+function revealStation(): void {
+  if (station !== undefined && !station.isDestroyed() && !station.isVisible()) station.show();
+  splash?.destroy();
+}
+
+/**
+ * La postazione nasce nascosta dopo l'avvio del motore e si mostra quando
+ * l'interfaccia e' collegata e disegnata (`stationReady`), al posto della
+ * finestra di avvio.
+ */
+function openStation(): BrowserWindow {
   const window = createWindow("station", {
     title: "Cuelith",
     icon: ICON,
@@ -127,8 +181,9 @@ function openStation(paths: AppPaths): BrowserWindow {
     backgroundColor: BACKGROUND,
     autoHideMenuBar: true,
   });
-  window.once("ready-to-show", () => {
-    window.show();
+  const fallback = setTimeout(revealStation, STATION_READY_TIMEOUT_MS);
+  window.on("show", () => {
+    clearTimeout(fallback);
   });
   // La postazione e' il programma: chiuderla chiude Cuelith (dopo aver chiesto
   // se salvare le modifiche).
@@ -140,12 +195,8 @@ function openStation(paths: AppPaths): BrowserWindow {
   window.on("closed", () => {
     station = undefined;
   });
-  void window.loadFile(path.join(paths.client, "splash.html"));
-  return window;
-}
-
-function showStation(window: BrowserWindow): void {
   void window.loadURL(`${engineOrigin()}/`);
+  return window;
 }
 
 async function main(): Promise<void> {
@@ -165,9 +216,12 @@ async function main(): Promise<void> {
     callback(false);
   });
 
-  const window = openStation(appPaths());
-  station = window;
+  splash = openSplash(appPaths());
   engine = await launchEngine();
+
+  ipcMain.on("cuelith:station-ready", (event) => {
+    if (trusted.get(event.sender.id) === "station") revealStation();
+  });
   const tokens = engine.tokens;
 
   ipcMain.handle("cuelith:local-session", (event) => {
@@ -222,8 +276,9 @@ async function main(): Promise<void> {
     await shell.openExternal(parsed.href);
   });
 
-  // Chiusa durante l'avvio: Cuelith sta gia' uscendo.
-  if (!window.isDestroyed()) showStation(window);
+  // Finestra di avvio chiusa a mano mentre partiva il motore: Cuelith sta uscendo.
+  if (startupCancelled()) return;
+  station = openStation();
   outputs = new OutputWindows({
     engine,
     origin: engineOrigin(),

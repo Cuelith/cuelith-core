@@ -20,6 +20,8 @@ declare global {
       readonly saveTextFile: (name: string, content: string) => Promise<void>;
       /** Apre un indirizzo https nel browser del sistema (documentazione dei moduli). */
       readonly openExternal: (url: string) => Promise<void>;
+      /** Interfaccia pronta: Electron chiude la finestra di avvio e mostra la postazione. */
+      readonly stationReady: () => void;
     };
   }
 }

@@ -5,9 +5,18 @@ import { screenshotsDir, test } from "./app.js";
 test("la postazione vuota mostra barra, dock col + e le tre colonne di Presenta", async ({
   running,
 }) => {
-  const { station, problems } = running;
+  const { app, station, problems } = running;
   const mode = station.locator('main[data-mode="core.present"]');
   await expect(mode).toBeVisible();
+
+  // Pronta l'interfaccia, la finestra di avvio col logo sparisce e resta la postazione, visibile.
+  await expect
+    .poll(() =>
+      app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows().map((w) => ({ title: w.getTitle(), visible: w.isVisible() })),
+      ),
+    )
+    .toEqual([{ title: "Cuelith", visible: true }]);
 
   // Barra in alto: marchio, sola modalita' Presenta attiva, nessuna uscita.
   const header = station.locator("header").first();
