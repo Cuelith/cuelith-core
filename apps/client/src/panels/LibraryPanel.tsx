@@ -16,6 +16,7 @@ import { EmptyState, Panel } from "../ui/Panel.js";
 
 const ENTRY_DRAG = "application/x-cuelith-library-entry";
 const LIBRARY_KEY = "cuelith.library";
+const NEW_LIBRARY = "__new__";
 
 function readLibrary(): string | undefined {
   try {
@@ -182,7 +183,10 @@ export function LibraryPanel() {
           aria-label={t("core.library.choose")}
           value={libraryId ?? ""}
           onChange={(event) => {
-            chooseLibrary(event.target.value === "" ? undefined : event.target.value);
+            const value = event.target.value;
+            // L'ultima voce della tendina crea una libreria (la scelta resta quella di prima).
+            if (value === NEW_LIBRARY) setDialog({ kind: "newLibrary" });
+            else chooseLibrary(value === "" ? undefined : value);
           }}
           className={`${INPUT} min-w-0 flex-1 py-1.5`}
         >
@@ -192,6 +196,7 @@ export function LibraryPanel() {
               {t("core.library.option", { name: l.name, count: l.count })}
             </option>
           ))}
+          <option value={NEW_LIBRARY}>+ {t("core.library.new")}</option>
         </select>
         <MenuButton
           label={t("core.library.menu")}

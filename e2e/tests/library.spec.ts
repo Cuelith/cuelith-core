@@ -11,9 +11,11 @@ async function openLibraries(station: Page): Promise<void> {
   await expect(station.getByRole("combobox", { name: "Libreria" })).toBeVisible();
 }
 
+/** Nuova libreria dalla tendina (la via piu' visibile); il menu ⋯ fa lo stesso. */
 async function newLibrary(station: Page, name: string): Promise<void> {
-  await station.getByRole("button", { name: "Azioni sulle librerie" }).click();
-  await station.getByRole("menuitem", { name: "Nuova libreria…" }).click();
+  await station
+    .getByRole("combobox", { name: "Libreria" })
+    .selectOption({ label: "+ Nuova libreria…" });
   const dialog = station.getByRole("dialog", { name: "Nuova libreria…" });
   await dialog.getByLabel("Nome").fill(name);
   await dialog.getByRole("button", { name: "Crea" }).click();
@@ -33,7 +35,7 @@ test("librerie: canto con crediti, tag e base; ricerca, versioni, in scaletta e 
   await expect(station.getByRole("combobox", { name: "Libreria" })).toHaveValue(/.+/);
 
   // Nuovo elemento nella libreria scelta: testo, crediti, tag e base musicale.
-  await station.getByRole("button", { name: "+ Nuovo" }).click();
+  await station.getByRole("button", { name: "+ Testo" }).click();
   const editor = station.getByRole("dialog", { name: "Nuovo elemento in libreria" });
   await editor.getByLabel("Titolo").fill("Luce del mattino");
   await editor.getByLabel("Testo").fill("Vieni su di noi\n\nResta con noi");
@@ -110,7 +112,7 @@ test("l'originale cambia in libreria: la copia in scaletta si aggiorna a richies
 }) => {
   const { station, problems } = running;
   await openLibraries(station);
-  await station.getByRole("button", { name: "+ Nuovo" }).click();
+  await station.getByRole("button", { name: "+ Testo" }).click();
   let editor = station.getByRole("dialog", { name: "Nuovo elemento in libreria" });
   await editor.getByLabel("Titolo").fill("Avvisi");
   await editor.getByLabel("Testo").fill("Cena domenica");
