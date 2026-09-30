@@ -41,11 +41,39 @@ function belongsToFocused(event: KeyboardEvent): boolean {
 }
 
 /**
- * Tasti delle sezioni (come in OpenLP): con in onda un elemento a gruppi (un
- * canto), V C P B I E O vanno alla prossima strofa, ritornello, pre-ritornello,
- * bridge, intro, finale o altro. Si ricomincia dall'inizio se non ce n'e' dopo.
+ * Tasti delle sezioni (come in OpenLP), con in onda un elemento a gruppi (un
+ * canto). Si ragiona per sezioni nell'ordine di proiezione, non per slide:
+ * - V C P B I E O = inizio della prossima strofa, ritornello, pre-ritornello,
+ *   bridge, intro, finale o altro; se dopo non ce n'e', si torna all'inizio
+ *   dell'ultima incontrata (es. C ripete il ritornello). Mai salti all'indietro
+ *   fino all'inizio del canto.
+ * Niente "lettera + numero": la lettera salterebbe subito e il numero dopo,
+ * con un lampo della sezione sbagliata in onda. Per una sezione precisa si
+ * clicca la sua slide.
  */
 const SECTION_KEYS = new Set(["v", "c", "p", "b", "i", "e", "o"]);
+
+/** Dove comincia ogni sezione nella sequenza proiettata (una ripetizione e' una nuova occorrenza). */
+export function sectionStarts(
+  item: Parameters<typeof slideSequence>[0],
+): { group: string; start: number }[] {
+  const starts: { group: string; start: number }[] = [];
+  if (item.arrangement !== undefined) {
+    let index = 0;
+    for (const group of item.arrangement) {
+      const count = item.slides.filter((s) => s.group === group).length;
+      if (count > 0) starts.push({ group, start: index });
+      index += count;
+    }
+    return starts;
+  }
+  item.slides.forEach((slide, index) => {
+    if (slide.group !== undefined && slide.group !== item.slides[index - 1]?.group) {
+      starts.push({ group: slide.group, start: index });
+    }
+  });
+  return starts;
+}
 
 export function sectionTarget(
   doc: StateDocument,
@@ -57,14 +85,12 @@ export function sectionTarget(
   const entry = doc.show.playlist.find((e) => e.id === entryId);
   const item = entry === undefined ? undefined : doc.show.items[entry.itemId];
   if (item === undefined) return undefined;
-  const sequence = slideSequence(item);
-  for (let step = 1; step <= sequence.length; step++) {
-    const index = (cursor.slideIndex + step) % sequence.length;
-    if (sequence[index]?.group?.toLowerCase().startsWith(letter) === true) {
-      return { entryId, slideIndex: index };
-    }
-  }
-  return undefined;
+  const matches = sectionStarts(item).filter(({ group }) => group.toLowerCase().startsWith(letter));
+  // Avanti se c'e'; altrimenti l'inizio dell'ultima gia' incontrata.
+  const target =
+    matches.find(({ start }) => start > cursor.slideIndex) ??
+    matches.filter(({ start }) => start <= cursor.slideIndex).at(-1);
+  return target === undefined ? undefined : { entryId, slideIndex: target.start };
 }
 
 export function useCueShortcuts(): void {
@@ -90,8 +116,9 @@ export function useCueShortcuts(): void {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (document.querySelector("dialog[open]") !== null) return;
       const letter = event.key.toLowerCase();
-      if (SECTION_KEYS.has(letter) && !belongsToFocused(event) && latest.current !== undefined) {
-        const target = sectionTarget(latest.current, letter);
+      const doc = latest.current;
+      if (SECTION_KEYS.has(letter) && doc !== undefined && !belongsToFocused(event)) {
+        const target = sectionTarget(doc, letter);
         if (target !== undefined) {
           event.preventDefault();
           void run("cue.goto", target);

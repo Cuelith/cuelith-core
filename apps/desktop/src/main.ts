@@ -13,7 +13,7 @@ import {
   saveTextFile,
 } from "./files.js";
 import { OutputWindows } from "./outputs.js";
-import { resolveAppPaths } from "./paths.js";
+import { resolveAppPaths, type AppPaths } from "./paths.js";
 import { folderFetch } from "./test-registry.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -43,12 +43,16 @@ function engineOrigin(): string {
   return `http://${engine.host}:${engine.port}`;
 }
 
-async function launchEngine(): Promise<Engine> {
-  const paths = resolveAppPaths({
+function appPaths(): AppPaths {
+  return resolveAppPaths({
     packaged: app.isPackaged,
     appPath: app.getAppPath(),
     resourcesPath: process.resourcesPath,
   });
+}
+
+async function launchEngine(): Promise<Engine> {
+  const paths = appPaths();
   const options = {
     version: app.getVersion(),
     paths: { ...paths, data: app.getPath("userData") },
@@ -92,19 +96,29 @@ function createWindow(
 }
 
 function lockDown(window: BrowserWindow, role: "station" | "output"): void {
-  const origin = engineOrigin();
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  // La postazione nasce prima del motore (schermata di avvio): l'origine si
+  // controlla al momento; finche' il motore non c'e' nessuna navigazione passa.
   window.webContents.on("will-navigate", (event, url) => {
-    if (new URL(url).origin !== origin) event.preventDefault();
+    if (engine === undefined || new URL(url).origin !== engineOrigin()) event.preventDefault();
   });
   const id = window.webContents.id;
   trusted.set(id, role);
   window.on("closed", () => trusted.delete(id));
 }
 
-function openStation(): BrowserWindow {
+/** Icona della finestra e della barra delle applicazioni (originale 1024 px). */
+const ICON = path.join(here, "..", "build", "icon.png");
+
+/**
+ * La postazione si apre subito con la schermata di avvio (logo), mentre parte
+ * il motore; poi `showStation` carica l'interfaccia, che mostra la stessa
+ * schermata finche' non e' collegata.
+ */
+function openStation(paths: AppPaths): BrowserWindow {
   const window = createWindow("station", {
     title: "Cuelith",
+    icon: ICON,
     width: 1440,
     height: 900,
     minWidth: 1024,
@@ -126,8 +140,12 @@ function openStation(): BrowserWindow {
   window.on("closed", () => {
     station = undefined;
   });
-  void window.loadURL(`${engineOrigin()}/`);
+  void window.loadFile(path.join(paths.client, "splash.html"));
   return window;
+}
+
+function showStation(window: BrowserWindow): void {
+  void window.loadURL(`${engineOrigin()}/`);
 }
 
 async function main(): Promise<void> {
@@ -147,6 +165,8 @@ async function main(): Promise<void> {
     callback(false);
   });
 
+  const window = openStation(appPaths());
+  station = window;
   engine = await launchEngine();
   const tokens = engine.tokens;
 
@@ -202,7 +222,8 @@ async function main(): Promise<void> {
     await shell.openExternal(parsed.href);
   });
 
-  station = openStation();
+  // Chiusa durante l'avvio: Cuelith sta gia' uscendo.
+  if (!window.isDestroyed()) showStation(window);
   outputs = new OutputWindows({
     engine,
     origin: engineOrigin(),

@@ -1,12 +1,19 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 import { useEngine, useT } from "./engine/react.js";
 import { Shell } from "./shell/Shell.js";
-import { BrandMark } from "./shell/TopBar.js";
 
-function Centered({ children }: { children: ReactNode }) {
+/**
+ * Schermata di avvio (public/splash.css): identica a quella che Electron
+ * mostra mentre parte il motore, con sotto lo stato del collegamento.
+ */
+function Splash({ status, busy }: { status: string; busy: boolean }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-      {children}
+    <div className="cl-splash">
+      <img className="cl-splash__logo" src="/brand/cuelith-logo.png" alt="Cuelith" />
+      <div className="cl-splash__bar" style={busy ? undefined : { visibility: "hidden" }} />
+      <p role="status" className="cl-splash__status">
+        {status}
+      </p>
     </div>
   );
 }
@@ -21,31 +28,17 @@ export function App() {
 
   if (status.kind === "incompatible") {
     return (
-      <Centered>
-        <BrandMark size={40} />
-        <p className="max-w-md text-muted">
-          {t("core.connection.incompatible", { engine: status.engineProtocol })}
-        </p>
-      </Centered>
+      <Splash
+        busy={false}
+        status={t("core.connection.incompatible", { engine: status.engineProtocol })}
+      />
     );
   }
   if (status.kind === "unpaired") {
-    return (
-      <Centered>
-        <BrandMark size={40} />
-        <p className="max-w-md text-muted">{t("core.pairing.required")}</p>
-      </Centered>
-    );
+    return <Splash busy={false} status={t("core.pairing.required")} />;
   }
   if (state === undefined) {
-    return (
-      <Centered>
-        <BrandMark size={40} />
-        <p role="status" className="text-sm text-faint">
-          {t("core.connection.connecting")}
-        </p>
-      </Centered>
-    );
+    return <Splash busy status={t("core.connection.connecting")} />;
   }
   return <Shell />;
 }

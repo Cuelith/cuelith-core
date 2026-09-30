@@ -1,0 +1,77 @@
+/*
+ * Schermata di avvio di Cuelith: la stessa dalla finestra di Electron (mentre
+ * parte il motore) alla postazione (mentre si collega), cosi' non ci sono
+ * stacchi. Solo colori fissi: i token dell'interfaccia non sono ancora caricati.
+ */
+html,
+body {
+  margin: 0;
+  background: #0b0c0e;
+}
+
+.cl-splash {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  background: #0b0c0e;
+  color: #7c818a;
+  font:
+    13px/1.4 "Schibsted Grotesk Variable",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  text-align: center;
+}
+
+.cl-splash__logo {
+  display: block;
+  width: min(360px, 60vw);
+  height: auto;
+}
+
+.cl-splash__bar {
+  position: relative;
+  width: min(220px, 40vw);
+  height: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: #1c1f24;
+}
+
+.cl-splash__bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: #37d1bf;
+  animation: cl-splash-run 1.2s ease-in-out infinite;
+}
+
+/* Spazio fisso per il testo di stato: il logo non si sposta quando compare. */
+.cl-splash__status {
+  min-height: 20px;
+  max-width: 28rem;
+  margin: 0;
+}
+
+@keyframes cl-splash-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-splash__bar::after {
+    width: 100%;
+    opacity: 0.5;
+    animation: none;
+  }
+}

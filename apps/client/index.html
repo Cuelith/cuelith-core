@@ -5,9 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
     <title>Cuelith</title>
+    <link rel="icon" type="image/svg+xml" href="/brand/cuelith-icon.svg" />
+    <link rel="stylesheet" href="/splash.css" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Schermata di avvio finche' l'interfaccia non e' pronta (React la sostituisce). -->
+      <div class="cl-splash">
+        <img class="cl-splash__logo" src="/brand/cuelith-logo.png" alt="Cuelith" />
+        <div class="cl-splash__bar"></div>
+        <p class="cl-splash__status"></p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

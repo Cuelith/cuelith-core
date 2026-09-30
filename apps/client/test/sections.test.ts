@@ -1,8 +1,14 @@
 import { emptyLayers, newId, type StateDocument } from "@cuelith/protocol";
 import { describe, expect, it } from "vitest";
-import { sectionTarget } from "../src/station/shortcuts.js";
+import { sectionStarts, sectionTarget } from "../src/station/shortcuts.js";
 
-function song(slideIndex: number): StateDocument {
+function song(
+  slideIndex: number,
+  shape: { slides: string[]; arrangement?: string[] } = {
+    slides: ["v1", "c1", "v2", "b1"],
+    arrangement: ["v1", "c1", "v2", "c1", "b1", "c1"],
+  },
+): StateDocument {
   const itemId = newId();
   const entryId = newId();
   const slide = (group: string) => ({
@@ -21,8 +27,8 @@ function song(slideIndex: number): StateDocument {
           id: itemId,
           type: "core.text",
           title: "Canto",
-          slides: [slide("v1"), slide("c1"), slide("v2"), slide("b1")],
-          arrangement: ["v1", "c1", "v2", "c1", "b1", "c1"],
+          slides: shape.slides.map(slide),
+          ...(shape.arrangement === undefined ? {} : { arrangement: shape.arrangement }),
           meta: {},
         },
       },
@@ -49,13 +55,45 @@ function song(slideIndex: number): StateDocument {
 }
 
 describe("tasti delle sezioni", () => {
-  it("vanno alla prossima occorrenza della sezione nell'ordine di proiezione", () => {
-    // v1 c1 v2 c1 b1 c1: dalla prima strofa, C va al primo ritornello.
+  // Sequenza proiettata: v1 c1 v2 c1 b1 c1 -> slide 0 1 2 3 4 5.
+  it("vanno all'inizio della prossima occorrenza della sezione", () => {
     expect(sectionTarget(song(0), "c")?.slideIndex).toBe(1);
     expect(sectionTarget(song(1), "c")?.slideIndex).toBe(3);
     expect(sectionTarget(song(2), "b")?.slideIndex).toBe(4);
-    // Dopo l'ultima strofa si ricomincia dall'inizio.
-    expect(sectionTarget(song(4), "v")?.slideIndex).toBe(0);
+    expect(sectionTarget(song(0), "v")?.slideIndex).toBe(2);
+  });
+
+  it("dopo l'ultima non si torna all'inizio del canto: si ripete l'ultima incontrata", () => {
+    expect(sectionTarget(song(4), "v")?.slideIndex).toBe(2);
+    expect(sectionTarget(song(5), "c")?.slideIndex).toBe(5);
+  });
+
+  it("una sezione di piu' slide si salta tutta, non slide per slide", () => {
+    // v1 (2 slide) c1 (2 slide) v2: sequenza v1 v1 c1 c1 v2 c1 c1.
+    const doc = song(0, {
+      slides: ["v1", "v1", "c1", "c1", "v2"],
+      arrangement: ["v1", "c1", "v2", "c1"],
+    });
+    const [item] = Object.values(doc.show.items);
+    if (item === undefined) throw new Error("canto mancante");
+    expect(sectionStarts(item)).toEqual([
+      { group: "v1", start: 0 },
+      { group: "c1", start: 2 },
+      { group: "v2", start: 4 },
+      { group: "c1", start: 5 },
+    ]);
+    expect(sectionTarget(doc, "v")?.slideIndex).toBe(4);
+    doc.live.cursor = { ...doc.live.cursor, slideIndex: 1 };
+    expect(sectionTarget(doc, "v")?.slideIndex).toBe(4);
+    expect(sectionTarget(doc, "c")?.slideIndex).toBe(2);
+    doc.live.cursor = { ...doc.live.cursor, slideIndex: 3 };
+    expect(sectionTarget(doc, "c")?.slideIndex).toBe(5);
+  });
+
+  it("senza ordine di proiezione le sezioni seguono le slide", () => {
+    const doc = song(1, { slides: ["v1", "v1", "c1", "v2"] });
+    expect(sectionTarget(doc, "v")?.slideIndex).toBe(3);
+    expect(sectionTarget(doc, "c")?.slideIndex).toBe(2);
   });
 
   it("niente sezione di quel tipo o niente in onda: nessun salto", () => {

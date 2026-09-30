@@ -65,7 +65,9 @@ export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp
     page.on("pageerror", (error) => problems.push(`pagina: ${error.message}`));
     page.on("request", (request) => {
       const url = new URL(request.url());
-      if (url.hostname !== "127.0.0.1" && url.protocol !== "data:" && url.protocol !== "blob:") {
+      // file: = la schermata di avvio, locale, mostrata mentre parte il motore.
+      const local = ["data:", "blob:", "file:"].includes(url.protocol);
+      if (url.hostname !== "127.0.0.1" && !local) {
         problems.push(`richiesta esterna: ${request.url()}`);
       }
     });

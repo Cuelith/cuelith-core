@@ -11,7 +11,7 @@ test("la postazione vuota mostra barra, dock col + e le tre colonne di Presenta"
 
   // Barra in alto: marchio, sola modalita' Presenta attiva, nessuna uscita.
   const header = station.locator("header").first();
-  await expect(header.getByText("CUELITH", { exact: true })).toBeVisible();
+  await expect(header.getByRole("img", { name: "Cuelith" })).toBeVisible();
   await expect(header.getByRole("button", { name: "Presenta" })).toHaveAttribute(
     "aria-pressed",
     "true",

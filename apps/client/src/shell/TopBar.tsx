@@ -5,16 +5,15 @@ import { useRun } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { ShowMenu } from "./ShowMenu.js";
 
-/** Marchio: quadrato ciano (prossimo) con il punto rosso (in onda). */
-export function BrandMark({ size = 28 }: { size?: number }) {
+/** Il logo di Cuelith (originale a 2400 px, sullo stesso nero della postazione). */
+function Logo() {
   return (
-    <span
-      aria-hidden="true"
-      className="grid shrink-0 place-items-center rounded-lg border-[1.5px] border-cue"
-      style={{ width: size, height: size }}
-    >
-      <span className="rounded-full bg-live" style={{ width: size * 0.36, height: size * 0.36 }} />
-    </span>
+    <img
+      src="/brand/cuelith-logo.png"
+      alt="Cuelith"
+      className="block h-[26px] w-auto shrink-0 select-none"
+      draggable={false}
+    />
   );
 }
 
@@ -35,9 +34,8 @@ export function TopBar({
 
   return (
     <header className="col-span-2 flex h-11 items-center gap-3 border-b border-line px-3">
-      <div className="flex items-center gap-2.5 pr-2">
-        <BrandMark />
-        <span className="text-[13px] font-bold tracking-[0.2em]">CUELITH</span>
+      <div className="flex items-center pr-2">
+        <Logo />
       </div>
 
       <ShowMenu files={files} />

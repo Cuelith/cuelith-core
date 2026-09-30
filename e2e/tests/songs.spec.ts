@@ -1,4 +1,5 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, type Page } from "@playwright/test";
@@ -67,7 +68,7 @@ test("modulo Canti: nuovo canto con sezioni e ordine, in scaletta, tasti delle s
 
   await editor.getByLabel("Titolo").fill("Santo");
   await editor.getByLabel("Autore 1", { exact: true }).fill("Tradizionale");
-  await editor.getByLabel("Testo della sezione V1").fill("Santo, santo\nsanto il Signore");
+  await editor.getByLabel("Testo della sezione V1").fill("Santo, santo\n[---]\nsanto il Signore");
   await editor.getByRole("button", { name: "+ Ritornello" }).click();
   await editor.getByLabel("Testo della sezione C1").fill("[G]Osanna, [D]osanna");
   await editor.getByRole("button", { name: "+ Strofa" }).click();
@@ -79,28 +80,59 @@ test("modulo Canti: nuovo canto con sezioni e ordine, in scaletta, tasti delle s
 
   await editor.getByRole("button", { name: "Salva e metti in scaletta" }).click();
   await expect(station.getByText("«Santo» salvato e messo in scaletta.")).toBeVisible();
+
+  // Esportazione di un canto in OpenLyrics (per OpenLP e gli altri programmi).
+  const exported = path.join(mkdtempSync(path.join(os.tmpdir(), "cuelith-canto-")), "Santo.xml");
+  await chooseFiles(app, exported);
+  await editor.getByRole("button", { name: "Esporta OpenLyrics" }).click();
+  await expect
+    .poll(() => (existsSync(exported) ? readFileSync(exported, "utf8") : ""))
+    .toContain("<title>Santo</title>");
+  expect(readFileSync(exported, "utf8")).toContain("<verseOrder>v1 c1 v2 c1</verseOrder>");
   await editor.getByRole("button", { name: "Chiudi", exact: true }).click();
   await expect(station.getByRole("region", { name: "Slide" })).toBeVisible();
   await expect(side.getByRole("list", { name: "Canti" })).toContainText("Santo");
+
+  // Backup: tutti i canti in un file ChordPro, scritto dove sceglie l'operatore.
+  const backup = path.join(mkdtempSync(path.join(os.tmpdir(), "cuelith-canti-")), "canti.cho");
+  await chooseFiles(app, backup);
+  await side.getByRole("button", { name: "Esporta tutti…" }).click();
+  await expect
+    .poll(() => (existsSync(backup) ? readFileSync(backup, "utf8") : ""))
+    .toContain("{title: Santo}");
+  expect(readFileSync(backup, "utf8")).toContain("[G]Osanna, [D]osanna");
 
   // In scaletta: le slide portano il nome della sezione, nell'ordine di proiezione.
   await station.getByRole("tab", { name: "Scaletta", exact: true }).click();
   const entries = station.getByRole("list", { name: "Voci della scaletta" }).getByRole("listitem");
   await expect(entries).toHaveCount(1);
   await entries.first().click({ position: { x: 24, y: 12 } });
-  await expect(station.getByTestId("slide-group")).toHaveText(["V1", "C1", "V2", "C1"]);
+  await expect(station.getByTestId("slide-group")).toHaveText(["V1", "V1", "C1", "V2", "C1"]);
 
-  // In onda: gli accordi non si vedono; V e C portano alla prossima strofa e al ritornello.
+  // In onda: gli accordi non si vedono. I tasti vanno per sezioni, non per
+  // slide: da V1 (due slide) V porta a V2, non alla seconda slide di V1.
   const program = station.locator('[data-screen="live"]');
+  const position = station
+    .getByRole("region", { name: "Programma" })
+    .getByText(/^Santo · \d di 5$/);
   await station.keyboard.press("Enter");
   await expect(program).toContainText("Santo, santo");
-  await station.keyboard.press("c");
-  await expect(program).toContainText("Osanna, osanna");
-  await expect(program).not.toContainText("[G]");
   await station.keyboard.press("v");
+  await expect(position).toHaveText("Santo · 4 di 5");
   await expect(program).toContainText("Benedetto colui che viene");
   await station.keyboard.press("c");
+  await expect(position).toHaveText("Santo · 5 di 5");
   await expect(program).toContainText("Osanna, osanna");
+  await expect(program).not.toContainText("[G]");
+  // Dopo l'ultimo ritornello C lo ripete (non si torna all'inizio del canto).
+  await station.keyboard.press("ArrowLeft");
+  await expect(position).toHaveText("Santo · 4 di 5");
+  await station.keyboard.press("c");
+  await expect(position).toHaveText("Santo · 5 di 5");
+  // V dopo l'ultima strofa riparte da V2 (l'ultima incontrata), non da V1.
+  await station.keyboard.press("v");
+  await expect(position).toHaveText("Santo · 4 di 5");
+  await expect(program).toContainText("Benedetto colui che viene");
   await station.screenshot({ path: path.join(screenshotsDir, "canti-in-onda.png") });
 
   // Importazione: un ChordPro completo si salva, un testo senza autore va completato.
