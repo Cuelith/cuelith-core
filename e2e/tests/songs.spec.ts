@@ -252,10 +252,13 @@ test("canto V1 V2 C1 V3 C1 B1 C1 mandato in onda senza scaletta; i tasti vanno p
   // Dalla scheda Librerie del nucleo: in anteprima senza scaletta.
   await station.getByRole("tab", { name: "Librerie", exact: true }).click();
   const row = station.getByRole("listitem").filter({ hasText: "Glorioso giorno" }).first();
-  await row.hover();
-  await row
-    .getByRole("button", { name: "Metti in anteprima «Glorioso giorno» senza scaletta" })
-    .click();
+  // Le azioni della riga compaiono al passaggio o col fuoco: il fuoco e' affidabile
+  // anche dove il puntatore si posa altrove (CI su Linux).
+  const toPreview = row.getByRole("button", {
+    name: "Metti in anteprima «Glorioso giorno» senza scaletta",
+  });
+  await toPreview.focus();
+  await toPreview.click();
   await expect(station.locator('[data-screen="cue"]')).toContainText("Strofa uno");
   expect(problems).toEqual([]);
 });
