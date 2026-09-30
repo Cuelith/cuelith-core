@@ -49,7 +49,7 @@ export function Shell() {
 function ShellBody() {
   const t = useT();
   const { status } = useEngine();
-  const { editor, unsavedPending } = useStation();
+  const { editor, unsavedQuestion } = useStation();
   const files = useShowFiles();
   useCueShortcuts();
   useFileShortcuts(files);
@@ -117,7 +117,9 @@ function ShellBody() {
           setOutputsOpen(false);
         }}
       />
-      {unsavedPending && <UnsavedDialog />}
+      {unsavedQuestion !== undefined && (
+        <UnsavedDialog key={unsavedQuestion} question={unsavedQuestion} />
+      )}
       <Notices />
       {status.kind === "lost" && (
         <div

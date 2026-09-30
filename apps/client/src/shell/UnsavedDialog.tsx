@@ -4,7 +4,7 @@ import { useStation } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 
 /** "Salvare le modifiche a «nome»?" prima di sostituire lo show aperto. */
-export function UnsavedDialog() {
+export function UnsavedDialog({ question }: { question: number }) {
   const t = useT();
   const { state } = useEngine();
   const { answerUnsaved } = useStation();
@@ -21,7 +21,7 @@ export function UnsavedDialog() {
       ref={dialog}
       // Esc o chiusura = Annulla.
       onClose={() => {
-        answerUnsaved("cancel");
+        answerUnsaved(question, "cancel");
       }}
       aria-labelledby={titleId}
       className="m-auto w-[min(460px,calc(100vw-32px))] rounded-xl border border-line-2 bg-bg-2 p-0 text-fg backdrop:bg-black/60"
@@ -43,7 +43,7 @@ export function UnsavedDialog() {
         <Button
           tone="live"
           onClick={() => {
-            answerUnsaved("discard");
+            answerUnsaved(question, "discard");
           }}
         >
           {t("core.file.dontSave")}
@@ -51,7 +51,7 @@ export function UnsavedDialog() {
         <Button
           tone="primary"
           onClick={() => {
-            answerUnsaved("save");
+            answerUnsaved(question, "save");
           }}
         >
           {t("core.action.save")}

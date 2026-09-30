@@ -83,7 +83,14 @@ test("con modifiche non salvate chiede prima di sostituire lo show", async ({ ru
   await expect(question).toBeHidden();
   await expect(entries).toHaveCount(1);
 
+  // Esc e subito di nuovo Ctrl+N: la nuova domanda deve restare aperta.
   await station.keyboard.press("Control+N");
+  await expect(question).toBeVisible();
+  await station.keyboard.press("Escape");
+  await station.keyboard.press("Control+N");
+  await expect(question).toBeVisible();
+  await station.waitForTimeout(300);
+  await expect(question).toBeVisible();
   await question.getByRole("button", { name: "Non salvare" }).click();
   await expect(entries).toHaveCount(0);
   expect(problems).toEqual([]);

@@ -27,14 +27,16 @@ interface StationContextValue {
   readonly notify: (key: string, params?: Readonly<Record<string, string>>) => void;
   readonly dismiss: (id: number) => void;
   /** Domanda in corso "salvare le modifiche?", se c'e'. */
-  readonly unsavedPending: boolean;
+  /** Id della domanda in corso: una risposta vale solo per la sua domanda. */
+  readonly unsavedQuestion: number | undefined;
   readonly askUnsaved: () => Promise<UnsavedChoice>;
-  readonly answerUnsaved: (choice: UnsavedChoice) => void;
+  readonly answerUnsaved: (question: number, choice: UnsavedChoice) => void;
 }
 
 const StationContext = createContext<StationContextValue | undefined>(undefined);
 
 let nextNotice = 1;
+let nextQuestion = 1;
 
 /** Stato locale della postazione: selezione, editor aperto, avvisi. */
 export function StationProvider({ children }: { children: ReactNode }) {
@@ -42,19 +44,21 @@ export function StationProvider({ children }: { children: ReactNode }) {
   const [editor, setEditor] = useState<EditorRequest | undefined>();
   const [notices, setNotices] = useState<readonly Notice[]>([]);
   const [unsaved, setUnsaved] = useState<
-    { resolve: (choice: UnsavedChoice) => void } | undefined
+    { id: number; resolve: (choice: UnsavedChoice) => void } | undefined
   >();
 
   const askUnsaved = useCallback(
     () =>
       new Promise<UnsavedChoice>((resolve) => {
-        setUnsaved({ resolve });
+        setUnsaved({ id: nextQuestion++, resolve });
       }),
     [],
   );
   const answerUnsaved = useCallback(
-    (choice: UnsavedChoice) => {
-      unsaved?.resolve(choice);
+    (question: number, choice: UnsavedChoice) => {
+      // Una chiusura in ritardo della domanda precedente non tocca quella nuova.
+      if (unsaved?.id !== question) return;
+      unsaved.resolve(choice);
       setUnsaved(undefined);
     },
     [unsaved],
@@ -80,7 +84,7 @@ export function StationProvider({ children }: { children: ReactNode }) {
       notices,
       notify,
       dismiss,
-      unsavedPending: unsaved !== undefined,
+      unsavedQuestion: unsaved?.id,
       askUnsaved,
       answerUnsaved,
     }),
