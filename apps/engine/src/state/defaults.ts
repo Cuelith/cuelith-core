@@ -45,5 +45,6 @@ export function createLiveState(): LiveState {
     clients: [],
     plugins: [],
     dirty: false,
+    libraryRev: 0,
   };
 }

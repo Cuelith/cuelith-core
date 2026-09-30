@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { extname, join } from "node:path";
 import { RPC_PATH } from "@cuelith/protocol";
 import type { Logger } from "../log.js";
+import { serveMedia } from "./media.js";
 import { serveFile } from "./static.js";
 
 export interface StaticPaths {
@@ -11,6 +12,8 @@ export interface StaticPaths {
   readonly renderer?: string;
   /** dist di @cuelith/ui: colori, font, classi comuni. */
   readonly ui: string;
+  /** Archivio media (cartella dati/media), servito sotto /media/. */
+  readonly media?: string;
 }
 
 /** Politica di sicurezza delle pagine del nucleo: niente risorse esterne. */
@@ -58,6 +61,16 @@ export function createHttpServer(paths: StaticPaths, logger: Logger): Server {
     }
     if (path.startsWith("/ui/")) {
       if (!(await serveFile(res, paths.ui, path.slice("/ui".length), { head }))) send(res, 404);
+      return;
+    }
+    if (path.startsWith("/media/")) {
+      const served =
+        paths.media !== undefined &&
+        (await serveMedia(res, paths.media, path.slice("/media/".length), {
+          head,
+          range: req.headers.range,
+        }));
+      if (!served) send(res, 404);
       return;
     }
     if (path === "/renderer" || path.startsWith("/renderer/")) {

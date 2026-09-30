@@ -35,6 +35,7 @@ function freshLive(current: LiveState, show: Show): LiveState {
   return {
     ...live,
     rev: current.rev,
+    libraryRev: current.libraryRev,
     clients: current.clients,
     plugins: current.plugins,
     ...(current.recovery === undefined ? {} : { recovery: current.recovery }),

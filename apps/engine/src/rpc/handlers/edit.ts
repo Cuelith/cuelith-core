@@ -10,11 +10,9 @@ import {
   type StateDocument,
 } from "@cuelith/protocol";
 import type { EngineContext } from "../../context.js";
+import { CORE_ITEM_TYPES } from "../../library/service.js";
 import { normalizeLive } from "../../show/live.js";
 import type { HandlerMap } from "../dispatch.js";
-
-/** Tipi di elemento che il nucleo sa disegnare; gli altri arrivano dai moduli. */
-export const CORE_ITEM_TYPES: readonly string[] = ["core.text"];
 
 /**
  * Ogni modifica allo show passa da qui: dopo la modifica cursore e anteprima
@@ -61,6 +59,13 @@ function checkArrangement(item: Item): void {
   if (item.arrangement.some((g) => !groups.has(g))) throw invalid("core.error.groupMissing");
 }
 
+/** Gli allegati devono essere file gia' nell'archivio media. */
+function checkAttachments(ctx: EngineContext, attachments: Item["attachments"]): void {
+  for (const attachment of attachments ?? []) {
+    if (!ctx.library.db.hasMedia(attachment.mediaId)) throw invalid("core.error.mediaMissing");
+  }
+}
+
 function checkIndex(index: number, max: number): void {
   if (index > max) throw invalid("core.error.indexOutOfRange");
 }
@@ -76,12 +81,16 @@ export const editHandlers: HandlerMap = {
       ) {
         throw invalid("core.error.itemTypeUnknown");
       }
+      checkAttachments(ctx, params.attachments);
       draft.show.items[id] = {
         id,
         type: params.type,
         title: params.title,
         slides: (params.slides ?? []).map(toSlide),
         meta: params.meta ?? {},
+        ...(params.credits === undefined ? {} : { credits: params.credits }),
+        ...(params.tags === undefined ? {} : { tags: params.tags }),
+        ...(params.attachments === undefined ? {} : { attachments: params.attachments }),
       };
     });
     return { id, rev };
@@ -94,6 +103,13 @@ export const editHandlers: HandlerMap = {
       if (params.meta !== undefined) item.meta = params.meta;
       if (params.arrangement === null) delete item.arrangement;
       else if (params.arrangement !== undefined) item.arrangement = params.arrangement;
+      if (params.credits === null) delete item.credits;
+      else if (params.credits !== undefined) item.credits = params.credits;
+      if (params.tags !== undefined) item.tags = params.tags;
+      if (params.attachments !== undefined) {
+        checkAttachments(ctx, params.attachments);
+        item.attachments = params.attachments;
+      }
       checkArrangement(item);
     }),
   }),

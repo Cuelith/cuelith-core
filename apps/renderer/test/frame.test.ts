@@ -71,6 +71,7 @@ function makeDoc() {
       clients: [],
       plugins: [],
       dirty: false,
+      libraryRev: 0,
     },
   };
   expect(StateDocumentSchema.safeParse(doc).success).toBe(true);

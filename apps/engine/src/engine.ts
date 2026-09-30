@@ -17,6 +17,8 @@ import { sessionHandlers } from "./rpc/handlers/session.js";
 import { showHandlers } from "./rpc/handlers/show.js";
 import { attachRpcServer } from "./rpc/server.js";
 import { ShowService } from "./show/service.js";
+import { LibraryService } from "./library/service.js";
+import { libraryHandlers } from "./rpc/handlers/library.js";
 import { createLiveState, createShow } from "./state/defaults.js";
 import { StateStore } from "./state/store.js";
 
@@ -61,6 +63,7 @@ const handlers: HandlerMap = {
   ...editHandlers,
   ...outputHandlers,
   ...showHandlers,
+  ...libraryHandlers,
 };
 
 export async function startEngine(options: EngineOptions): Promise<Engine> {
@@ -96,18 +99,22 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
       : { autosaveIntervalMs: options.autosaveIntervalMs }),
   });
 
+  const library = new LibraryService({ store, modules, dataDir: options.paths.data });
+  await library.start();
+
   const context: EngineContext = {
     version: options.version,
     store,
     locales,
     modules,
+    library,
     shows,
     displays: options.displays,
     tokens: new Tokens(),
     logger,
   };
 
-  const http = createHttpServer(options.paths, logger);
+  const http = createHttpServer({ ...options.paths, media: library.media.dir }, logger);
   const rpc = attachRpcServer(http, context, handlers);
 
   await new Promise<void>((resolve, reject) => {
@@ -138,6 +145,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     stop: async () => {
       await shows.stop();
       await rpc.close();
+      library.stop();
       await new Promise<void>((resolve) => {
         http.close(() => {
           resolve();
