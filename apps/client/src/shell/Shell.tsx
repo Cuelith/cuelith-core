@@ -14,6 +14,7 @@ import { RecoveryBanner } from "./RecoveryBanner.js";
 import { UnsavedDialog } from "./UnsavedDialog.js";
 import { ItemEditorDialog } from "./ItemEditorDialog.js";
 import { TopBar } from "./TopBar.js";
+import { useFollowDirect } from "../station/direct.js";
 
 const MODE_KEY = "cuelith.mode";
 
@@ -54,6 +55,7 @@ function ShellBody() {
   const files = useShowFiles();
   const { panels: modulePanels, editors } = useModuleUi();
   useCueShortcuts();
+  useFollowDirect();
   useFileShortcuts(files);
   const modes = CORE_MODES;
   const [mode, setMode] = useState<Mode>(() => readSavedMode(modes));

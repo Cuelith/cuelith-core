@@ -2,6 +2,7 @@ import { slideSequence, type Item } from "@cuelith/protocol";
 import { useEffect, useState } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
 import { useLibraries } from "../station/library.js";
+import { directItemId } from "../station/direct.js";
 import { itemOfEntry, roomStyle, slideText } from "../station/show.js";
 import { useEditItem } from "../station/editItem.js";
 import { useRun, useStation } from "../station/station.js";
@@ -22,8 +23,18 @@ export function SlidesPanel() {
   const run = useRun();
   if (state === undefined) return null;
 
-  const item = itemOfEntry(state, selectedEntryId);
-  if (selectedEntryId === undefined || item === undefined) {
+  const { live } = state;
+  // La voce di scaletta scelta; se non c'e', l'elemento mandato fuori scaletta.
+  const directId = selectedEntryId === undefined ? directItemId(live) : undefined;
+  const item =
+    directId === undefined ? itemOfEntry(state, selectedEntryId) : live.direct?.[directId];
+  const where =
+    directId !== undefined
+      ? { itemId: directId }
+      : selectedEntryId === undefined
+        ? undefined
+        : { entryId: selectedEntryId };
+  if (where === undefined || item === undefined) {
     return (
       <Panel label={t("core.panel.slides")}>
         <EmptyState title={t("core.slides.empty")} />
@@ -31,37 +42,48 @@ export function SlidesPanel() {
     );
   }
 
-  const entryId = selectedEntryId;
-  const { live } = state;
   const style = roomStyle(state);
   const slides = slideSequence(item);
+  const here = (cursor: { entryId?: string | undefined; itemId?: string | undefined }) =>
+    "itemId" in where ? cursor.itemId === where.itemId : cursor.entryId === where.entryId;
   const liveIndex =
-    live.layers.content.visible && live.cursor.entryId === entryId
-      ? live.cursor.slideIndex
-      : undefined;
-  const previewIndex = live.preview.entryId === entryId ? live.preview.slideIndex : undefined;
+    live.layers.content.visible && here(live.cursor) ? live.cursor.slideIndex : undefined;
+  const previewIndex = here(live.preview) ? live.preview.slideIndex : undefined;
 
   return (
     <Panel
       label={t("core.panel.slides")}
       actions={
-        <div className="flex gap-1.5">
-          <SaveToLibrary item={item} />
-          <Button
-            size="sm"
-            onClick={() => {
-              editShowItem(item);
-            }}
-          >
-            {t("core.action.edit")}
-          </Button>
-        </div>
+        directId !== undefined ? (
+          <DirectActions item={item} />
+        ) : (
+          <div className="flex gap-1.5">
+            <SaveToLibrary item={item} />
+            <Button
+              size="sm"
+              onClick={() => {
+                editShowItem(item);
+              }}
+            >
+              {t("core.action.edit")}
+            </Button>
+          </div>
+        )
       }
     >
       <h3 className="truncate font-display text-lg font-semibold">
         {item.title === "" ? t("core.editor.untitled") : item.title}
       </h3>
-      <LibraryLink item={item} />
+      {directId !== undefined ? (
+        <p className="text-xs text-muted" data-testid="direct-badge">
+          <span className="rounded border border-stage-line px-1.5 py-0.5 text-stage">
+            {t("core.direct.badge")}
+          </span>{" "}
+          {t("core.direct.hint")}
+        </p>
+      ) : (
+        <LibraryLink item={item} />
+      )}
       {slides.length === 0 ? (
         <EmptyState title={t("core.slides.none")} />
       ) : (
@@ -79,10 +101,10 @@ export function SlidesPanel() {
                   aria-label={t("core.slides.tileLabel", { n: index + 1 })}
                   data-state={isLive ? "live" : isPreview ? "preview" : undefined}
                   onClick={() => {
-                    void run("preview.set", { entryId, slideIndex: index });
+                    void run("preview.set", { ...where, slideIndex: index });
                   }}
                   onDoubleClick={() => {
-                    void run("cue.goto", { entryId, slideIndex: index });
+                    void run("cue.goto", { ...where, slideIndex: index });
                   }}
                   className={`relative block aspect-video w-full overflow-hidden rounded-md border-2 bg-screen text-left ${
                     isLive
@@ -122,6 +144,27 @@ export function SlidesPanel() {
       )}
       <p className="text-xs text-faint">{t("core.slides.hint")}</p>
     </Panel>
+  );
+}
+
+/** Elemento fuori scaletta: si puo' mettere in scaletta (la copia viene dalla libreria). */
+function DirectActions({ item }: { item: Item }) {
+  const t = useT();
+  const run = useRun();
+  const { notify } = useStation();
+  const libraryItemId = item.libraryRef?.itemId;
+  if (libraryItemId === undefined) return null;
+  return (
+    <Button
+      size="sm"
+      onClick={() => {
+        void run("playlist.addFromLibrary", { itemId: libraryItemId }).then((added) => {
+          if (added !== undefined) notify("core.direct.added", { title: item.title }, "info");
+        });
+      }}
+    >
+      {t("core.direct.addToPlaylist")}
+    </Button>
   );
 }
 

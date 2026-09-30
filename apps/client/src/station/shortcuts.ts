@@ -1,4 +1,4 @@
-import { slideSequence, type StateDocument } from "@cuelith/protocol";
+import { cursorItem, slideSequence, type Position, type StateDocument } from "@cuelith/protocol";
 import { useEffect, useRef } from "react";
 import { useEngine } from "../engine/react.js";
 import { useRun } from "./station.js";
@@ -43,10 +43,11 @@ function belongsToFocused(event: KeyboardEvent): boolean {
 /**
  * Tasti delle sezioni, con in onda un elemento a gruppi (un
  * canto). Si ragiona per sezioni nell'ordine di proiezione, non per slide:
- * - V C P B I E O = inizio della prossima strofa, ritornello, pre-ritornello,
- *   bridge, intro, finale o altro; se dopo non ce n'e', si torna all'inizio
- *   dell'ultima incontrata (es. C ripete il ritornello). Mai salti all'indietro
- *   fino all'inizio del canto.
+ * - V C P B I E O = inizio della prossima Verse, Chorus, Pre-Chorus, Bridge,
+ *   Intro, Ending, Others nell'ordine di proiezione; dopo l'ultima si riparte
+ *   dalla prima di quel tipo (in cerchio: il tasto non si blocca mai).
+ * - Niente in onda (o non ancora: tasto premuto subito dopo Invio): si parte
+ *   dall'elemento in anteprima, dall'inizio.
  * Niente "lettera + numero": la lettera salterebbe subito e il numero dopo,
  * con un lampo della sezione sbagliata in onda. Per una sezione precisa si
  * clicca la sua slide.
@@ -75,22 +76,21 @@ export function sectionStarts(
   return starts;
 }
 
-export function sectionTarget(
-  doc: StateDocument,
-  letter: string,
-): { entryId: string; slideIndex: number } | undefined {
-  const { cursor } = doc.live;
-  if (cursor.entryId === undefined) return undefined;
-  const entryId = cursor.entryId;
-  const entry = doc.show.playlist.find((e) => e.id === entryId);
-  const item = entry === undefined ? undefined : doc.show.items[entry.itemId];
+export function sectionTarget(doc: StateDocument, letter: string): Position | undefined {
+  const { cursor, preview } = doc.live;
+  const hasProgram = cursor.entryId !== undefined || cursor.itemId !== undefined;
+  const base = hasProgram ? cursor : preview;
+  const item = cursorItem(doc, base);
   if (item === undefined) return undefined;
+  const from = hasProgram ? cursor.slideIndex : -1;
   const matches = sectionStarts(item).filter(({ group }) => group.toLowerCase().startsWith(letter));
-  // Avanti se c'e'; altrimenti l'inizio dell'ultima gia' incontrata.
-  const target =
-    matches.find(({ start }) => start > cursor.slideIndex) ??
-    matches.filter(({ start }) => start <= cursor.slideIndex).at(-1);
-  return target === undefined ? undefined : { entryId, slideIndex: target.start };
+  const target = matches.find(({ start }) => start > from) ?? matches[0];
+  if (target === undefined) return undefined;
+  return base.itemId !== undefined
+    ? { itemId: base.itemId, slideIndex: target.start }
+    : base.entryId !== undefined
+      ? { entryId: base.entryId, slideIndex: target.start }
+      : undefined;
 }
 
 export function useCueShortcuts(): void {

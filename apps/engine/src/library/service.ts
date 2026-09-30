@@ -116,6 +116,11 @@ export class LibraryService {
     return { ...structuredClone(item), id: newId(), libraryRef: { itemId: id, updatedAt } };
   }
 
+  /** Copia di un elemento di libreria da mandare in onda senza scaletta (`live.direct`). */
+  directCopy(libraryItemId: string): Item {
+    return this.#showCopy(libraryItemId);
+  }
+
   /** Mette in scaletta un elemento di libreria; riusa la copia se lo show ne ha gia' una aggiornata. */
   addToShow(draft: StateDocument, libraryItemId: string, index?: number): string {
     const { updatedAt } = this.db.getItem(libraryItemId);

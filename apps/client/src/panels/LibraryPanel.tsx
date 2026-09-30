@@ -14,6 +14,7 @@ import { Button } from "../ui/Button.js";
 import { ConfirmDialog, FieldLabel, INPUT, ModalDialog, PromptDialog } from "../ui/Dialogs.js";
 import { LibraryDialog } from "./library/LibraryDialog.js";
 import { LibraryPicker } from "./library/LibraryPicker.js";
+import { useSendDirect } from "../station/direct.js";
 import { MenuButton, type MenuItem } from "../ui/Menu.js";
 import { EmptyState, Panel } from "../ui/Panel.js";
 
@@ -82,6 +83,8 @@ export function LibraryPanel() {
     }
   };
 
+  const sendDirect = useSendDirect();
+
   const toPlaylist = (item: LibraryItemSummary) => {
     void run("playlist.addFromLibrary", { itemId: item.id });
   };
@@ -114,6 +117,12 @@ export function LibraryPanel() {
   };
 
   const itemMenu = (item: LibraryItemSummary): MenuItem[] => [
+    {
+      label: t("core.action.edit"),
+      action: () => {
+        editLibraryItem(item);
+      },
+    },
     {
       label: t("core.library.duplicate"),
       action: () =>
@@ -313,6 +322,26 @@ export function LibraryPanel() {
                 </span>
               </button>
               <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-1 rounded-md bg-inherit pl-2 opacity-0 pointer-events-none group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+                {/* Senza passare dalla scaletta: in anteprima o subito in onda. */}
+                <Button
+                  size="sm"
+                  aria-label={t("core.direct.toPreviewOf", { title: item.title })}
+                  onClick={() => {
+                    sendDirect(item.id, "preview");
+                  }}
+                >
+                  {t("core.direct.toPreview")}
+                </Button>
+                <Button
+                  size="sm"
+                  tone="live"
+                  aria-label={t("core.direct.toProgramOf", { title: item.title })}
+                  onClick={() => {
+                    sendDirect(item.id, "program");
+                  }}
+                >
+                  {t("core.direct.toProgram")}
+                </Button>
                 <Button
                   size="sm"
                   tone="cue"
@@ -321,14 +350,6 @@ export function LibraryPanel() {
                   }}
                 >
                   {t("core.library.toPlaylist")}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    editLibraryItem(item);
-                  }}
-                >
-                  {t("core.action.edit")}
                 </Button>
                 <MenuButton
                   label={t("core.library.itemMenu", { title: item.title })}

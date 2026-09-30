@@ -1,5 +1,12 @@
 import { creditsFor, FullscreenStyleSchema, type FullscreenStyle } from "@cuelith-core/core-looks";
-import { slideSequence, type Item, type Slide, type StateDocument } from "@cuelith/protocol";
+import {
+  cursorItem,
+  itemById,
+  slideSequence,
+  type Item,
+  type Slide,
+  type StateDocument,
+} from "@cuelith/protocol";
 
 /** Slide pronta da disegnare, con l'identita' che serve alle dissolvenze. */
 export interface ShownSlide {
@@ -38,12 +45,12 @@ function shown(item: Item | undefined, index: number | undefined): ShownSlide | 
 export function programSlide(doc: StateDocument): ShownSlide | undefined {
   const content = doc.live.layers.content;
   if (!content.visible || content.itemId === undefined) return undefined;
-  return shown(doc.show.items[content.itemId], content.slideIndex);
+  return shown(itemById(doc, content.itemId), content.slideIndex);
 }
 
 export function previewSlide(doc: StateDocument): ShownSlide | undefined {
   const { preview } = doc.live;
-  return shown(itemOfEntry(doc, preview.entryId), preview.slideIndex);
+  return shown(cursorItem(doc, preview), preview.slideIndex);
 }
 
 /** Stile del look Sala (template a tutto schermo) con cui la postazione disegna i testi. */

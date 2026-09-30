@@ -69,9 +69,9 @@ test("modulo Canti: nuovo canto con sezioni e ordine, in scaletta, tasti delle s
   await editor.getByLabel("Titolo").fill("Santo");
   await editor.getByLabel("Autore 1", { exact: true }).fill("Tradizionale");
   await editor.getByLabel("Testo della sezione V1").fill("Santo, santo\n[---]\nsanto il Signore");
-  await editor.getByRole("button", { name: "+ Ritornello" }).click();
+  await editor.getByRole("button", { name: "+ Chorus" }).click();
   await editor.getByLabel("Testo della sezione C1").fill("[G]Osanna, [D]osanna");
-  await editor.getByRole("button", { name: "+ Strofa" }).click();
+  await editor.getByRole("button", { name: "+ Verse" }).click();
   await editor.getByLabel("Testo della sezione V2").fill("Benedetto colui che viene");
   await editor.getByLabel("Ordine di proiezione").fill("v1 c1 v2 c1");
   await expect(editor.getByTestId("song-order")).toContainText("V1 → C1 → V2 → C1");
@@ -124,15 +124,14 @@ test("modulo Canti: nuovo canto con sezioni e ordine, in scaletta, tasti delle s
   await expect(position).toHaveText("Santo · 5 di 5");
   await expect(program).toContainText("Osanna, osanna");
   await expect(program).not.toContainText("[G]");
-  // Dopo l'ultimo ritornello C lo ripete (non si torna all'inizio del canto).
-  await station.keyboard.press("ArrowLeft");
-  await expect(position).toHaveText("Santo · 4 di 5");
+  // In cerchio: dopo l'ultimo Chorus C torna al primo, dopo l'ultimo Verse V torna a V1.
   await station.keyboard.press("c");
-  await expect(position).toHaveText("Santo · 5 di 5");
-  // V dopo l'ultima strofa riparte da V2 (l'ultima incontrata), non da V1.
+  await expect(position).toHaveText("Santo · 3 di 5");
   await station.keyboard.press("v");
   await expect(position).toHaveText("Santo · 4 di 5");
-  await expect(program).toContainText("Benedetto colui che viene");
+  await station.keyboard.press("v");
+  await expect(position).toHaveText("Santo · 1 di 5");
+  await expect(program).toContainText("Santo, santo");
   await station.screenshot({ path: path.join(screenshotsDir, "canti-in-onda.png") });
 
   // Importazione: un ChordPro completo si salva, un testo senza autore va completato.
@@ -161,5 +160,102 @@ test("modulo Canti: nuovo canto con sezioni e ordine, in scaletta, tasti delle s
   await editor.getByRole("button", { name: "Chiudi", exact: true }).click();
   await expect(station.getByRole("region", { name: "Slide" })).toBeVisible();
 
+  expect(problems).toEqual([]);
+});
+
+test("canto V1 V2 C1 V3 C1 B1 C1 mandato in onda senza scaletta; i tasti vanno per sezioni, in cerchio", async ({
+  running,
+}) => {
+  test.skip(songsPackage === undefined, "pacchetto plugin-songs non costruito");
+  const { app, station, problems } = running;
+  await install(station, app, songsPackage ?? "");
+  const dock = station.getByRole("navigation", { name: "Moduli" });
+  await dock.getByRole("button", { name: "Canti", exact: true }).click();
+  const side = station.frameLocator('[data-module-panel="cuelith.songs.songs"]');
+  await side.getByRole("button", { name: "+ Nuovo canto" }).click();
+  const editor = station.frameLocator('[data-module-panel="cuelith.songs.editor"]');
+
+  // Nomi delle sezioni fissi (Verse, Chorus, ...), non tradotti.
+  await expect(editor.getByLabel("Tipo della sezione V1")).toHaveValue("verse");
+  await expect(editor.getByLabel("Tipo della sezione V1").locator("option")).toHaveText([
+    "Verse",
+    "Chorus",
+    "Pre-Chorus",
+    "Bridge",
+    "Intro",
+    "Ending",
+    "Others",
+  ]);
+  await editor.getByLabel("Titolo").fill("Glorioso giorno");
+  await editor.getByLabel("Autore 1", { exact: true }).fill("Autore");
+  await editor.getByLabel("Testo della sezione V1").fill("Strofa uno");
+  await editor.getByRole("button", { name: "+ Verse" }).click();
+  await editor.getByLabel("Testo della sezione V2").fill("Strofa due");
+  await editor.getByRole("button", { name: "+ Verse" }).click();
+  await editor.getByLabel("Testo della sezione V3").fill("Strofa tre");
+  await editor.getByRole("button", { name: "+ Chorus" }).click();
+  await editor.getByLabel("Testo della sezione C1").fill("Tu mi hai chiamato");
+  await editor.getByRole("button", { name: "+ Bridge" }).click();
+  await editor.getByLabel("Testo della sezione B1").fill("Ero legato");
+  await editor.getByLabel("Ordine di proiezione").fill("V1 V2 C1 V3 C1 B1 C1");
+  await editor.getByRole("button", { name: "Salva", exact: true }).click();
+  await expect(station.getByText("«Glorioso giorno» salvato.")).toBeVisible();
+  await editor.getByRole("button", { name: "Chiudi", exact: true }).click();
+
+  // Dalla scheda Canti, subito in onda senza passare dalla scaletta.
+  await side
+    .getByRole("button", { name: "Manda subito in onda «Glorioso giorno» senza scaletta" })
+    .click();
+  const program = station.locator('[data-screen="live"]');
+  await expect(program).toContainText("Strofa uno");
+  await expect(station.getByTestId("direct-badge")).toContainText("Fuori scaletta");
+  await expect(station.getByTestId("slide-group")).toHaveText([
+    "V1",
+    "V2",
+    "C1",
+    "V3",
+    "C1",
+    "B1",
+    "C1",
+  ]);
+
+  // I tasti premuti subito dopo il clic nel pannello arrivano alla regia.
+  const position = station
+    .getByRole("region", { name: "Programma" })
+    .getByText(/^Glorioso giorno · \d di 7$/);
+  const expectAfter = async (key: string, n: number) => {
+    await station.keyboard.press(key);
+    await expect(position).toHaveText(`Glorioso giorno · ${String(n)} di 7`);
+  };
+  await expectAfter("v", 2);
+  await expectAfter("v", 4);
+  await expectAfter("v", 1);
+  await expectAfter("c", 3);
+  await expectAfter("c", 5);
+  await expectAfter("c", 7);
+  await expectAfter("c", 3);
+  await expectAfter("b", 6);
+  await expectAfter("ArrowRight", 7);
+  await station.screenshot({ path: path.join(screenshotsDir, "canti-fuori-scaletta.png") });
+
+  // Lo show non cambia; dal pannello Slide lo si puo' mettere in scaletta.
+  await station
+    .getByRole("region", { name: "Slide" })
+    .getByRole("button", { name: "Metti in scaletta" })
+    .click();
+  await expect(station.getByText("«Glorioso giorno» messo in scaletta.")).toBeVisible();
+  await station.getByRole("tab", { name: "Scaletta", exact: true }).click();
+  await expect(
+    station.getByRole("list", { name: "Voci della scaletta" }).getByRole("listitem"),
+  ).toHaveCount(1);
+
+  // Dalla scheda Librerie del nucleo: in anteprima senza scaletta.
+  await station.getByRole("tab", { name: "Librerie", exact: true }).click();
+  const row = station.getByRole("listitem").filter({ hasText: "Glorioso giorno" }).first();
+  await row.hover();
+  await row
+    .getByRole("button", { name: "Metti in anteprima «Glorioso giorno» senza scaletta" })
+    .click();
+  await expect(station.locator('[data-screen="cue"]')).toContainText("Strofa uno");
   expect(problems).toEqual([]);
 });

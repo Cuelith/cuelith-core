@@ -131,7 +131,9 @@ test("l'originale cambia in libreria: la copia in scaletta si aggiorna a richies
   const row = libraryRows(station).first();
   await row.hover();
   await row.getByRole("button", { name: "In scaletta" }).click();
-  await row.getByRole("button", { name: "Modifica" }).click();
+  // «Modifica» sta nel menu ⋯ della riga (in vista: Anteprima, In onda, In scaletta).
+  await row.getByRole("button", { name: /^Altre azioni per/ }).click();
+  await station.getByRole("menuitem", { name: "Modifica" }).click();
   editor = station.getByRole("dialog", { name: "Modifica elemento della libreria" });
   await expect(editor.getByLabel("Testo")).toHaveValue("Cena domenica");
   await editor.getByLabel("Testo").fill("Cena domenica alle 19");

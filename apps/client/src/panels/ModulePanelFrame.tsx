@@ -4,6 +4,7 @@ import {
   isEngineMethod,
   OpenPanelParamsSchema,
   SaveFileParamsSchema,
+  KeyParamsSchema,
   PANEL_CONNECT,
   PANEL_HOST_METHODS,
   PanelToHostSchema,
@@ -115,6 +116,18 @@ export function ModulePanelFrame({
           return;
         }
         await saveTextFile(request.data.name, request.data.content, request.data.mime);
+        send({ type: "result", id, result: {} });
+        return;
+      }
+      if (method === PANEL_HOST_METHODS.key) {
+        // Tasto della regia premuto nel pannello: come se fosse premuto qui
+        // (lo raccolgono i tasti della regia, con le loro regole).
+        const request = KeyParamsSchema.safeParse(params);
+        if (!request.success) {
+          fail(ErrorCode.InvalidParameters, "core.error.invalidParams");
+          return;
+        }
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: request.data.key }));
         send({ type: "result", id, result: {} });
         return;
       }

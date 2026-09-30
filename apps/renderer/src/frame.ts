@@ -6,6 +6,8 @@ import {
   type FullscreenStyle,
 } from "@cuelith-core/core-looks";
 import {
+  cursorItem,
+  itemById,
   slideSequence,
   type Feed,
   type Look,
@@ -75,7 +77,8 @@ const textOf = (slide: Slide | undefined): string | undefined => {
 /** Slide in onda e prossima, dal layer del contenuto e dall'anteprima. */
 function presentation(doc: StateDocument) {
   const content = doc.live.layers.content;
-  const item = content.itemId === undefined ? undefined : doc.show.items[content.itemId];
+  // Anche un elemento fuori scaletta (mandato direttamente in onda).
+  const item = itemById(doc, content.itemId);
   const sequence = item === undefined ? [] : slideSequence(item);
   const onAir =
     content.visible && item !== undefined && content.slideIndex !== undefined
@@ -86,8 +89,7 @@ function presentation(doc: StateDocument) {
       ? undefined
       : creditsFor(item, content.slideIndex, sequence.length);
   const { preview } = doc.live;
-  const previewEntry = doc.show.playlist.find((e) => e.id === preview.entryId);
-  const previewItem = previewEntry === undefined ? undefined : doc.show.items[previewEntry.itemId];
+  const previewItem = cursorItem(doc, preview);
   const next =
     previewItem === undefined ? undefined : slideSequence(previewItem)[preview.slideIndex];
   const key =

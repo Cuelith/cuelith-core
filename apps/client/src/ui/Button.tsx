@@ -20,7 +20,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`rounded-md border ${size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[13px]"} disabled:pointer-events-none disabled:opacity-40 ${tones[tone]} ${className}`}
+      className={`whitespace-nowrap rounded-md border ${size === "sm" ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-[13px]"} disabled:pointer-events-none disabled:opacity-40 ${tones[tone]} ${className}`}
       {...props}
     />
   );

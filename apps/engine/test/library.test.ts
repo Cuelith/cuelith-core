@@ -206,6 +206,64 @@ describe("librerie", () => {
   });
 });
 
+describe("fuori scaletta (protocollo 1.5)", () => {
+  it("un elemento della libreria va in onda senza scaletta e senza modificare lo show", async () => {
+    const { ok, state } = await start();
+    const item = song("Luce", ["uno", "due"]);
+    await ok("library.saveItem", { item });
+    const { id } = await ok("cue.send", { libraryItemId: item.id, to: "program" });
+    const doc = state();
+    expect(doc.show.playlist).toEqual([]);
+    expect(doc.show.items).toEqual({});
+    expect(doc.live.dirty).toBe(false);
+    expect(doc.live.direct?.[id]?.libraryRef?.itemId).toBe(item.id);
+    expect(doc.live.cursor).toEqual({ itemId: id, slideIndex: 0 });
+    expect(doc.live.layers.content).toEqual({ visible: true, itemId: id, slideIndex: 0 });
+    // L'anteprima e' la slide dopo; avanti e indietro restano nell'elemento.
+    expect(doc.live.preview).toEqual({ itemId: id, slideIndex: 1 });
+    await ok("cue.next", {});
+    expect(state().live.cursor).toEqual({ itemId: id, slideIndex: 1 });
+    await ok("cue.next", {});
+    expect(state().live.cursor).toEqual({ itemId: id, slideIndex: 1 });
+    await ok("cue.prev", {});
+    expect(state().live.cursor).toEqual({ itemId: id, slideIndex: 0 });
+  });
+
+  it("in anteprima, poi in onda con Invio; sparisce quando non serve piu'", async () => {
+    const { ok, state } = await start();
+    const first = song("Uno", ["a"]);
+    const second = song("Due", ["b"]);
+    await ok("library.saveItem", { item: first });
+    await ok("library.saveItem", { item: second });
+    const { id: a } = await ok("cue.send", { libraryItemId: first.id, to: "preview" });
+    expect(state().live.preview).toEqual({ itemId: a, slideIndex: 0 });
+    expect(state().live.layers.content.visible).toBe(false);
+    await ok("cue.take", {});
+    expect(state().live.layers.content).toEqual({ visible: true, itemId: a, slideIndex: 0 });
+
+    // Un altro elemento in onda: il primo non e' piu' usato e si toglie.
+    const { id: b } = await ok("cue.send", { libraryItemId: second.id, to: "program" });
+    expect(Object.keys(state().live.direct ?? {})).toEqual([b]);
+    await ok("layer.clear", { layer: "content" });
+    await ok("playlist.addFromLibrary", { itemId: first.id });
+    const entry = state().show.playlist[0]?.id ?? "";
+    await ok("cue.goto", { entryId: entry, slideIndex: 0 });
+    expect(state().live.direct).toBeUndefined();
+  });
+
+  it("elementi inesistenti: 4040", async () => {
+    const { fails } = await start();
+    expect(await fails("cue.send", { libraryItemId: newId(), to: "program" })).toEqual([
+      4040,
+      "core.error.libraryItemNotFound",
+    ]);
+    expect(await fails("cue.goto", { itemId: newId(), slideIndex: 0 })).toEqual([
+      4040,
+      "core.error.itemNotFound",
+    ]);
+  });
+});
+
 describe("libreria e scaletta", () => {
   it("in scaletta va una copia che ricorda l'originale; la stessa copia si riusa", async () => {
     const { ok, state } = await start();
