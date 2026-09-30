@@ -392,6 +392,10 @@ describe("file dei moduli", () => {
     const image = await fetch(`${base}/1.0.0/guide/passo1.svg`);
     expect(image.status).toBe(200);
     expect(image.headers.get("content-security-policy")).toContain("sandbox");
+    // I pannelli isolati possono leggere i file del modulo; le pagine della postazione no.
+    expect(image.headers.get("access-control-allow-origin")).toBe("*");
+    const station = await fetch(`http://127.0.0.1:${String(engine.port)}/`);
+    expect(station.headers.get("access-control-allow-origin")).toBeNull();
     expect((await fetch(`${base}/9.9.9/guide/passo1.svg`)).status).toBe(404);
     expect((await fetch(`${base}/1.0.0/..%2F..%2Finstalled.json`)).status).toBe(404);
   });

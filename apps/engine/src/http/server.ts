@@ -26,7 +26,13 @@ const PLUGIN_HEADERS = {
   "Content-Security-Policy":
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-ancestors 'self'; form-action 'none'; base-uri 'none'; sandbox allow-scripts",
   "Referrer-Policy": "no-referrer",
+  // I pannelli girano isolati (origine "null"): per caricare script e font del
+  // modulo serve il permesso esplicito. Sono file pubblici, come quelli di /ui/.
+  "Access-Control-Allow-Origin": "*",
 };
+
+/** Colori, font e stili comuni: pubblici, usati anche dai pannelli isolati dei moduli. */
+const UI_HEADERS = { "Access-Control-Allow-Origin": "*" };
 
 /** Politica di sicurezza delle pagine del nucleo: niente risorse esterne. */
 function csp(host: string): string {
@@ -72,7 +78,11 @@ export function createHttpServer(paths: StaticPaths, logger: Logger): Server {
       return;
     }
     if (path.startsWith("/ui/")) {
-      if (!(await serveFile(res, paths.ui, path.slice("/ui".length), { head }))) send(res, 404);
+      const served = await serveFile(res, paths.ui, path.slice("/ui".length), {
+        head,
+        headers: UI_HEADERS,
+      });
+      if (!served) send(res, 404);
       return;
     }
     const plugin = /^\/plugins\/([a-z0-9.-]+)\/([0-9A-Za-z.+-]+)(\/.*)$/.exec(path);

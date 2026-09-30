@@ -30,6 +30,9 @@ interface StationContextValue {
   readonly selectedEntryId: string | undefined;
   readonly select: (entryId: string | undefined) => void;
   readonly editor: EditorRequest | undefined;
+  /** Pannello di un modulo aperto al posto della colonna Slide (id qualificato). */
+  readonly centerPanel: string | undefined;
+  readonly setCenterPanel: (id: string | undefined) => void;
   readonly openEditor: (request: EditorRequest) => void;
   readonly closeEditor: () => void;
   readonly notices: readonly Notice[];
@@ -55,6 +58,7 @@ let nextQuestion = 1;
 export function StationProvider({ children }: { children: ReactNode }) {
   const [selectedEntryId, setSelected] = useState<string | undefined>();
   const [editor, setEditor] = useState<EditorRequest | undefined>();
+  const [centerPanel, setCenterPanel] = useState<string | undefined>();
   const [notices, setNotices] = useState<readonly Notice[]>([]);
   const [unsaved, setUnsaved] = useState<
     { id: number; resolve: (choice: UnsavedChoice) => void } | undefined
@@ -97,6 +101,8 @@ export function StationProvider({ children }: { children: ReactNode }) {
       selectedEntryId,
       select: setSelected,
       editor,
+      centerPanel,
+      setCenterPanel,
       openEditor: setEditor,
       closeEditor: () => {
         setEditor(undefined);
@@ -108,7 +114,17 @@ export function StationProvider({ children }: { children: ReactNode }) {
       askUnsaved,
       answerUnsaved,
     }),
-    [selectedEntryId, editor, notices, notify, dismiss, unsaved, askUnsaved, answerUnsaved],
+    [
+      selectedEntryId,
+      editor,
+      centerPanel,
+      notices,
+      notify,
+      dismiss,
+      unsaved,
+      askUnsaved,
+      answerUnsaved,
+    ],
   );
   return <StationContext.Provider value={value}>{children}</StationContext.Provider>;
 }

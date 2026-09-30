@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useEngine, useT } from "../engine/react.js";
 import { CORE_MODES, PRESENT_MODE, type Mode } from "../modes/core.js";
 import { useShowFiles, type ShowFiles } from "../station/files.js";
+import { useModulePanels } from "../station/modulePanels.js";
 import { useCueShortcuts } from "../station/shortcuts.js";
 import { StationProvider, useStation } from "../station/station.js";
 import { Dock } from "./Dock.js";
@@ -51,6 +52,7 @@ function ShellBody() {
   const { status } = useEngine();
   const { editor, unsavedQuestion } = useStation();
   const files = useShowFiles();
+  const modulePanels = useModulePanels();
   useCueShortcuts();
   useFileShortcuts(files);
   const modes = CORE_MODES;
@@ -96,11 +98,12 @@ function ShellBody() {
           files={files}
         />
         <Dock
+          panels={modulePanels}
           onManageModules={() => {
             setModulesOpen(true);
           }}
         />
-        <ModeView mode={mode} />
+        <ModeView mode={mode} modulePanels={modulePanels} />
       </div>
       {modulesOpen && (
         <ModulesWindow

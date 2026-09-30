@@ -1,8 +1,20 @@
 import { areaPanelIds, providerOf } from "@cuelith/protocol";
-import { useId, useState, type CSSProperties, type KeyboardEvent } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 import { useT, type Translate } from "../engine/react.js";
 import type { Mode } from "../modes/core.js";
 import { CORE_PANEL_COMPONENTS } from "../panels/core-panels.js";
+import { ModulePanelFrame } from "../panels/ModulePanelFrame.js";
+import type { ModulePanel } from "../station/modulePanels.js";
+import { useStation } from "../station/station.js";
+import { Button } from "../ui/Button.js";
 import { EmptyState, Panel, PanelChrome } from "../ui/Panel.js";
 
 function UnavailablePanel({ panelId }: { panelId: string }) {
@@ -14,15 +26,34 @@ function UnavailablePanel({ panelId }: { panelId: string }) {
   );
 }
 
+/** Pannelli dei moduli attivi, per id qualificato. */
+const ModulePanels = createContext<ReadonlyMap<string, ModulePanel>>(new Map());
+
 function PanelView({ panelId }: { panelId: string }) {
+  const modules = useContext(ModulePanels);
+  const modulePanel = modules.get(panelId);
+  if (modulePanel !== undefined) return <ModulePanelFrame panel={modulePanel} />;
   const Component = CORE_PANEL_COMPONENTS[panelId];
   return Component === undefined ? <UnavailablePanel panelId={panelId} /> : <Component />;
 }
 
-/** Nome di un pannello: "core.library" -> chiave core.panel.library (i moduli porteranno il loro). */
-function panelTitle(t: Translate, panelId: string): string {
+/** Nome di un pannello: del nucleo (core.panel.*) o il titolo dichiarato dal modulo. */
+function panelTitle(
+  t: Translate,
+  panelId: string,
+  modules: ReadonlyMap<string, ModulePanel>,
+): string {
+  const modulePanel = modules.get(panelId);
+  if (modulePanel !== undefined) return t(modulePanel.title);
   if (providerOf(panelId, []) === "core") return t(`core.panel.${panelId.slice("core.".length)}`);
   return panelId;
+}
+
+/** Evento per aprire una scheda da fuori (es. dal dock). */
+export const SHOW_TAB_EVENT = "cuelith:show-tab";
+
+export function showTab(panelId: string): void {
+  window.dispatchEvent(new CustomEvent(SHOW_TAB_EVENT, { detail: panelId }));
 }
 
 function readTab(key: string): string | undefined {
@@ -36,6 +67,7 @@ function readTab(key: string): string | undefined {
 /** Piu' pannelli nella stessa area, come schede (cap. 16: "schede dentro le sezioni"). */
 function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: readonly string[] }) {
   const t = useT();
+  const modules = useContext(ModulePanels);
   const baseId = useId();
   const [saved, setSaved] = useState(() => readTab(storageKey));
   const active = saved !== undefined && panelIds.includes(saved) ? saved : (panelIds[0] ?? "");
@@ -48,6 +80,24 @@ function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: re
       // La scheda scelta vale comunque per questa sessione.
     }
   };
+
+  // Il dock puo' chiedere di mostrare la scheda di un modulo.
+  useEffect(() => {
+    const onShow = (event: Event) => {
+      const panelId = (event as CustomEvent<string>).detail;
+      if (!panelIds.includes(panelId)) return;
+      setSaved(panelId);
+      try {
+        localStorage.setItem(storageKey, panelId);
+      } catch {
+        // Vale comunque per questa sessione.
+      }
+    };
+    window.addEventListener(SHOW_TAB_EVENT, onShow);
+    return () => {
+      window.removeEventListener(SHOW_TAB_EVENT, onShow);
+    };
+  }, [panelIds, storageKey]);
 
   const onKey = (event: KeyboardEvent) => {
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
@@ -92,7 +142,7 @@ function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: re
                 selected ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg"
               }`}
             >
-              {panelTitle(t, panelId)}
+              {panelTitle(t, panelId, modules)}
             </button>
           );
         })}
@@ -117,8 +167,42 @@ function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: re
  * diventano una griglia CSS, ogni area mostra il suo pannello (o piu'
  * pannelli a schede). Lo stesso codice vale per Presenta e per i moduli.
  */
-export function ModeView({ mode }: { mode: Mode }) {
+/** Pannello centrale di un modulo (es. un editor), con il suo titolo e "Chiudi". */
+function CenterPanel({ panel, onClose }: { panel: ModulePanel; onClose: () => void }) {
+  const t = useT();
+  return (
+    <section aria-label={t(panel.title)} className="flex min-h-0 flex-1 flex-col">
+      <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-mod">
+          {t(panel.title)}
+        </h2>
+        <Button size="sm" onClick={onClose}>
+          {t("core.action.close")}
+        </Button>
+      </header>
+      <ModulePanelFrame panel={panel} onClose={onClose} />
+    </section>
+  );
+}
+
+export function ModeView({
+  mode,
+  modulePanels,
+}: {
+  mode: Mode;
+  modulePanels: readonly ModulePanel[];
+}) {
   const { layout } = mode;
+  const { centerPanel, setCenterPanel } = useStation();
+  const modules = new Map(modulePanels.map((p) => [p.id, p]));
+  const side = modulePanels.filter((p) => p.placement === "side").map((p) => p.id);
+  const center = centerPanel === undefined ? undefined : modules.get(centerPanel);
+  const entries = Object.entries(layout.panels).map(
+    ([area, panels]) => [area, areaPanelIds(panels)] as const,
+  );
+  // I pannelli laterali dei moduli diventano schede dell'area della Scaletta.
+  const sideArea = entries.find(([, ids]) => ids.includes("core.playlist"))?.[0];
+  const centerArea = entries.find(([, ids]) => ids.includes("core.slides"))?.[0];
   const style: CSSProperties = {
     gridTemplateColumns: layout.columns.join(" "),
     gridTemplateRows: layout.rows.join(" "),
@@ -132,25 +216,38 @@ export function ModeView({ mode }: { mode: Mode }) {
       style={style}
       data-mode={mode.qualifiedId}
     >
-      {Object.entries(layout.panels).map(([area, panels]) => {
-        const ids = areaPanelIds(panels);
-        const single = ids.length === 1 ? ids[0] : undefined;
-        return (
-          <div
-            key={area}
-            data-area={area}
-            data-panel={single}
-            className={`flex min-h-0 min-w-0 flex-col ${single === undefined ? "" : "overflow-auto"} ${lastColumn.has(area) ? "" : "border-r border-line"}`}
-            style={{ gridArea: area }}
-          >
-            {single !== undefined ? (
-              <PanelView panelId={single} />
-            ) : (
-              <TabbedArea storageKey={`cuelith.tabs.${mode.qualifiedId}.${area}`} panelIds={ids} />
-            )}
-          </div>
-        );
-      })}
+      <ModulePanels.Provider value={modules}>
+        {entries.map(([area, coreIds]) => {
+          const ids = area === sideArea ? [...coreIds, ...side] : coreIds;
+          const single = ids.length === 1 ? ids[0] : undefined;
+          const showCenter = area === centerArea && center !== undefined;
+          return (
+            <div
+              key={area}
+              data-area={area}
+              data-panel={single}
+              className={`flex min-h-0 min-w-0 flex-col ${single === undefined ? "" : "overflow-auto"} ${lastColumn.has(area) ? "" : "border-r border-line"}`}
+              style={{ gridArea: area }}
+            >
+              {showCenter ? (
+                <CenterPanel
+                  panel={center}
+                  onClose={() => {
+                    setCenterPanel(undefined);
+                  }}
+                />
+              ) : single !== undefined ? (
+                <PanelView panelId={single} />
+              ) : (
+                <TabbedArea
+                  storageKey={`cuelith.tabs.${mode.qualifiedId}.${area}`}
+                  panelIds={ids}
+                />
+              )}
+            </div>
+          );
+        })}
+      </ModulePanels.Provider>
     </main>
   );
 }

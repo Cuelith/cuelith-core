@@ -1,16 +1,58 @@
 import { useT } from "../engine/react.js";
+import type { ModulePanel } from "../station/modulePanels.js";
+import { useStation } from "../station/station.js";
+import { showTab } from "./ModeView.js";
+
+/** Sigla di due lettere dal titolo del pannello, come nel dock del documento ("BI", "TI"...). */
+function initials(title: string): string {
+  const words = title.split(/s+/).filter((w) => w !== "");
+  const letters =
+    words.length > 1 ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}` : title.slice(0, 2);
+  return letters.toUpperCase();
+}
 
 /**
- * Dock dei moduli (cap. 04): un'icona per ogni modulo con pannelli e, in
- * fondo, il "+" che apre il gestore moduli. Col nucleo nudo c'e' solo il "+".
+ * Dock dei moduli (cap. 04): un'icona per ogni pannello dei moduli attivi e,
+ * in fondo, il "+" che apre la finestra Moduli. Un pannello laterale si apre
+ * come scheda a sinistra; uno centrale prende il posto della colonna Slide.
  */
-export function Dock({ onManageModules }: { onManageModules: () => void }) {
+export function Dock({
+  panels,
+  onManageModules,
+}: {
+  panels: readonly ModulePanel[];
+  onManageModules: () => void;
+}) {
   const t = useT();
+  const { centerPanel, setCenterPanel } = useStation();
   return (
     <nav
       aria-label={t("core.dock.label")}
       className="flex flex-col items-center gap-2 border-r border-line py-2.5"
     >
+      {panels.map((panel) => {
+        const open = panel.placement === "center" && centerPanel === panel.id;
+        return (
+          <button
+            key={panel.id}
+            type="button"
+            aria-label={t(panel.title)}
+            title={t(panel.title)}
+            aria-pressed={panel.placement === "center" ? open : undefined}
+            onClick={() => {
+              if (panel.placement === "center") setCenterPanel(open ? undefined : panel.id);
+              else showTab(panel.id);
+            }}
+            className={`grid h-8 w-8 place-items-center rounded-lg font-mono text-[10px] font-semibold ${
+              open
+                ? "bg-mod text-mod-bg"
+                : "bg-mod-chip text-mod hover:outline hover:outline-mod-line"
+            }`}
+          >
+            {initials(t(panel.title))}
+          </button>
+        );
+      })}
       <button
         type="button"
         onClick={onManageModules}
