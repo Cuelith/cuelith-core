@@ -1,7 +1,7 @@
 import type { Item } from "@cuelith/protocol";
 import { useCallback, useContext } from "react";
 import { ModuleEditorsContext } from "./modulePanels.js";
-import { useStation } from "./station.js";
+import { openPanelWindow, useStation } from "./station.js";
 
 /** Contesto passato all'editor di un modulo: quale elemento modificare. */
 export interface EditContext {
@@ -21,7 +21,7 @@ export function useEditItem(): {
   readonly editLibraryItem: (item: { readonly id: string; readonly type: string }) => void;
 } {
   const editors = useContext(ModuleEditorsContext);
-  const { openEditor, openCenterPanel, notify } = useStation();
+  const { openEditor, notify } = useStation();
 
   const editShowItem = useCallback(
     (item: Pick<Item, "id" | "type" | "libraryRef">) => {
@@ -38,9 +38,9 @@ export function useEditItem(): {
         showItemId: item.id,
         ...(item.libraryRef === undefined ? {} : { libraryItemId: item.libraryRef.itemId }),
       };
-      openCenterPanel(editor, context);
+      openPanelWindow(editor, context);
     },
-    [editors, openEditor, openCenterPanel, notify],
+    [editors, openEditor, notify],
   );
 
   const editLibraryItem = useCallback(
@@ -54,9 +54,9 @@ export function useEditItem(): {
         notify("core.error.editorUnavailable");
         return;
       }
-      openCenterPanel(editor, { libraryItemId: item.id } satisfies EditContext);
+      openPanelWindow(editor, { libraryItemId: item.id } satisfies EditContext);
     },
-    [editors, openEditor, openCenterPanel, notify],
+    [editors, openEditor, notify],
   );
 
   return { editShowItem, editLibraryItem };

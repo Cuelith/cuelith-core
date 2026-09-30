@@ -22,4 +22,7 @@ electron.contextBridge.exposeInMainWorld("cuelithDesktop", {
   stationReady: (): void => {
     electron.ipcRenderer.send("cuelith:station-ready");
   },
+  /** Finestra propria di un pannello di modulo (es. l'editor dei canti). */
+  openPanelWindow: (path: unknown): Promise<unknown> =>
+    electron.ipcRenderer.invoke("cuelith:open-panel-window", typeof path === "string" ? path : ""),
 });

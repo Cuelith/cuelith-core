@@ -1,5 +1,5 @@
 import type { Library, LibraryItemSummary } from "@cuelith/protocol";
-import { useState, type DragEvent, type KeyboardEvent } from "react";
+import { useState, type DragEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { useT } from "../engine/react.js";
 import {
   LIBRARY_ITEM_DRAG,
@@ -85,8 +85,37 @@ export function LibraryPanel() {
 
   const sendDirect = useSendDirect();
 
-  const toPlaylist = (item: LibraryItemSummary) => {
-    void run("playlist.addFromLibrary", { itemId: item.id });
+  // Selezione: clic = uno, Ctrl+clic = aggiungi/togli, Maiusc+clic = intervallo.
+  // L'ordine della selezione e' quello in cui gli elementi vanno in scaletta.
+  const [selected, setSelected] = useState<string[]>([]);
+  const [anchor, setAnchor] = useState<string | undefined>();
+  const visible = items.map((item) => item.id);
+  const selection = selected.filter((id) => visible.includes(id));
+  const chosen = selection.flatMap((id) => items.filter((item) => item.id === id).slice(0, 1));
+  const single = chosen.length === 1 ? chosen[0] : undefined;
+  const selectOnly = (id: string) => {
+    setSelected([id]);
+    setAnchor(id);
+  };
+  const choose = (id: string, event: MouseEvent) => {
+    if (event.shiftKey && anchor !== undefined && visible.includes(anchor)) {
+      const a = visible.indexOf(anchor);
+      const b = visible.indexOf(id);
+      setSelected(visible.slice(Math.min(a, b), Math.max(a, b) + 1));
+      return;
+    }
+    if (event.ctrlKey || event.metaKey) {
+      setSelected(selection.includes(id) ? selection.filter((s) => s !== id) : [...selection, id]);
+      setAnchor(id);
+      return;
+    }
+    selectOnly(id);
+  };
+
+  const toPlaylistAll = async (list: readonly LibraryItemSummary[]) => {
+    for (const item of list) {
+      if ((await run("playlist.addFromLibrary", { itemId: item.id })) === undefined) return;
+    }
   };
 
   const moveEntry = (entryId: string, toIndex: number) => {
@@ -223,6 +252,53 @@ export function LibraryPanel() {
         )}
       </div>
 
+      {/* Azioni fisse sulla selezione: sempre nello stesso posto. */}
+      <div
+        role="toolbar"
+        aria-label={t("core.library.actions")}
+        className="flex flex-wrap gap-1.5 [&>*]:flex-auto"
+      >
+        <Button
+          size="sm"
+          disabled={single === undefined}
+          onClick={() => {
+            if (single !== undefined) sendDirect(single.id, "preview");
+          }}
+        >
+          {t("core.direct.toPreview")}
+        </Button>
+        <Button
+          size="sm"
+          tone="live"
+          disabled={single === undefined}
+          onClick={() => {
+            if (single !== undefined) sendDirect(single.id, "program");
+          }}
+        >
+          {t("core.direct.toProgram")}
+        </Button>
+        <Button
+          size="sm"
+          tone="cue"
+          disabled={chosen.length === 0}
+          onClick={() => {
+            void toPlaylistAll(chosen);
+          }}
+        >
+          {t("core.library.toPlaylist")}
+        </Button>
+        <Button
+          size="sm"
+          disabled={chosen.length > 1}
+          onClick={() => {
+            if (single !== undefined) editLibraryItem(single);
+            else openEditor({ mode: "libraryCreate", libraryId });
+          }}
+        >
+          {t("core.library.editor")}
+        </Button>
+      </div>
+
       <p className="text-xs text-faint" aria-live="polite">
         {loading ? t("core.library.searching") : t("core.library.count", { count: total })}
       </p>
@@ -232,7 +308,6 @@ export function LibraryPanel() {
           title={t(
             query !== "" || tag !== undefined ? "core.library.noResults" : "core.library.empty",
           )}
-          hint={t("core.library.emptyHint")}
         />
       ) : (
         <ol
@@ -270,7 +345,11 @@ export function LibraryPanel() {
                 event.stopPropagation();
                 onDrop(event, insertionAt(event, index));
               }}
-              className="group relative flex items-center gap-2 rounded-md py-1.5 pr-1.5 pl-2 hover:bg-bg-2 focus-within:bg-bg-2"
+              className={`group relative flex items-center gap-2 rounded-md py-1.5 pr-1.5 pl-2 ${
+                selection.includes(item.id)
+                  ? "bg-cue-bg shadow-[inset_3px_0_0_var(--color-cue)]"
+                  : "hover:bg-bg-2 focus-within:bg-bg-2"
+              }`}
             >
               {dropIndex === index && (
                 <span
@@ -285,13 +364,18 @@ export function LibraryPanel() {
               )}
               <button
                 type="button"
+                aria-pressed={selection.includes(item.id)}
+                onClick={(event) => {
+                  choose(item.id, event);
+                }}
                 onDoubleClick={() => {
-                  toPlaylist(item);
+                  // Doppio clic = in anteprima: sicuro, non va in onda.
+                  selectOnly(item.id);
+                  sendDirect(item.id, "preview");
                 }}
                 onKeyDown={(event) => {
                   onRowKey(event, item, index);
                 }}
-                title={t("core.library.rowHint")}
                 className="flex min-w-0 flex-1 flex-col items-start text-left"
               >
                 <span className="flex w-full items-center gap-1.5">
@@ -322,35 +406,6 @@ export function LibraryPanel() {
                 </span>
               </button>
               <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-1 rounded-md bg-inherit pl-2 opacity-0 pointer-events-none group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
-                {/* Senza passare dalla scaletta: in anteprima o subito in onda. */}
-                <Button
-                  size="sm"
-                  aria-label={t("core.direct.toPreviewOf", { title: item.title })}
-                  onClick={() => {
-                    sendDirect(item.id, "preview");
-                  }}
-                >
-                  {t("core.direct.toPreview")}
-                </Button>
-                <Button
-                  size="sm"
-                  tone="live"
-                  aria-label={t("core.direct.toProgramOf", { title: item.title })}
-                  onClick={() => {
-                    sendDirect(item.id, "program");
-                  }}
-                >
-                  {t("core.direct.toProgram")}
-                </Button>
-                <Button
-                  size="sm"
-                  tone="cue"
-                  onClick={() => {
-                    toPlaylist(item);
-                  }}
-                >
-                  {t("core.library.toPlaylist")}
-                </Button>
                 <MenuButton
                   label={t("core.library.itemMenu", { title: item.title })}
                   items={itemMenu(item)}

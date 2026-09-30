@@ -22,14 +22,26 @@ export type EditorRequest =
   | { readonly mode: "libraryCreate"; readonly libraryId: string | undefined }
   | { readonly mode: "libraryEdit"; readonly itemId: string };
 
-/** Pannello centrale aperto: id qualificato, contesto e numero di apertura (per ricaricarlo). */
-export interface CenterPanelRequest {
-  readonly id: string;
-  readonly context: unknown;
-  readonly opening: number;
+/**
+ * Indirizzo della finestra di un pannello di modulo (es. l'editor dei canti):
+ * la stessa postazione, che disegna solo quel pannello.
+ */
+export function panelWindowPath(panelId: string, context?: unknown): string {
+  const query = new URLSearchParams({ panelWindow: panelId });
+  if (context !== undefined) query.set("context", JSON.stringify(context));
+  return `/?${query.toString()}`;
 }
 
-let nextOpening = 1;
+/**
+ * Apre un pannello di modulo (gli editor, "center" nel manifest) in una
+ * finestra sua: la zona centrale della postazione resta dell'operatore.
+ */
+export function openPanelWindow(panelId: string, context?: unknown): void {
+  const path = panelWindowPath(panelId, context);
+  const desktop = window.cuelithDesktop;
+  if (desktop !== undefined) void desktop.openPanelWindow(path);
+  else window.open(path, `cuelith-${panelId}`);
+}
 
 /** Risposta alla domanda "salvare le modifiche?". */
 export type UnsavedChoice = "save" | "discard" | "cancel";
@@ -39,10 +51,6 @@ interface StationContextValue {
   readonly selectedEntryId: string | undefined;
   readonly select: (entryId: string | undefined) => void;
   readonly editor: EditorRequest | undefined;
-  /** Pannello di un modulo aperto al posto della colonna Slide, col suo contesto. */
-  readonly centerPanel: CenterPanelRequest | undefined;
-  readonly openCenterPanel: (id: string, context?: unknown) => void;
-  readonly closeCenterPanel: () => void;
   readonly openEditor: (request: EditorRequest) => void;
   readonly closeEditor: () => void;
   readonly notices: readonly Notice[];
@@ -68,13 +76,6 @@ let nextQuestion = 1;
 export function StationProvider({ children }: { children: ReactNode }) {
   const [selectedEntryId, setSelected] = useState<string | undefined>();
   const [editor, setEditor] = useState<EditorRequest | undefined>();
-  const [centerPanel, setCenterPanel] = useState<CenterPanelRequest | undefined>();
-  const openCenterPanel = useCallback((id: string, context?: unknown) => {
-    setCenterPanel({ id, context, opening: nextOpening++ });
-  }, []);
-  const closeCenterPanel = useCallback(() => {
-    setCenterPanel(undefined);
-  }, []);
   const [notices, setNotices] = useState<readonly Notice[]>([]);
   const [unsaved, setUnsaved] = useState<
     { id: number; resolve: (choice: UnsavedChoice) => void } | undefined
@@ -117,9 +118,6 @@ export function StationProvider({ children }: { children: ReactNode }) {
       selectedEntryId,
       select: setSelected,
       editor,
-      centerPanel,
-      openCenterPanel,
-      closeCenterPanel,
       openEditor: setEditor,
       closeEditor: () => {
         setEditor(undefined);
@@ -131,19 +129,7 @@ export function StationProvider({ children }: { children: ReactNode }) {
       askUnsaved,
       answerUnsaved,
     }),
-    [
-      selectedEntryId,
-      editor,
-      centerPanel,
-      openCenterPanel,
-      closeCenterPanel,
-      notices,
-      notify,
-      dismiss,
-      unsaved,
-      askUnsaved,
-      answerUnsaved,
-    ],
+    [selectedEntryId, editor, notices, notify, dismiss, unsaved, askUnsaved, answerUnsaved],
   );
   return <StationContext.Provider value={value}>{children}</StationContext.Provider>;
 }

@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { chooseFiles, screenshotsDir, test } from "./app.js";
 
 const tab = (station: Page, name: string) => station.getByRole("tab", { name, exact: true });
@@ -34,6 +34,18 @@ async function newLibrary(station: Page, name: string, fields: LibraryFields = {
 
 const libraryRows = (station: Page) =>
   station.getByRole("list", { name: "Elementi" }).getByRole("listitem");
+
+/** Seleziona una riga (clic sul titolo, a sinistra) e usa la barra fissa delle azioni. */
+async function onSelected(station: Page, row: Locator, action: string): Promise<void> {
+  await row
+    .getByRole("button")
+    .first()
+    .click({ position: { x: 16, y: 8 } });
+  await station
+    .getByRole("toolbar", { name: "Azioni sugli elementi selezionati" })
+    .getByRole("button", { name: action, exact: true })
+    .click();
+}
 
 test("librerie: canto con crediti, tag e base; ricerca, versioni, in scaletta e crediti in onda", async ({
   running,
@@ -94,8 +106,7 @@ test("librerie: canto con crediti, tag e base; ricerca, versioni, in scaletta e 
 
   // In scaletta (la copia ricorda l'originale).
   const original = libraryRows(station).filter({ hasNotText: "versione" });
-  await original.hover();
-  await original.getByRole("button", { name: "In scaletta" }).click();
+  await onSelected(station, original, "In scaletta");
   await tab(station, "Scaletta").click();
   const entries = station.getByRole("list", { name: "Voci della scaletta" }).getByRole("listitem");
   await expect(entries).toHaveCount(1);
@@ -129,11 +140,9 @@ test("l'originale cambia in libreria: la copia in scaletta si aggiorna a richies
   await expect(editor).toBeHidden();
 
   const row = libraryRows(station).first();
-  await row.hover();
-  await row.getByRole("button", { name: "In scaletta" }).click();
-  // «Modifica» sta nel menu ⋯ della riga (in vista: Anteprima, In onda, In scaletta).
-  await row.getByRole("button", { name: /^Altre azioni per/ }).click();
-  await station.getByRole("menuitem", { name: "Modifica" }).click();
+  await onSelected(station, row, "In scaletta");
+  // Con la riga selezionata, «Editor» della barra fissa la modifica.
+  await onSelected(station, row, "Editor");
   editor = station.getByRole("dialog", { name: "Modifica elemento della libreria" });
   await expect(editor.getByLabel("Testo")).toHaveValue("Cena domenica");
   await editor.getByLabel("Testo").fill("Cena domenica alle 19");

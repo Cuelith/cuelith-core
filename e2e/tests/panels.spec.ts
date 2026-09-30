@@ -37,6 +37,7 @@ window.addEventListener("message", (event) => {
       show("pannello", data.panelId);
       show("saluto", data.catalog["cuelith.greetings.hello"]);
       show("show", data.state.show.name);
+      show("contesto", JSON.stringify(data.context ?? null));
       show("testi del nucleo", Object.keys(data.catalog).some((k) => k.startsWith("core.")) ? "visibili" : "nascosti");
       document.getElementById("create").onclick = async () => {
         const { id } = await call("item.create", { type: "core.text", title: "Dal modulo", slides: [{ fields: { text: { kind: "text", value: "Ciao dal modulo" } } }] });
@@ -50,6 +51,7 @@ window.addEventListener("message", (event) => {
         );
       document.getElementById("notify").onclick = () => call("host.notify", { key: "cuelith.greetings.hello", params: {} });
       document.getElementById("close").onclick = () => call("host.close", {});
+      document.getElementById("openEditor").onclick = () => call("host.openPanel", { panel: "editor", context: { da: "lista" } });
     } else if (data.type === "state") {
       show("show", data.state.show.name);
     } else if (data.type === "result" || data.type === "error") {
@@ -70,6 +72,7 @@ const PANEL_HTML = `<!doctype html>
 <button id="forbidden">Elimina uscita</button>
 <button id="notify">Avviso</button>
 <button id="close">Chiudi pannello</button>
+<button id="openEditor">Apri editor</button>
 <script type="module" src="panel.js"></script>
 </body></html>`;
 
@@ -174,14 +177,24 @@ test("pannelli dei moduli: scheda laterale e pannello centrale isolati, con i so
   await expect(line(side, "show")).toHaveText("show: Culto");
   await station.screenshot({ path: path.join(screenshotsDir, "pannello-modulo-laterale.png") });
 
-  // Pannello centrale: prende il posto delle Slide, il programma resta visibile.
-  await dock.getByRole("button", { name: "Editor saluti" }).click();
-  const center = station.frameLocator('[data-module-panel="cuelith.greetings.editor"]');
+  // Gli editor (pannelli "center") non stanno nel dock e non prendono mai la
+  // zona centrale: si aprono su richiesta in una finestra propria, col contesto.
+  await expect(dock.getByRole("button", { name: "Editor saluti" })).toHaveCount(0);
+  const [editorWindow] = await Promise.all([
+    app.waitForEvent("window", {
+      predicate: (page) => page.url().includes("panelWindow=cuelith.greetings.editor"),
+    }),
+    side.getByRole("button", { name: "Apri editor" }).click(),
+  ]);
+  const center = editorWindow.frameLocator('[data-module-panel="cuelith.greetings.editor"]');
   await expect(line(center, "pannello")).toHaveText("pannello: editor");
-  await expect(station.locator('[data-screen="live"]')).toBeVisible();
-  await expect(station.getByRole("region", { name: "Slide" })).toHaveCount(0);
-  await station.screenshot({ path: path.join(screenshotsDir, "pannello-modulo-centrale.png") });
-  await center.getByRole("button", { name: "Chiudi pannello" }).click();
+  await expect(line(center, "contesto")).toHaveText('contesto: {"da":"lista"}');
   await expect(station.getByRole("region", { name: "Slide" })).toBeVisible();
+  await expect(station.locator('[data-screen="live"]')).toBeVisible();
+  await editorWindow.screenshot({
+    path: path.join(screenshotsDir, "pannello-modulo-finestra.png"),
+  });
+  await center.getByRole("button", { name: "Chiudi pannello" }).click();
+  await expect.poll(() => editorWindow.isClosed()).toBe(true);
   expect(problems.filter((p) => !p.includes("example.com"))).toEqual([]);
 });

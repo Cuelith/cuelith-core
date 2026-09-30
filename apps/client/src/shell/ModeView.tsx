@@ -12,9 +12,7 @@ import type { Mode } from "../modes/core.js";
 import { CORE_PANEL_COMPONENTS } from "../panels/core-panels.js";
 import { ModulePanelFrame } from "../panels/ModulePanelFrame.js";
 import { ModulePanelsContext, type ModulePanel } from "../station/modulePanels.js";
-import { useStation } from "../station/station.js";
 import { SHOW_TAB_EVENT } from "../station/tabs.js";
-import { Button } from "../ui/Button.js";
 import { EmptyState, Panel, PanelChrome } from "../ui/Panel.js";
 
 function UnavailablePanel({ panelId }: { panelId: string }) {
@@ -159,32 +157,6 @@ function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: re
  * diventano una griglia CSS, ogni area mostra il suo pannello (o piu'
  * pannelli a schede). Lo stesso codice vale per Presenta e per i moduli.
  */
-/** Pannello centrale di un modulo (es. un editor), con il suo titolo e "Chiudi". */
-function CenterPanel({
-  panel,
-  context,
-  onClose,
-}: {
-  panel: ModulePanel;
-  context: unknown;
-  onClose: () => void;
-}) {
-  const t = useT();
-  return (
-    <section aria-label={t(panel.title)} className="flex min-h-0 flex-1 flex-col">
-      <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-mod">
-          {t(panel.title)}
-        </h2>
-        <Button size="sm" onClick={onClose}>
-          {t("core.action.close")}
-        </Button>
-      </header>
-      <ModulePanelFrame panel={panel} context={context} onClose={onClose} />
-    </section>
-  );
-}
-
 export function ModeView({
   mode,
   modulePanels,
@@ -193,16 +165,13 @@ export function ModeView({
   modulePanels: readonly ModulePanel[];
 }) {
   const { layout } = mode;
-  const { centerPanel, closeCenterPanel } = useStation();
   const modules = new Map(modulePanels.map((p) => [p.id, p]));
   const side = modulePanels.filter((p) => p.placement === "side").map((p) => p.id);
-  const center = centerPanel === undefined ? undefined : modules.get(centerPanel.id);
   const entries = Object.entries(layout.panels).map(
     ([area, panels]) => [area, areaPanelIds(panels)] as const,
   );
   // I pannelli laterali dei moduli diventano schede dell'area della Scaletta.
   const sideArea = entries.find(([, ids]) => ids.includes("core.playlist"))?.[0];
-  const centerArea = entries.find(([, ids]) => ids.includes("core.slides"))?.[0];
   const style: CSSProperties = {
     gridTemplateColumns: layout.columns.join(" "),
     gridTemplateRows: layout.rows.join(" "),
@@ -220,7 +189,6 @@ export function ModeView({
         {entries.map(([area, coreIds]) => {
           const ids = area === sideArea ? [...coreIds, ...side] : coreIds;
           const single = ids.length === 1 ? ids[0] : undefined;
-          const showCenter = area === centerArea && center !== undefined;
           return (
             <div
               key={area}
@@ -229,14 +197,7 @@ export function ModeView({
               className={`flex min-h-0 min-w-0 flex-col ${single === undefined ? "" : "overflow-auto"} ${lastColumn.has(area) ? "" : "border-r border-line"}`}
               style={{ gridArea: area }}
             >
-              {showCenter ? (
-                <CenterPanel
-                  key={centerPanel?.opening}
-                  panel={center}
-                  context={centerPanel?.context}
-                  onClose={closeCenterPanel}
-                />
-              ) : single !== undefined ? (
+              {single !== undefined ? (
                 <PanelView panelId={single} />
               ) : (
                 <TabbedArea

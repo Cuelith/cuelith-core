@@ -14,6 +14,19 @@ export interface ModulePanel {
   readonly placement: "side" | "center";
   /** Pagina del pannello servita dal motore (area isolata dei moduli). */
   readonly src: string;
+  /** Icona del modulo (SVG del pacchetto), se la dichiara. */
+  readonly icon: string | undefined;
+}
+
+/** Indirizzo dell'icona di un modulo installato, servita dal motore. */
+export function pluginIconUrl(manifest: {
+  id: string;
+  version: string;
+  icon?: string | undefined;
+}): string | undefined {
+  return manifest.icon === undefined
+    ? undefined
+    : `/plugins/${manifest.id}/${manifest.version}/${manifest.icon}`;
 }
 
 export function panelsOf(plugins: readonly InstalledPlugin[]): ModulePanel[] {
@@ -29,6 +42,7 @@ export function panelsOf(plugins: readonly InstalledPlugin[]): ModulePanel[] {
       title: panel.title,
       placement: panel.placement ?? "side",
       src: `/plugins/${manifest.id}/${manifest.version}/${entry}?panel=${encodeURIComponent(panel.id)}`,
+      icon: pluginIconUrl(manifest),
     }));
   });
 }

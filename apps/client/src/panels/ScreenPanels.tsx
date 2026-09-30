@@ -103,7 +103,6 @@ export function PreviewPanel() {
         </Button>
       </div>
       <Caption slide={slide} />
-      <p className="text-xs text-faint">{t("core.program.keys")}</p>
     </Panel>
   );
 }

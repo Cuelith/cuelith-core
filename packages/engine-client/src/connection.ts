@@ -31,6 +31,8 @@ export interface EngineSnapshot {
   readonly lang: Lang;
   readonly catalog: Catalog;
   readonly role: RoleId | undefined;
+  /** Versione del motore collegato (dal saluto iniziale). */
+  readonly engineVersion: string | undefined;
 }
 
 /** Errore restituito dal motore: chiave di traduzione + parametri. */
@@ -115,6 +117,7 @@ export class EngineConnection {
       lang: cached?.lang ?? "it",
       catalog: cached?.catalog ?? {},
       role: undefined,
+      engineVersion: undefined,
     };
   }
 
@@ -185,10 +188,11 @@ export class EngineConnection {
 
   async #handshake(): Promise<void> {
     const { name, token } = await this.#credentials();
-    await this.call("session.hello", {
+    const hello = await this.call("session.hello", {
       protocol: PROTOCOL_VERSION,
       client: { name, kind: "client" },
     });
+    this.#set({ engineVersion: hello.engine.version });
     if (token === undefined) {
       this.#set({ status: { kind: "unpaired" } });
       return;

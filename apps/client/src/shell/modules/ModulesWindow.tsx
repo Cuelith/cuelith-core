@@ -1,4 +1,10 @@
-import type { InstalledPlugin, PluginManifest, RegistryPlugin } from "@cuelith/protocol";
+import {
+  isActivePlugin,
+  type InstalledPlugin,
+  type PluginManifest,
+  type RegistryPlugin,
+} from "@cuelith/protocol";
+import { pluginIconUrl } from "../../station/modulePanels.js";
 import { useEffect, useId, useState } from "react";
 import { useConnection, useEngine, useT, type Translate } from "../../engine/react.js";
 import { useRun, useStation } from "../../station/station.js";
@@ -263,6 +269,7 @@ function Marketplace({
               className="flex flex-col gap-2 rounded-lg border border-line bg-bg-3 p-3"
             >
               <div className="flex items-start gap-2">
+                <ModuleIcon src={plugin.icon} name={plugin.name} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{plugin.name}</p>
                   <p className="truncate text-xs text-muted">
@@ -398,14 +405,17 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
               key={manifest.id}
               className="flex flex-wrap items-center gap-3 rounded-lg bg-bg-3 px-3 py-2.5"
             >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-mod-chip font-mono text-[11px] font-semibold text-mod">
-                {manifest.name.slice(0, 2).toUpperCase()}
-              </span>
+              <ModuleIcon src={pluginIconUrl(manifest)} name={manifest.name} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold">{manifest.name}</p>
                 <p className="truncate text-xs text-muted">
-                  {t(`core.family.${manifest.family}`)} · {manifest.version} ·{" "}
-                  {t(`core.modules.source.${plugin.source}`)} ·{" "}
+                  {t(`core.family.${manifest.family}`)} ·{" "}
+                  {t(
+                    isActivePlugin(manifest)
+                      ? "core.modules.kind.active"
+                      : "core.modules.kind.passive",
+                  )}{" "}
+                  · {manifest.version} · {t(`core.modules.source.${plugin.source}`)} ·{" "}
                   {t(`core.pluginState.${status.state}`)}
                 </p>
                 {problem !== undefined && <p className="text-xs text-stage">{t(problem)}</p>}
@@ -500,5 +510,18 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
         </ModalDialog>
       )}
     </div>
+  );
+}
+
+/** Icona del modulo (SVG del pacchetto o del registry); sigla solo se manca. */
+function ModuleIcon({ src, name }: { src: string | undefined; name: string }) {
+  return (
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-mod-chip font-mono text-[11px] font-semibold text-mod">
+      {src === undefined ? (
+        name.slice(0, 2).toUpperCase()
+      ) : (
+        <img src={src} alt="" className="h-6 w-6" draggable={false} />
+      )}
+    </span>
   );
 }

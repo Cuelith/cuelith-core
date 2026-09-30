@@ -60,3 +60,29 @@ test("la postazione vuota mostra barra, dock col + e le tre colonne di Presenta"
   await station.screenshot({ path: path.join(screenshotsDir, "presenta-vuota.png") });
   expect(problems).toEqual([]);
 });
+
+test("impostazioni: ingranaggio e Ctrl+, ; la legenda dei tasti sta in Scorciatoie", async ({
+  running,
+}) => {
+  const { station, problems } = running;
+  // Niente scritte di spiegazione nell'interfaccia: la legenda e' nelle impostazioni.
+  await expect(station.locator("main")).not.toContainText("Invio manda in onda");
+
+  await station.getByRole("button", { name: "Impostazioni" }).click();
+  const settings = station.getByRole("dialog", { name: "Impostazioni" });
+  await expect(settings.getByTestId("settings-language")).toHaveText("Italiano");
+  await settings.getByRole("button", { name: "Scorciatoie" }).click();
+  const legend = settings.getByTestId("shortcuts");
+  await expect(legend).toContainText("Manda in onda ciò che è in anteprima");
+  await expect(legend).toContainText("Inizio del prossimo Verse");
+  await expect(legend).toContainText("Inizio del prossimo Others");
+  await station.screenshot({ path: path.join(screenshotsDir, "impostazioni-scorciatoie.png") });
+  await settings.getByRole("button", { name: "Informazioni e licenza" }).click();
+  await expect(settings).toContainText("Community, gratuita");
+  await settings.getByRole("button", { name: "Chiudi" }).last().click();
+  await expect(settings).toBeHidden();
+
+  await station.keyboard.press("Control+,");
+  await expect(settings).toBeVisible();
+  expect(problems).toEqual([]);
+});

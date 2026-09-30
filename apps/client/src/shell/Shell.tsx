@@ -11,6 +11,7 @@ import { ModulesWindow } from "./modules/ModulesWindow.js";
 import { Notices } from "./Notices.js";
 import { OutputsDialog } from "./OutputsDialog.js";
 import { RecoveryBanner } from "./RecoveryBanner.js";
+import { SettingsDialog } from "./SettingsDialog.js";
 import { UnsavedDialog } from "./UnsavedDialog.js";
 import { ItemEditorDialog } from "./ItemEditorDialog.js";
 import { TopBar } from "./TopBar.js";
@@ -61,6 +62,7 @@ function ShellBody() {
   const [mode, setMode] = useState<Mode>(() => readSavedMode(modes));
   const [modulesOpen, setModulesOpen] = useState(false);
   const [outputsOpen, setOutputsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const selectMode = useCallback((next: Mode) => {
     setMode(next);
@@ -76,6 +78,12 @@ function ShellBody() {
       const match = modes.find(
         (m) => m.shortcut !== undefined && matchesShortcut(event, m.shortcut),
       );
+      // Ctrl+, apre le impostazioni (come nella maggior parte dei programmi).
+      if ((event.ctrlKey || event.metaKey) && event.key === "," && !event.altKey) {
+        event.preventDefault();
+        setSettingsOpen(true);
+        return;
+      }
       if (match === undefined) return;
       event.preventDefault();
       selectMode(match);
@@ -98,6 +106,9 @@ function ShellBody() {
             onManageOutputs={() => {
               setOutputsOpen(true);
             }}
+            onOpenSettings={() => {
+              setSettingsOpen(true);
+            }}
             files={files}
           />
           <Dock
@@ -119,6 +130,19 @@ function ShellBody() {
           <ItemEditorDialog
             key={"itemId" in editor ? `${editor.mode}:${editor.itemId}` : editor.mode}
             request={editor}
+          />
+        )}
+        {settingsOpen && (
+          <SettingsDialog
+            onClose={() => {
+              setSettingsOpen(false);
+            }}
+            onManageOutputs={() => {
+              setOutputsOpen(true);
+            }}
+            onManageModules={() => {
+              setModulesOpen(true);
+            }}
           />
         )}
         <OutputsDialog

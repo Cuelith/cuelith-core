@@ -75,11 +75,13 @@ export function SlidesPanel() {
         {item.title === "" ? t("core.editor.untitled") : item.title}
       </h3>
       {directId !== undefined ? (
-        <p className="text-xs text-muted" data-testid="direct-badge">
-          <span className="rounded border border-stage-line px-1.5 py-0.5 text-stage">
+        <p className="text-xs" data-testid="direct-badge">
+          <span
+            title={t("core.direct.hint")}
+            className="rounded border border-stage-line px-1.5 py-0.5 text-stage"
+          >
             {t("core.direct.badge")}
-          </span>{" "}
-          {t("core.direct.hint")}
+          </span>
         </p>
       ) : (
         <LibraryLink item={item} />
@@ -142,7 +144,6 @@ export function SlidesPanel() {
           })}
         </ol>
       )}
-      <p className="text-xs text-faint">{t("core.slides.hint")}</p>
     </Panel>
   );
 }

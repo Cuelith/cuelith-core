@@ -19,7 +19,7 @@ import { useConnection, useEngine, useT } from "../engine/react.js";
 import { ModulePanelsContext, type ModulePanel } from "../station/modulePanels.js";
 import { saveTextFile } from "../station/saveFile.js";
 import { showTab } from "../station/tabs.js";
-import { useStation } from "../station/station.js";
+import { openPanelWindow, useStation } from "../station/station.js";
 
 /** Solo i testi del modulo: un pannello non vede quelli del nucleo o di altri moduli. */
 function ownCatalog(catalog: Catalog, pluginId: string): Catalog {
@@ -49,7 +49,6 @@ export function ModulePanelFrame({
   const port = useRef<MessagePort | undefined>(undefined);
   const t = useT();
   const panels = useContext(ModulePanelsContext);
-  const { openCenterPanel } = useStation();
   const latest = useRef({
     state,
     catalog,
@@ -58,10 +57,9 @@ export function ModulePanelFrame({
     onClose,
     context,
     panels,
-    openCenterPanel,
   });
   useEffect(() => {
-    latest.current = { state, catalog, lang, notify, onClose, context, panels, openCenterPanel };
+    latest.current = { state, catalog, lang, notify, onClose, context, panels };
   });
 
   useEffect(() => {
@@ -103,8 +101,8 @@ export function ModulePanelFrame({
           fail(ErrorCode.NotFound, "core.error.panelNotFound");
           return;
         }
-        if (target.placement === "center")
-          latest.current.openCenterPanel(target.id, request.data?.context);
+        // Gli editor ("center") si aprono in una finestra propria, mai al centro.
+        if (target.placement === "center") openPanelWindow(target.id, request.data?.context);
         else showTab(target.id);
         send({ type: "result", id, result: {} });
         return;

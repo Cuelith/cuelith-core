@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
 import { EngineConnection, type Credentials } from "@cuelith-core/engine-client";
 import { ConnectionProvider } from "./engine/react.js";
+import { PanelWindow, panelWindowRequest } from "./shell/PanelWindow.js";
 import "./styles.css";
 
 declare global {
@@ -22,6 +23,8 @@ declare global {
       readonly openExternal: (url: string) => Promise<void>;
       /** Interfaccia pronta: Electron chiude la finestra di avvio e mostra la postazione. */
       readonly stationReady: () => void;
+      /** Apre (o riusa) la finestra di un pannello di modulo, es. l'editor dei canti. */
+      readonly openPanelWindow: (path: string) => Promise<void>;
     };
   }
 }
@@ -37,12 +40,19 @@ const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}
 const connection = new EngineConnection(url, credentials);
 connection.start();
 
+// La stessa pagina fa anche da finestra propria di un pannello di modulo.
+const panelRequest = panelWindowRequest(location.search);
+
 const root = document.getElementById("root");
 if (root === null) throw new Error("#root mancante");
 createRoot(root).render(
   <StrictMode>
     <ConnectionProvider connection={connection}>
-      <App />
+      {panelRequest === undefined ? (
+        <App />
+      ) : (
+        <PanelWindow panelId={panelRequest.panelId} context={panelRequest.context} />
+      )}
     </ConnectionProvider>
   </StrictMode>,
 );

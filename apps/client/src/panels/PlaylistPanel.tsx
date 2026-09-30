@@ -108,7 +108,7 @@ export function PlaylistPanel() {
             onDrop(event, 0);
           }}
         >
-          <EmptyState title={t("core.playlist.empty")} hint={t("core.playlist.emptyHint")} />
+          <EmptyState title={t("core.playlist.empty")} />
         </div>
       ) : (
         <ol

@@ -22,12 +22,14 @@ export function TopBar({
   active,
   onSelect,
   onManageOutputs,
+  onOpenSettings,
   files,
 }: {
   modes: readonly Mode[];
   active: Mode;
   onSelect: (mode: Mode) => void;
   onManageOutputs: () => void;
+  onOpenSettings: () => void;
   files: ShowFiles;
 }) {
   const t = useT();
@@ -67,6 +69,27 @@ export function TopBar({
       <div className="flex-1" />
 
       <OutputsBar onManage={onManageOutputs} />
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        aria-label={t("core.settings.title")}
+        title={t("core.settings.title")}
+        className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-bg-3 hover:text-fg"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          className="h-[18px] w-[18px]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+        </svg>
+      </button>
     </header>
   );
 }

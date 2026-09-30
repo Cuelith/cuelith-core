@@ -159,7 +159,9 @@ test("senza marketplace raggiungibile lo dice, e l'italiano resta obbligatorio",
   const italian = window.getByRole("list", { name: "Installati" }).getByRole("listitem").filter({
     hasText: "Italiano",
   });
-  await expect(italian).toContainText("Lingua · 0.1.0 · Incluso · Attivo");
+  // Modulo passivo: lavora in background, niente icona nella colonna degli strumenti.
+  await expect(italian).toContainText("Lingua · In background · 0.1.0 · Incluso · Attivo");
+  await expect(italian.locator("img")).toHaveAttribute("src", /icon\.svg$/);
   await expect(italian.getByRole("switch", { name: "Attiva Italiano" })).toBeDisabled();
   await expect(italian.getByRole("button", { name: "Disinstalla" })).toHaveCount(0);
   expect(problems).toEqual([]);
