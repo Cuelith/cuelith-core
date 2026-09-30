@@ -79,7 +79,9 @@ function ShellBody() {
         (m) => m.shortcut !== undefined && matchesShortcut(event, m.shortcut),
       );
       // Ctrl+, apre le impostazioni (come nella maggior parte dei programmi).
-      if ((event.ctrlKey || event.metaKey) && event.key === "," && !event.altKey) {
+      // Per tasto o per posizione (layout di tastiera diversi, Linux).
+      const comma = event.key === "," || event.code === "Comma";
+      if ((event.ctrlKey || event.metaKey) && comma && !event.altKey) {
         event.preventDefault();
         setSettingsOpen(true);
         return;
