@@ -83,7 +83,10 @@ test("impostazioni: ingranaggio e Ctrl+, ; la legenda dei tasti sta in Scorciato
   await expect(settings).toBeHidden();
 
   // Il fuoco torna alla postazione (chiuso il dialogo, su Linux resta in sospeso).
-  await station.locator("header").first().click({ position: { x: 700, y: 20 } });
+  await station
+    .locator("header")
+    .first()
+    .click({ position: { x: 700, y: 20 } });
   await station.keyboard.press("Control+,");
   await expect(settings).toBeVisible();
   expect(problems).toEqual([]);
