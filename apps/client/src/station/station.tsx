@@ -22,6 +22,15 @@ export type EditorRequest =
   | { readonly mode: "libraryCreate"; readonly libraryId: string | undefined }
   | { readonly mode: "libraryEdit"; readonly itemId: string };
 
+/** Pannello centrale aperto: id qualificato, contesto e numero di apertura (per ricaricarlo). */
+export interface CenterPanelRequest {
+  readonly id: string;
+  readonly context: unknown;
+  readonly opening: number;
+}
+
+let nextOpening = 1;
+
 /** Risposta alla domanda "salvare le modifiche?". */
 export type UnsavedChoice = "save" | "discard" | "cancel";
 
@@ -30,9 +39,10 @@ interface StationContextValue {
   readonly selectedEntryId: string | undefined;
   readonly select: (entryId: string | undefined) => void;
   readonly editor: EditorRequest | undefined;
-  /** Pannello di un modulo aperto al posto della colonna Slide (id qualificato). */
-  readonly centerPanel: string | undefined;
-  readonly setCenterPanel: (id: string | undefined) => void;
+  /** Pannello di un modulo aperto al posto della colonna Slide, col suo contesto. */
+  readonly centerPanel: CenterPanelRequest | undefined;
+  readonly openCenterPanel: (id: string, context?: unknown) => void;
+  readonly closeCenterPanel: () => void;
   readonly openEditor: (request: EditorRequest) => void;
   readonly closeEditor: () => void;
   readonly notices: readonly Notice[];
@@ -58,7 +68,13 @@ let nextQuestion = 1;
 export function StationProvider({ children }: { children: ReactNode }) {
   const [selectedEntryId, setSelected] = useState<string | undefined>();
   const [editor, setEditor] = useState<EditorRequest | undefined>();
-  const [centerPanel, setCenterPanel] = useState<string | undefined>();
+  const [centerPanel, setCenterPanel] = useState<CenterPanelRequest | undefined>();
+  const openCenterPanel = useCallback((id: string, context?: unknown) => {
+    setCenterPanel({ id, context, opening: nextOpening++ });
+  }, []);
+  const closeCenterPanel = useCallback(() => {
+    setCenterPanel(undefined);
+  }, []);
   const [notices, setNotices] = useState<readonly Notice[]>([]);
   const [unsaved, setUnsaved] = useState<
     { id: number; resolve: (choice: UnsavedChoice) => void } | undefined
@@ -102,7 +118,8 @@ export function StationProvider({ children }: { children: ReactNode }) {
       select: setSelected,
       editor,
       centerPanel,
-      setCenterPanel,
+      openCenterPanel,
+      closeCenterPanel,
       openEditor: setEditor,
       closeEditor: () => {
         setEditor(undefined);
@@ -118,6 +135,8 @@ export function StationProvider({ children }: { children: ReactNode }) {
       selectedEntryId,
       editor,
       centerPanel,
+      openCenterPanel,
+      closeCenterPanel,
       notices,
       notify,
       dismiss,

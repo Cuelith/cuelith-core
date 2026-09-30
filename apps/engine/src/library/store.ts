@@ -77,6 +77,7 @@ export interface ItemQuery {
   readonly libraryId?: string | undefined;
   readonly query?: string | undefined;
   readonly tag?: string | undefined;
+  readonly type?: string | undefined;
   readonly offset?: number | undefined;
   readonly limit?: number | undefined;
 }
@@ -451,6 +452,10 @@ export class LibraryStore {
         where.push("i.id IN (SELECT id FROM items_fts WHERE items_fts MATCH ?)");
         params.push(match);
       }
+    }
+    if (query.type !== undefined) {
+      where.push("json_extract(i.data, '$.type') = ?");
+      params.push(query.type);
     }
     if (query.tag !== undefined) {
       where.push(

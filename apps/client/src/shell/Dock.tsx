@@ -1,7 +1,7 @@
 import { useT } from "../engine/react.js";
 import type { ModulePanel } from "../station/modulePanels.js";
 import { useStation } from "../station/station.js";
-import { showTab } from "./ModeView.js";
+import { showTab } from "../station/tabs.js";
 
 /** Sigla di due lettere dal titolo del pannello, come nel dock del documento ("BI", "TI"...). */
 function initials(title: string): string {
@@ -24,14 +24,14 @@ export function Dock({
   onManageModules: () => void;
 }) {
   const t = useT();
-  const { centerPanel, setCenterPanel } = useStation();
+  const { centerPanel, openCenterPanel, closeCenterPanel } = useStation();
   return (
     <nav
       aria-label={t("core.dock.label")}
       className="flex flex-col items-center gap-2 border-r border-line py-2.5"
     >
       {panels.map((panel) => {
-        const open = panel.placement === "center" && centerPanel === panel.id;
+        const open = panel.placement === "center" && centerPanel?.id === panel.id;
         return (
           <button
             key={panel.id}
@@ -40,8 +40,10 @@ export function Dock({
             title={t(panel.title)}
             aria-pressed={panel.placement === "center" ? open : undefined}
             onClick={() => {
-              if (panel.placement === "center") setCenterPanel(open ? undefined : panel.id);
-              else showTab(panel.id);
+              if (panel.placement === "center") {
+                if (open) closeCenterPanel();
+                else openCenterPanel(panel.id);
+              } else showTab(panel.id);
             }}
             className={`grid h-8 w-8 place-items-center rounded-lg font-mono text-[10px] font-semibold ${
               open

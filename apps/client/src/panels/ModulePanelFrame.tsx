@@ -2,6 +2,8 @@ import {
   EngineMethods,
   ErrorCode,
   isEngineMethod,
+  OpenPanelParamsSchema,
+  SaveFileParamsSchema,
   PANEL_CONNECT,
   PANEL_HOST_METHODS,
   PanelToHostSchema,
@@ -11,9 +13,11 @@ import {
   type HostToPanel,
 } from "@cuelith/protocol";
 import { EngineCallError } from "@cuelith-core/engine-client";
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
-import type { ModulePanel } from "../station/modulePanels.js";
+import { ModulePanelsContext, type ModulePanel } from "../station/modulePanels.js";
+import { saveTextFile } from "../station/saveFile.js";
+import { showTab } from "../station/tabs.js";
 import { useStation } from "../station/station.js";
 
 /** Solo i testi del modulo: un pannello non vede quelli del nucleo o di altri moduli. */
@@ -27,16 +31,36 @@ function ownCatalog(catalog: Catalog, pluginId: string): Catalog {
  * ne' accesso alla postazione) collegato con una porta privata. I comandi
  * arrivano al motore solo se il ruolo dei moduli li consente.
  */
-export function ModulePanelFrame({ panel, onClose }: { panel: ModulePanel; onClose?: () => void }) {
+export function ModulePanelFrame({
+  panel,
+  context,
+  onClose,
+}: {
+  panel: ModulePanel;
+  /** Contesto passato da chi ha aperto il pannello (es. il canto da modificare). */
+  context?: unknown;
+  onClose?: () => void;
+}) {
   const connection = useConnection();
   const { state, catalog, lang } = useEngine();
   const { notify } = useStation();
   const frame = useRef<HTMLIFrameElement>(null);
   const port = useRef<MessagePort | undefined>(undefined);
   const t = useT();
-  const latest = useRef({ state, catalog, lang, notify, onClose });
+  const panels = useContext(ModulePanelsContext);
+  const { openCenterPanel } = useStation();
+  const latest = useRef({
+    state,
+    catalog,
+    lang,
+    notify,
+    onClose,
+    context,
+    panels,
+    openCenterPanel,
+  });
   useEffect(() => {
-    latest.current = { state, catalog, lang, notify, onClose };
+    latest.current = { state, catalog, lang, notify, onClose, context, panels, openCenterPanel };
   });
 
   useEffect(() => {
@@ -65,6 +89,32 @@ export function ModulePanelFrame({ panel, onClose }: { panel: ModulePanel; onClo
       }
       if (method === PANEL_HOST_METHODS.close) {
         latest.current.onClose?.();
+        send({ type: "result", id, result: {} });
+        return;
+      }
+      if (method === PANEL_HOST_METHODS.openPanel) {
+        const request = OpenPanelParamsSchema.safeParse(params);
+        // Solo pannelli dello stesso modulo.
+        const target = request.success
+          ? latest.current.panels.get(`${panel.pluginId}.${request.data.panel}`)
+          : undefined;
+        if (target === undefined) {
+          fail(ErrorCode.NotFound, "core.error.panelNotFound");
+          return;
+        }
+        if (target.placement === "center")
+          latest.current.openCenterPanel(target.id, request.data?.context);
+        else showTab(target.id);
+        send({ type: "result", id, result: {} });
+        return;
+      }
+      if (method === PANEL_HOST_METHODS.saveFile) {
+        const request = SaveFileParamsSchema.safeParse(params);
+        if (!request.success) {
+          fail(ErrorCode.InvalidParameters, "core.error.invalidParams");
+          return;
+        }
+        await saveTextFile(request.data.name, request.data.content, request.data.mime);
         send({ type: "result", id, result: {} });
         return;
       }
@@ -110,6 +160,7 @@ export function ModulePanelFrame({ panel, onClose }: { panel: ModulePanel; onClo
         lang: current.lang,
         catalog: ownCatalog(current.catalog, panel.pluginId),
         state: current.state,
+        ...(current.context === undefined ? {} : { context: current.context }),
       });
     };
 

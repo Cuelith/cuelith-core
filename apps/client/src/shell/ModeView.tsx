@@ -1,6 +1,5 @@
 import { areaPanelIds, providerOf } from "@cuelith/protocol";
 import {
-  createContext,
   useContext,
   useEffect,
   useId,
@@ -12,8 +11,9 @@ import { useT, type Translate } from "../engine/react.js";
 import type { Mode } from "../modes/core.js";
 import { CORE_PANEL_COMPONENTS } from "../panels/core-panels.js";
 import { ModulePanelFrame } from "../panels/ModulePanelFrame.js";
-import type { ModulePanel } from "../station/modulePanels.js";
+import { ModulePanelsContext, type ModulePanel } from "../station/modulePanels.js";
 import { useStation } from "../station/station.js";
+import { SHOW_TAB_EVENT } from "../station/tabs.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState, Panel, PanelChrome } from "../ui/Panel.js";
 
@@ -27,10 +27,9 @@ function UnavailablePanel({ panelId }: { panelId: string }) {
 }
 
 /** Pannelli dei moduli attivi, per id qualificato. */
-const ModulePanels = createContext<ReadonlyMap<string, ModulePanel>>(new Map());
 
 function PanelView({ panelId }: { panelId: string }) {
-  const modules = useContext(ModulePanels);
+  const modules = useContext(ModulePanelsContext);
   const modulePanel = modules.get(panelId);
   if (modulePanel !== undefined) return <ModulePanelFrame panel={modulePanel} />;
   const Component = CORE_PANEL_COMPONENTS[panelId];
@@ -49,13 +48,6 @@ function panelTitle(
   return panelId;
 }
 
-/** Evento per aprire una scheda da fuori (es. dal dock). */
-export const SHOW_TAB_EVENT = "cuelith:show-tab";
-
-export function showTab(panelId: string): void {
-  window.dispatchEvent(new CustomEvent(SHOW_TAB_EVENT, { detail: panelId }));
-}
-
 function readTab(key: string): string | undefined {
   try {
     return localStorage.getItem(key) ?? undefined;
@@ -67,7 +59,7 @@ function readTab(key: string): string | undefined {
 /** Piu' pannelli nella stessa area, come schede (cap. 16: "schede dentro le sezioni"). */
 function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: readonly string[] }) {
   const t = useT();
-  const modules = useContext(ModulePanels);
+  const modules = useContext(ModulePanelsContext);
   const baseId = useId();
   const [saved, setSaved] = useState(() => readTab(storageKey));
   const active = saved !== undefined && panelIds.includes(saved) ? saved : (panelIds[0] ?? "");
@@ -168,7 +160,15 @@ function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: re
  * pannelli a schede). Lo stesso codice vale per Presenta e per i moduli.
  */
 /** Pannello centrale di un modulo (es. un editor), con il suo titolo e "Chiudi". */
-function CenterPanel({ panel, onClose }: { panel: ModulePanel; onClose: () => void }) {
+function CenterPanel({
+  panel,
+  context,
+  onClose,
+}: {
+  panel: ModulePanel;
+  context: unknown;
+  onClose: () => void;
+}) {
   const t = useT();
   return (
     <section aria-label={t(panel.title)} className="flex min-h-0 flex-1 flex-col">
@@ -180,7 +180,7 @@ function CenterPanel({ panel, onClose }: { panel: ModulePanel; onClose: () => vo
           {t("core.action.close")}
         </Button>
       </header>
-      <ModulePanelFrame panel={panel} onClose={onClose} />
+      <ModulePanelFrame panel={panel} context={context} onClose={onClose} />
     </section>
   );
 }
@@ -193,10 +193,10 @@ export function ModeView({
   modulePanels: readonly ModulePanel[];
 }) {
   const { layout } = mode;
-  const { centerPanel, setCenterPanel } = useStation();
+  const { centerPanel, closeCenterPanel } = useStation();
   const modules = new Map(modulePanels.map((p) => [p.id, p]));
   const side = modulePanels.filter((p) => p.placement === "side").map((p) => p.id);
-  const center = centerPanel === undefined ? undefined : modules.get(centerPanel);
+  const center = centerPanel === undefined ? undefined : modules.get(centerPanel.id);
   const entries = Object.entries(layout.panels).map(
     ([area, panels]) => [area, areaPanelIds(panels)] as const,
   );
@@ -216,7 +216,7 @@ export function ModeView({
       style={style}
       data-mode={mode.qualifiedId}
     >
-      <ModulePanels.Provider value={modules}>
+      <ModulePanelsContext.Provider value={modules}>
         {entries.map(([area, coreIds]) => {
           const ids = area === sideArea ? [...coreIds, ...side] : coreIds;
           const single = ids.length === 1 ? ids[0] : undefined;
@@ -231,10 +231,10 @@ export function ModeView({
             >
               {showCenter ? (
                 <CenterPanel
+                  key={centerPanel?.opening}
                   panel={center}
-                  onClose={() => {
-                    setCenterPanel(undefined);
-                  }}
+                  context={centerPanel?.context}
+                  onClose={closeCenterPanel}
                 />
               ) : single !== undefined ? (
                 <PanelView panelId={single} />
@@ -247,7 +247,7 @@ export function ModeView({
             </div>
           );
         })}
-      </ModulePanels.Provider>
+      </ModulePanelsContext.Provider>
     </main>
   );
 }

@@ -1,4 +1,6 @@
-import { useEffect } from "react";
+import { slideSequence, type StateDocument } from "@cuelith/protocol";
+import { useEffect, useRef } from "react";
+import { useEngine } from "../engine/react.js";
 import { useRun } from "./station.js";
 
 type CueCommand = "cue.next" | "cue.prev" | "cue.take" | "clear";
@@ -38,8 +40,40 @@ function belongsToFocused(event: KeyboardEvent): boolean {
   return activates && control !== null && control === keyboardFocused;
 }
 
+/**
+ * Tasti delle sezioni (come in OpenLP): con in onda un elemento a gruppi (un
+ * canto), V C P B I E O vanno alla prossima strofa, ritornello, pre-ritornello,
+ * bridge, intro, finale o altro. Si ricomincia dall'inizio se non ce n'e' dopo.
+ */
+const SECTION_KEYS = new Set(["v", "c", "p", "b", "i", "e", "o"]);
+
+export function sectionTarget(
+  doc: StateDocument,
+  letter: string,
+): { entryId: string; slideIndex: number } | undefined {
+  const { cursor } = doc.live;
+  if (cursor.entryId === undefined) return undefined;
+  const entryId = cursor.entryId;
+  const entry = doc.show.playlist.find((e) => e.id === entryId);
+  const item = entry === undefined ? undefined : doc.show.items[entry.itemId];
+  if (item === undefined) return undefined;
+  const sequence = slideSequence(item);
+  for (let step = 1; step <= sequence.length; step++) {
+    const index = (cursor.slideIndex + step) % sequence.length;
+    if (sequence[index]?.group?.toLowerCase().startsWith(letter) === true) {
+      return { entryId, slideIndex: index };
+    }
+  }
+  return undefined;
+}
+
 export function useCueShortcuts(): void {
   const run = useRun();
+  const { state } = useEngine();
+  const latest = useRef(state);
+  useEffect(() => {
+    latest.current = state;
+  });
   useEffect(() => {
     const onPointer = () => {
       lastInputWasKeyboard = false;
@@ -55,6 +89,15 @@ export function useCueShortcuts(): void {
       if (event.defaultPrevented || event.repeat) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (document.querySelector("dialog[open]") !== null) return;
+      const letter = event.key.toLowerCase();
+      if (SECTION_KEYS.has(letter) && !belongsToFocused(event) && latest.current !== undefined) {
+        const target = sectionTarget(latest.current, letter);
+        if (target !== undefined) {
+          event.preventDefault();
+          void run("cue.goto", target);
+          return;
+        }
+      }
       const command = KEYS[event.key];
       if (command === undefined || belongsToFocused(event)) return;
       event.preventDefault();

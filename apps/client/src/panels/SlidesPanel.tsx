@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
 import { useLibraries } from "../station/library.js";
 import { itemOfEntry, roomStyle, slideText } from "../station/show.js";
+import { useEditItem } from "../station/editItem.js";
 import { useRun, useStation } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { FieldLabel, INPUT, ModalDialog } from "../ui/Dialogs.js";
@@ -16,7 +17,8 @@ import { SlideText } from "../ui/SlideText.js";
 export function SlidesPanel() {
   const t = useT();
   const { state } = useEngine();
-  const { selectedEntryId, openEditor } = useStation();
+  const { selectedEntryId } = useStation();
+  const { editShowItem } = useEditItem();
   const run = useRun();
   if (state === undefined) return null;
 
@@ -48,7 +50,7 @@ export function SlidesPanel() {
           <Button
             size="sm"
             onClick={() => {
-              openEditor({ mode: "edit", itemId: item.id });
+              editShowItem(item);
             }}
           >
             {t("core.action.edit")}
@@ -93,6 +95,14 @@ export function SlidesPanel() {
                   <span className="absolute inset-0" style={{ containerType: "size" }}>
                     <SlideText text={slideText(slide)} style={style} />
                   </span>
+                  {slide.group !== undefined && (
+                    <span
+                      data-testid="slide-group"
+                      className="absolute top-1 left-1 rounded bg-mod-chip px-1.5 font-mono text-[10px] font-semibold text-mod"
+                    >
+                      {slide.group.toUpperCase()}
+                    </span>
+                  )}
                   <span
                     className={`absolute bottom-1 left-1 rounded px-1.5 font-mono text-[10px] font-semibold ${
                       isLive

@@ -1,5 +1,5 @@
 import type { InstalledPlugin } from "@cuelith/protocol";
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useEffect, useMemo, useState } from "react";
 import { useConnection, useEngine } from "../engine/react.js";
 
 /** Un pannello offerto da un modulo attivo. */
@@ -33,8 +33,30 @@ export function panelsOf(plugins: readonly InstalledPlugin[]): ModulePanel[] {
   });
 }
 
+/** Tipo di elemento di un modulo -> pannello che lo modifica (id qualificato). */
+export function editorsOf(plugins: readonly InstalledPlugin[]): ReadonlyMap<string, string> {
+  const editors = new Map<string, string>();
+  for (const { manifest, status } of plugins) {
+    if (status.state !== "active") continue;
+    for (const type of manifest.contributes.itemTypes ?? []) {
+      if (type.editor !== undefined)
+        editors.set(`${manifest.id}.${type.id}`, `${manifest.id}.${type.editor}`);
+    }
+  }
+  return editors;
+}
+
+/** Editor dei tipi di elemento dei moduli (forniti dalla postazione). */
+export const ModuleEditorsContext = createContext<ReadonlyMap<string, string>>(new Map());
+
+/** Pannelli dei moduli attivi, per id qualificato (forniti dalla vista della modalita'). */
+export const ModulePanelsContext = createContext<ReadonlyMap<string, ModulePanel>>(new Map());
+
 /** Pannelli dei moduli attivi, riletti quando i moduli cambiano. */
-export function useModulePanels(): readonly ModulePanel[] {
+export function useModuleUi(): {
+  readonly panels: readonly ModulePanel[];
+  readonly editors: ReadonlyMap<string, string>;
+} {
   const connection = useConnection();
   const plugins = useEngine().state?.live.plugins;
   const key = JSON.stringify(plugins);
@@ -51,5 +73,8 @@ export function useModulePanels(): readonly ModulePanel[] {
       cancelled = true;
     };
   }, [connection, key]);
-  return useMemo(() => panelsOf(installed), [installed]);
+  return useMemo(
+    () => ({ panels: panelsOf(installed), editors: editorsOf(installed) }),
+    [installed],
+  );
 }

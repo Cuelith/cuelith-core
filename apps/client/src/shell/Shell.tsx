@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useEngine, useT } from "../engine/react.js";
 import { CORE_MODES, PRESENT_MODE, type Mode } from "../modes/core.js";
 import { useShowFiles, type ShowFiles } from "../station/files.js";
-import { useModulePanels } from "../station/modulePanels.js";
+import { ModuleEditorsContext, useModuleUi } from "../station/modulePanels.js";
 import { useCueShortcuts } from "../station/shortcuts.js";
 import { StationProvider, useStation } from "../station/station.js";
 import { Dock } from "./Dock.js";
@@ -52,7 +52,7 @@ function ShellBody() {
   const { status } = useEngine();
   const { editor, unsavedQuestion } = useStation();
   const files = useShowFiles();
-  const modulePanels = useModulePanels();
+  const { panels: modulePanels, editors } = useModuleUi();
   useCueShortcuts();
   useFileShortcuts(files);
   const modes = CORE_MODES;
@@ -85,58 +85,60 @@ function ShellBody() {
   }, [modes, selectMode]);
 
   return (
-    <div className="flex h-full flex-col">
-      <RecoveryBanner files={files} />
-      <div className="grid min-h-0 flex-1 grid-cols-[48px_1fr] grid-rows-[44px_1fr]">
-        <TopBar
-          modes={modes}
-          active={mode}
-          onSelect={selectMode}
-          onManageOutputs={() => {
-            setOutputsOpen(true);
-          }}
-          files={files}
-        />
-        <Dock
-          panels={modulePanels}
-          onManageModules={() => {
-            setModulesOpen(true);
-          }}
-        />
-        <ModeView mode={mode} modulePanels={modulePanels} />
-      </div>
-      {modulesOpen && (
-        <ModulesWindow
-          onClose={() => {
-            setModulesOpen(false);
-          }}
-        />
-      )}
-      {editor !== undefined && (
-        <ItemEditorDialog
-          key={"itemId" in editor ? `${editor.mode}:${editor.itemId}` : editor.mode}
-          request={editor}
-        />
-      )}
-      <OutputsDialog
-        open={outputsOpen}
-        onClose={() => {
-          setOutputsOpen(false);
-        }}
-      />
-      {unsavedQuestion !== undefined && (
-        <UnsavedDialog key={unsavedQuestion} question={unsavedQuestion} />
-      )}
-      <Notices />
-      {status.kind === "lost" && (
-        <div
-          role="status"
-          className="fixed inset-x-0 top-0 z-50 bg-stage px-4 py-2 text-center text-sm font-semibold text-bg"
-        >
-          {t("core.connection.lost")}
+    <ModuleEditorsContext.Provider value={editors}>
+      <div className="flex h-full flex-col">
+        <RecoveryBanner files={files} />
+        <div className="grid min-h-0 flex-1 grid-cols-[48px_1fr] grid-rows-[44px_1fr]">
+          <TopBar
+            modes={modes}
+            active={mode}
+            onSelect={selectMode}
+            onManageOutputs={() => {
+              setOutputsOpen(true);
+            }}
+            files={files}
+          />
+          <Dock
+            panels={modulePanels}
+            onManageModules={() => {
+              setModulesOpen(true);
+            }}
+          />
+          <ModeView mode={mode} modulePanels={modulePanels} />
         </div>
-      )}
-    </div>
+        {modulesOpen && (
+          <ModulesWindow
+            onClose={() => {
+              setModulesOpen(false);
+            }}
+          />
+        )}
+        {editor !== undefined && (
+          <ItemEditorDialog
+            key={"itemId" in editor ? `${editor.mode}:${editor.itemId}` : editor.mode}
+            request={editor}
+          />
+        )}
+        <OutputsDialog
+          open={outputsOpen}
+          onClose={() => {
+            setOutputsOpen(false);
+          }}
+        />
+        {unsavedQuestion !== undefined && (
+          <UnsavedDialog key={unsavedQuestion} question={unsavedQuestion} />
+        )}
+        <Notices />
+        {status.kind === "lost" && (
+          <div
+            role="status"
+            className="fixed inset-x-0 top-0 z-50 bg-stage px-4 py-2 text-center text-sm font-semibold text-bg"
+          >
+            {t("core.connection.lost")}
+          </div>
+        )}
+      </div>
+    </ModuleEditorsContext.Provider>
   );
 }
 

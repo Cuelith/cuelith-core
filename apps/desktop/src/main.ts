@@ -5,7 +5,13 @@ import { consoleLogger, startEngine, type Engine } from "@cuelith-core/engine";
 import { DEFAULT_ENGINE_PORT } from "@cuelith/protocol";
 import { app, BrowserWindow, ipcMain, Menu, session, shell } from "electron";
 import { electronDisplays } from "./displays.js";
-import { chooseMediaFiles, chooseModuleFile, chooseShowFile, confirmUnsaved } from "./files.js";
+import {
+  chooseMediaFiles,
+  chooseModuleFile,
+  chooseShowFile,
+  confirmUnsaved,
+  saveTextFile,
+} from "./files.js";
 import { OutputWindows } from "./outputs.js";
 import { resolveAppPaths } from "./paths.js";
 import { folderFetch } from "./test-registry.js";
@@ -167,6 +173,15 @@ async function main(): Promise<void> {
       throw new Error("richiesta non autorizzata");
     }
     return chooseMediaFiles(station, engine, kind === "image" ? "image" : "audio");
+  });
+
+  ipcMain.handle("cuelith:save-text-file", async (event, name: unknown, content: unknown) => {
+    const role = trusted.get(event.sender.id);
+    if (role !== "station" || station === undefined || engine === undefined) {
+      throw new Error("richiesta non autorizzata");
+    }
+    if (typeof name !== "string" || typeof content !== "string") throw new Error("dati non validi");
+    await saveTextFile(station, engine, name, content);
   });
 
   ipcMain.handle("cuelith:choose-module-file", async (event) => {

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  newId,
   PROTOCOL_VERSION,
   type EngineMethodName,
   type EngineMethodParams,
@@ -398,5 +399,55 @@ describe("file dei moduli", () => {
     expect(station.headers.get("access-control-allow-origin")).toBeNull();
     expect((await fetch(`${base}/9.9.9/guide/passo1.svg`)).status).toBe(404);
     expect((await fetch(`${base}/1.0.0/..%2F..%2Finstalled.json`)).status).toBe(404);
+  });
+});
+
+describe("elementi dei moduli", () => {
+  function cardModule(): Uint8Array {
+    return cpkg({
+      "cuelith-plugin.json": manifest("cuelith.greetings", "1.2.0", {
+        contributes: {
+          itemTypes: [{ id: "card", title: "cuelith.greetings.card" }],
+          locales: [{ lang: "it", file: "locales/it.json" }],
+        },
+      }),
+      "locales/it.json": { "cuelith.greetings.card": "Biglietto" },
+    });
+  }
+
+  it("un elemento di un modulo entra nello show e lo show dichiara il modulo", async () => {
+    const net = new FakeNet();
+    net.publish("cuelith.greetings", "1.2.0", cardModule());
+    const { ok, fails, engine } = await start(net);
+    expect(await fails("item.create", { type: "cuelith.greetings.card", title: "x" })).toEqual([
+      4220,
+      "core.error.itemTypeUnknown",
+    ]);
+    await ok("plugin.installFromRegistry", { id: "cuelith.greetings" });
+    const { id } = await ok("item.create", { type: "cuelith.greetings.card", title: "Benvenuti" });
+    const show = engine.context.store.snapshot().show;
+    expect(show.items[id]?.type).toBe("cuelith.greetings.card");
+    expect(show.plugins).toEqual({ "cuelith.greetings": "^1.2.0" });
+  });
+
+  it("nelle librerie si filtra per tipo, e dalla libreria allo show il modulo si dichiara", async () => {
+    const net = new FakeNet();
+    net.publish("cuelith.greetings", "1.2.0", cardModule());
+    const { ok, engine } = await start(net);
+    await ok("plugin.installFromRegistry", { id: "cuelith.greetings" });
+    const item = (type: string, title: string) => ({
+      id: newId(),
+      type,
+      title,
+      slides: [{ id: newId(), fields: { text: { kind: "text" as const, value: title } } }],
+      meta: {},
+    });
+    const card = item("cuelith.greetings.card", "Biglietto");
+    await ok("library.saveItem", { item: card });
+    await ok("library.saveItem", { item: item("core.text", "Testo") });
+    const cards = await ok("library.items", { type: "cuelith.greetings.card" });
+    expect(cards.items.map((i) => i.title)).toEqual(["Biglietto"]);
+    await ok("playlist.addFromLibrary", { itemId: card.id });
+    expect(engine.context.store.snapshot().show.plugins).toEqual({ "cuelith.greetings": "^1.2.0" });
   });
 });

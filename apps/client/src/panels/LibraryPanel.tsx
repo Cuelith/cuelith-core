@@ -8,6 +8,7 @@ import {
   useLibraryItems,
   useLibraryTags,
 } from "../station/library.js";
+import { useEditItem } from "../station/editItem.js";
 import { useRun, useStation } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { ConfirmDialog, FieldLabel, INPUT, ModalDialog, PromptDialog } from "../ui/Dialogs.js";
@@ -50,6 +51,7 @@ type Dialog =
  */
 export function LibraryPanel() {
   const t = useT();
+  const { editLibraryItem } = useEditItem();
   const run = useRun();
   const { openEditor } = useStation();
   const libraries = useLibraries();
@@ -323,7 +325,7 @@ export function LibraryPanel() {
                 <Button
                   size="sm"
                   onClick={() => {
-                    openEditor({ mode: "libraryEdit", itemId: item.id });
+                    editLibraryItem(item);
                   }}
                 >
                   {t("core.action.edit")}

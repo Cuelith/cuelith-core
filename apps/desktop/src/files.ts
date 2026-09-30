@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { MEDIA_FORMATS, type Engine } from "@cuelith-core/engine";
 import { SHOW_FILE_EXTENSION } from "@cuelith/protocol";
@@ -130,4 +130,19 @@ export async function chooseMediaFiles(
     properties: ["openFile", "multiSelections"],
   });
   return result.canceled ? [] : result.filePaths;
+}
+
+/** Finestra "Salva" per un file di testo prodotto da un modulo (es. un canto esportato). */
+export async function saveTextFile(
+  parent: BrowserWindow,
+  engine: Engine,
+  name: string,
+  content: string,
+): Promise<void> {
+  const result = await dialog.showSaveDialog(parent, {
+    title: engine.context.locales.t("core.file.saveTitleGeneric"),
+    defaultPath: path.join(await defaultFolder(), safeFileName(path.basename(name))),
+  });
+  if (result.canceled || result.filePath === "") return;
+  await writeFile(result.filePath, content, "utf8");
 }

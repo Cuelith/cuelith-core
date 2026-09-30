@@ -14,8 +14,9 @@ import type { StateStore } from "../state/store.js";
 import { MediaFiles } from "./media.js";
 import { LibraryStore, type ItemQuery } from "./store.js";
 
-/** Tipi di elemento che il nucleo sa disegnare; gli altri arrivano dai moduli. */
-export const CORE_ITEM_TYPES: readonly string[] = ["core.text"];
+import { CORE_ITEM_TYPES, declareItemType } from "../show/plugins.js";
+
+export { CORE_ITEM_TYPES };
 
 export interface LibraryServiceOptions {
   readonly store: StateStore;
@@ -122,6 +123,7 @@ export class LibraryService {
       (i) => i.libraryRef?.itemId === libraryItemId && i.libraryRef.updatedAt === updatedAt,
     );
     const item = existing ?? this.#showCopy(libraryItemId);
+    declareItemType(draft, item.type, this.#o.modules);
     if (existing === undefined) draft.show.items[item.id] = item;
     const playlist = draft.show.playlist;
     const at = index ?? playlist.length;

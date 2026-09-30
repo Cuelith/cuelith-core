@@ -2,7 +2,6 @@ import { isDeepStrictEqual } from "node:util";
 import {
   ErrorCode,
   newId,
-  providerOf,
   RpcError,
   type Item,
   type Slide,
@@ -10,7 +9,7 @@ import {
   type StateDocument,
 } from "@cuelith/protocol";
 import type { EngineContext } from "../../context.js";
-import { CORE_ITEM_TYPES } from "../../library/service.js";
+import { declareItemType } from "../../show/plugins.js";
 import { normalizeLive } from "../../show/live.js";
 import type { HandlerMap } from "../dispatch.js";
 
@@ -74,13 +73,7 @@ export const editHandlers: HandlerMap = {
   "item.create": (ctx, _session, params) => {
     const id = newId();
     const rev = edit(ctx, (draft) => {
-      const provider = providerOf(params.type, Object.keys(draft.show.plugins));
-      if (
-        provider === undefined ||
-        (provider === "core" && !CORE_ITEM_TYPES.includes(params.type))
-      ) {
-        throw invalid("core.error.itemTypeUnknown");
-      }
+      declareItemType(draft, params.type, ctx.modules);
       checkAttachments(ctx, params.attachments);
       draft.show.items[id] = {
         id,

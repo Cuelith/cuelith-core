@@ -3,6 +3,7 @@ import { useState, type DragEvent, type KeyboardEvent } from "react";
 import { useEngine, useT } from "../engine/react.js";
 import { useChooseEntry } from "../station/choose.js";
 import { LIBRARY_ITEM_DRAG } from "../station/library.js";
+import { useEditItem } from "../station/editItem.js";
 import { useRun, useStation } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState, Panel } from "../ui/Panel.js";
@@ -15,6 +16,7 @@ export function PlaylistPanel() {
   const { state } = useEngine();
   const { selectedEntryId, select, openEditor } = useStation();
   const choose = useChooseEntry();
+  const { editShowItem } = useEditItem();
   const run = useRun();
   const [dropIndex, setDropIndex] = useState<number | undefined>();
   if (state === undefined) return null;
@@ -168,7 +170,7 @@ export function PlaylistPanel() {
                     choose(entry.id);
                   }}
                   onDoubleClick={() => {
-                    openEditor({ mode: "edit", itemId: item.id });
+                    editShowItem(item);
                   }}
                   onKeyDown={(event) => {
                     onRowKey(event, entry.id, index);
@@ -190,7 +192,7 @@ export function PlaylistPanel() {
                   <Button
                     size="sm"
                     onClick={() => {
-                      openEditor({ mode: "edit", itemId: item.id });
+                      editShowItem(item);
                     }}
                   >
                     {t("core.action.edit")}
