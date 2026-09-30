@@ -8,18 +8,28 @@ const tab = (station: Page, name: string) => station.getByRole("tab", { name, ex
 
 async function openLibraries(station: Page): Promise<void> {
   await tab(station, "Librerie").click();
-  await expect(station.getByRole("combobox", { name: "Libreria" })).toBeVisible();
+  await expect(picker(station)).toBeVisible();
 }
 
-/** Nuova libreria dalla tendina (la via piu' visibile); il menu ⋯ fa lo stesso. */
-async function newLibrary(station: Page, name: string): Promise<void> {
-  await station
-    .getByRole("combobox", { name: "Libreria" })
-    .selectOption({ label: "+ Nuova libreria…" });
+/** Il selettore delle librerie (il nome dice quale e' scelta). */
+const picker = (station: Page) => station.getByRole("button", { name: /^Libreria: / });
+
+interface LibraryFields {
+  readonly category?: string;
+  readonly code?: string;
+}
+
+/** Nuova libreria dal selettore; alla fine e' quella scelta. */
+async function newLibrary(station: Page, name: string, fields: LibraryFields = {}): Promise<void> {
+  await picker(station).click();
+  await station.getByRole("button", { name: "+ Nuova libreria…" }).click();
   const dialog = station.getByRole("dialog", { name: "Nuova libreria…" });
   await dialog.getByLabel("Nome").fill(name);
+  if (fields.category !== undefined) await dialog.getByLabel("Categoria").fill(fields.category);
+  if (fields.code !== undefined) await dialog.getByLabel("Sigla").fill(fields.code);
   await dialog.getByRole("button", { name: "Crea" }).click();
   await expect(dialog).toBeHidden();
+  await expect(picker(station)).toHaveAccessibleName(`Libreria: ${name}. Cambia libreria`);
 }
 
 const libraryRows = (station: Page) =>
@@ -32,7 +42,6 @@ test("librerie: canto con crediti, tag e base; ricerca, versioni, in scaletta e 
   await openLibraries(station);
   await expect(station.getByText("Qui non c’è ancora nulla.")).toBeVisible();
   await newLibrary(station, "Innario");
-  await expect(station.getByRole("combobox", { name: "Libreria" })).toHaveValue(/.+/);
 
   // Nuovo elemento nella libreria scelta: testo, crediti, tag e base musicale.
   await station.getByRole("button", { name: "+ Testo" }).click();
@@ -182,5 +191,65 @@ test("un testo della scaletta si salva in una libreria; si trascina dalla librer
   await station.mouse.move(listBox.x + 40, listBox.y + listBox.height - 4, { steps: 8 });
   await station.mouse.up();
   await expect(list.getByRole("listitem")).toHaveCount(2);
+  expect(problems).toEqual([]);
+});
+
+test("tante librerie: categorie, preferite, ricerca della libreria, sigla e numero", async ({
+  running,
+}) => {
+  const { station, problems } = running;
+  await openLibraries(station);
+  await newLibrary(station, "Innario 2026", { category: "Innari", code: "INN" });
+  await newLibrary(station, "Canti di Natale", { category: "Canti" });
+  await newLibrary(station, "Avvisi della domenica", { category: "Avvisi" });
+
+  // Un brano nell'innario col numero 245.
+  await picker(station).click();
+  await station.getByRole("searchbox", { name: "Cerca una libreria" }).fill("inn");
+  await station.getByRole("button", { name: /^Innario 2026/ }).click();
+  await station.getByRole("button", { name: "+ Testo" }).click();
+  const editor = station.getByRole("dialog", { name: "Nuovo elemento in libreria" });
+  await editor.getByLabel("Titolo").fill("Luce del mattino");
+  await editor.getByLabel("Testo").fill("Vieni su di noi");
+  await editor.getByRole("button", { name: "Salva" }).click();
+  await expect(editor).toBeHidden();
+  const row = libraryRows(station).first();
+  await row.hover();
+  await row.getByRole("button", { name: "Altre azioni per «Luce del mattino»" }).click();
+  await station.getByRole("menuitem", { name: "Numero…" }).click();
+  const numberDialog = station.getByRole("dialog", { name: "Numero…" });
+  await numberDialog.getByLabel("Numero").fill("245");
+  await numberDialog.getByRole("button", { name: "Salva" }).click();
+  await expect(row).toContainText("245");
+
+  // Preferita: compare in cima; le altre raggruppate per categoria.
+  await picker(station).click();
+  const popup = station.getByRole("dialog", { name: "Libreria" });
+  await popup.getByRole("button", { name: "Aggiungi «Canti di Natale» alle preferite" }).click();
+  await expect(popup.getByRole("region", { name: "Preferite" })).toContainText("Canti di Natale");
+  await expect(popup.getByRole("region", { name: "Innari" })).toContainText("Innario 2026");
+  await expect(popup.getByRole("region", { name: "Avvisi" })).toContainText(
+    "Avvisi della domenica",
+  );
+  await station.screenshot({ path: path.join(screenshotsDir, "librerie-selettore.png") });
+
+  // Ricerca della libreria per sigla o categoria.
+  await popup.getByRole("searchbox", { name: "Cerca una libreria" }).fill("avvisi");
+  await expect(popup.getByRole("region", { name: "Risultati" }).getByRole("listitem")).toHaveCount(
+    1,
+  );
+  await popup.getByRole("button", { name: /^Avvisi della domenica/ }).press("Escape");
+  await expect(popup).toBeHidden();
+
+  // In tutto l'archivio: "INN 245" porta dritto al brano, e ogni brano dice dove sta.
+  await picker(station).click();
+  await popup.getByRole("button", { name: "Tutto l’archivio" }).click();
+  const search = station.getByRole("searchbox", { name: "Cerca nell’archivio" });
+  await search.fill("INN 245");
+  await expect(libraryRows(station)).toHaveCount(1);
+  await expect(libraryRows(station).first()).toContainText("INN 245");
+  await search.fill("inn luce");
+  await expect(libraryRows(station)).toHaveCount(1);
+  await station.screenshot({ path: path.join(screenshotsDir, "librerie-sigla.png") });
   expect(problems).toEqual([]);
 });

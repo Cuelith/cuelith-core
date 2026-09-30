@@ -11,12 +11,22 @@ import {
 import { useRun, useStation } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { ConfirmDialog, FieldLabel, INPUT, ModalDialog, PromptDialog } from "../ui/Dialogs.js";
+import { LibraryDialog } from "./library/LibraryDialog.js";
+import { LibraryPicker } from "./library/LibraryPicker.js";
 import { MenuButton, type MenuItem } from "../ui/Menu.js";
 import { EmptyState, Panel } from "../ui/Panel.js";
 
+/** "INN 245 · Natale": in quali librerie sta un brano (nella vista di tutto l'archivio). */
+function whereLabel(item: LibraryItemSummary): string {
+  return item.libraries
+    .map((m) =>
+      m.code !== undefined ? [m.code, m.number].filter((p) => p !== undefined).join(" ") : m.name,
+    )
+    .join(", ");
+}
+
 const ENTRY_DRAG = "application/x-cuelith-library-entry";
 const LIBRARY_KEY = "cuelith.library";
-const NEW_LIBRARY = "__new__";
 
 function readLibrary(): string | undefined {
   try {
@@ -27,8 +37,7 @@ function readLibrary(): string | undefined {
 }
 
 type Dialog =
-  | { kind: "newLibrary" }
-  | { kind: "renameLibrary"; library: Library }
+  | { kind: "library"; library: Library | undefined }
   | { kind: "deleteLibrary"; library: Library }
   | { kind: "addTo"; item: LibraryItemSummary }
   | { kind: "number"; item: LibraryItemSummary }
@@ -54,6 +63,9 @@ export function LibraryPanel() {
 
   // La libreria scelta vale solo se esiste ancora (un'altra postazione puo' eliminarla).
   const library = libraries?.find((l) => l.id === saved);
+  const categories = [
+    ...new Set((libraries ?? []).flatMap((l) => (l.category === undefined ? [] : [l.category]))),
+  ];
   const libraryId = library?.id;
   const { items, total, loading } = useLibraryItems({ libraryId, query, tag, limit });
 
@@ -98,30 +110,6 @@ export function LibraryPanel() {
     const from = items.findIndex((i) => i.entryId === entryId);
     moveEntry(entryId, target > from ? target - 1 : target);
   };
-
-  const libraryMenu: MenuItem[] = [
-    {
-      label: t("core.library.new"),
-      action: () => {
-        setDialog({ kind: "newLibrary" });
-      },
-    },
-    {
-      label: t("core.library.rename"),
-      disabled: library === undefined,
-      action: () => {
-        if (library !== undefined) setDialog({ kind: "renameLibrary", library });
-      },
-    },
-    {
-      label: t("core.library.delete"),
-      disabled: library === undefined,
-      danger: true,
-      action: () => {
-        if (library !== undefined) setDialog({ kind: "deleteLibrary", library });
-      },
-    },
-  ];
 
   const itemMenu = (item: LibraryItemSummary): MenuItem[] => [
     {
@@ -178,35 +166,20 @@ export function LibraryPanel() {
         </Button>
       }
     >
-      <div className="flex items-center gap-1.5">
-        <select
-          aria-label={t("core.library.choose")}
-          value={libraryId ?? ""}
-          onChange={(event) => {
-            const value = event.target.value;
-            // L'ultima voce della tendina crea una libreria (la scelta resta quella di prima).
-            if (value === NEW_LIBRARY) setDialog({ kind: "newLibrary" });
-            else chooseLibrary(value === "" ? undefined : value);
-          }}
-          className={`${INPUT} min-w-0 flex-1 py-1.5`}
-        >
-          <option value="">{t("core.library.archive")}</option>
-          {libraries?.map((l) => (
-            <option key={l.id} value={l.id}>
-              {t("core.library.option", { name: l.name, count: l.count })}
-            </option>
-          ))}
-          <option value={NEW_LIBRARY}>+ {t("core.library.new")}</option>
-        </select>
-        <MenuButton
-          label={t("core.library.menu")}
-          items={libraryMenu}
-          align="right"
-          className="rounded-md border border-line-2 px-2 py-1.5 text-sm text-muted hover:text-fg"
-        >
-          ⋯
-        </MenuButton>
-      </div>
+      <LibraryPicker
+        libraries={libraries ?? []}
+        selected={library}
+        onSelect={chooseLibrary}
+        onNew={() => {
+          setDialog({ kind: "library", library: undefined });
+        }}
+        onEdit={(chosen) => {
+          setDialog({ kind: "library", library: chosen });
+        }}
+        onDelete={(chosen) => {
+          setDialog({ kind: "deleteLibrary", library: chosen });
+        }}
+      />
 
       <div className="flex items-center gap-1.5">
         <input
@@ -240,7 +213,7 @@ export function LibraryPanel() {
       </div>
 
       <p className="text-xs text-faint" aria-live="polite">
-        {loading ? t("core.modules.loading") : t("core.library.count", { count: total })}
+        {loading ? t("core.library.searching") : t("core.library.count", { count: total })}
       </p>
 
       {!loading && items.length === 0 ? (
@@ -328,6 +301,7 @@ export function LibraryPanel() {
                 </span>
                 <span className="w-full truncate text-xs text-muted">
                   {[
+                    libraryId === undefined ? whereLabel(item) : "",
                     item.authors.join(", "),
                     t("core.playlist.slideCount", { count: item.slideCount }),
                     ...item.tags.map((tg) => `#${tg}`),
@@ -378,33 +352,14 @@ export function LibraryPanel() {
         </Button>
       )}
 
-      {dialog?.kind === "newLibrary" && (
-        <PromptDialog
-          title={t("core.library.new")}
-          label={t("core.outputs.name")}
-          confirm={t("core.action.create")}
+      {dialog?.kind === "library" && (
+        <LibraryDialog
+          library={dialog.library}
+          categories={categories}
           onClose={() => {
             setDialog(undefined);
           }}
-          onSubmit={async (name) => {
-            const created = await run("library.create", { name });
-            if (created !== undefined) chooseLibrary(created.id);
-            return created !== undefined;
-          }}
-        />
-      )}
-      {dialog?.kind === "renameLibrary" && (
-        <PromptDialog
-          title={t("core.library.rename")}
-          label={t("core.outputs.name")}
-          initial={dialog.library.name}
-          confirm={t("core.action.save")}
-          onClose={() => {
-            setDialog(undefined);
-          }}
-          onSubmit={async (name) =>
-            (await run("library.update", { id: dialog.library.id, name })) !== undefined
-          }
+          onCreated={chooseLibrary}
         />
       )}
       {dialog?.kind === "deleteLibrary" && (

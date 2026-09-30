@@ -24,9 +24,7 @@ export const libraryHandlers: HandlerMap = {
   "library.list": (ctx) => ({ libraries: ctx.library.db.libraries() }),
 
   "library.create": (ctx, _session, params) => {
-    const id = ctx.library.change((db) =>
-      db.createLibrary(params.name, params.description, params.color),
-    );
+    const id = ctx.library.change((db) => db.createLibrary(params));
     return { id, rev: ctx.store.rev };
   },
 

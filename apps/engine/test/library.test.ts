@@ -1,5 +1,6 @@
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import {
   newId,
@@ -319,3 +320,93 @@ describe("archivio media", () => {
     expect(parseRange("items=0-1", 100)).toBeNull();
   });
 });
+
+describe("librerie organizzate (decisione 0004)", () => {
+  it("categoria, sigla e preferita; la sigla e' unica", async () => {
+    const { ok, fails } = await start();
+    const { id } = await ok("library.create", { name: "Innario", category: "Innari", code: "INN" });
+    await ok("library.update", { id, favorite: true });
+    expect((await ok("library.list", {})).libraries[0]).toMatchObject({
+      name: "Innario",
+      category: "Innari",
+      code: "INN",
+      favorite: true,
+    });
+    expect(await fails("library.create", { name: "Altro", code: "INN" })).toEqual([
+      4220,
+      "core.error.libraryCodeInUse",
+    ]);
+    await ok("library.update", { id, code: null, category: null });
+    expect((await ok("library.list", {})).libraries[0]).not.toHaveProperty("code");
+    await ok("library.create", { name: "Altro", code: "INN" });
+  });
+
+  it("'INN 245' va al brano 245 dell'innario; 'inn luce' cerca solo li'", async () => {
+    const { ok } = await start();
+    const { id: innario } = await ok("library.create", { name: "Innario", code: "INN" });
+    const luce = song("Luce del mattino", ["Vieni su di noi"]);
+    const altra = song("Luce eterna", ["Gloria"]);
+    await ok("library.saveItem", { item: luce });
+    await ok("library.saveItem", { item: altra });
+    await ok("library.addEntry", { libraryId: innario, itemId: luce.id, number: "245" });
+    const titles = async (query: string) =>
+      (await ok("library.items", { query })).items.map((i) => i.title);
+    expect(await titles("INN 245")).toEqual(["Luce del mattino"]);
+    expect(await titles("inn luce")).toEqual(["Luce del mattino"]);
+    expect(await titles("luce")).toEqual(["Luce del mattino", "Luce eterna"]);
+    // Una parola qualsiasi seguita da altro non e' una sigla: ricerca normale.
+    expect(await titles("luce eterna")).toEqual(["Luce eterna"]);
+  });
+
+  it("nella ricerca in tutto l'archivio ogni brano dice in quali librerie sta", async () => {
+    const { ok } = await start();
+    const { id: a } = await ok("library.create", { name: "Innario", code: "INN" });
+    const { id: b } = await ok("library.create", { name: "Natale" });
+    const item = song("Astro del ciel", ["Astro del ciel"]);
+    await ok("library.saveItem", { item });
+    await ok("library.addEntry", { libraryId: a, itemId: item.id, number: "12" });
+    await ok("library.addEntry", { libraryId: b, itemId: item.id });
+    const [found] = (await ok("library.items", {})).items;
+    expect(found?.libraries).toEqual([
+      { libraryId: a, name: "Innario", code: "INN", number: "12" },
+      { libraryId: b, name: "Natale" },
+    ]);
+  });
+
+  it("un archivio creato con la versione precedente si aggiorna senza perdere nulla", async () => {
+    const data = folder();
+    const db = new DatabaseSync(join(data, "library.sqlite"));
+    db.exec(ARCHIVE_V1);
+    const item = song("Vecchio canto", ["Ancora qui"]);
+    db.prepare("INSERT INTO items (id, title, data, updated_at) VALUES (?, ?, ?, ?)").run(
+      item.id,
+      item.title,
+      JSON.stringify(item),
+      new Date().toISOString(),
+    );
+    db.prepare(
+      "INSERT INTO libraries (id, name, description, color, position) VALUES (?, ?, NULL, NULL, 0)",
+    ).run(newId(), "Vecchia libreria");
+    db.exec("PRAGMA user_version = 1");
+    db.close();
+
+    const { ok } = await start({ data });
+    expect((await ok("library.list", {})).libraries).toEqual([
+      expect.objectContaining({ name: "Vecchia libreria", favorite: false, count: 0 }),
+    ]);
+    expect((await ok("library.getItem", { id: item.id })).item.title).toBe("Vecchio canto");
+    const { id } = (await ok("library.list", {})).libraries[0] ?? { id: "" };
+    await ok("library.update", { id, code: "OLD", category: "Archivio storico" });
+  });
+});
+
+/** Schema dell'archivio alla versione 1 (congelato: serve a provare la migrazione). */
+const ARCHIVE_V1 = `
+  CREATE TABLE items (id TEXT PRIMARY KEY, title TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL);
+  CREATE VIRTUAL TABLE items_fts USING fts5(id UNINDEXED, title, body, authors, tags, tokenize = 'unicode61 remove_diacritics 2');
+  CREATE TABLE libraries (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT, color TEXT, position INTEGER NOT NULL);
+  CREATE TABLE entries (id TEXT PRIMARY KEY, library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE, item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE, position INTEGER NOT NULL, number TEXT);
+  CREATE INDEX entries_library ON entries(library_id, position);
+  CREATE INDEX entries_item ON entries(item_id);
+  CREATE TABLE media (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, mime TEXT NOT NULL, size INTEGER NOT NULL, created_at TEXT NOT NULL);
+`;

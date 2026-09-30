@@ -12,7 +12,7 @@ import {
 } from "@cuelith/protocol";
 import { ftsQuery, searchableBody } from "./search.js";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const MIGRATIONS: readonly string[] = [
   `
@@ -50,6 +50,13 @@ const MIGRATIONS: readonly string[] = [
     size INTEGER NOT NULL,
     created_at TEXT NOT NULL
   );
+  `,
+  // 2: librerie organizzate (decisione 0004): categoria, sigla unica, preferita.
+  `
+  ALTER TABLE libraries ADD COLUMN category TEXT;
+  ALTER TABLE libraries ADD COLUMN code TEXT;
+  ALTER TABLE libraries ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0;
+  CREATE UNIQUE INDEX libraries_code ON libraries(code) WHERE code IS NOT NULL;
   `,
 ];
 
@@ -135,34 +142,61 @@ export class LibraryStore {
 
   libraries(): Library[] {
     return this.#all(
-      `SELECT l.id, l.name, l.description, l.color, COUNT(e.id) AS count
+      `SELECT l.id, l.name, l.description, l.color, l.category, l.code, l.favorite,
+              COUNT(e.id) AS count
        FROM libraries l LEFT JOIN entries e ON e.library_id = l.id
        GROUP BY l.id ORDER BY l.position`,
     ).map((row) => {
       const description = optStr(row, "description");
       const color = optStr(row, "color");
+      const category = optStr(row, "category");
+      const code = optStr(row, "code");
       return {
         id: str(row, "id"),
         name: str(row, "name"),
         ...(description === undefined ? {} : { description }),
         ...(color === undefined ? {} : { color }),
+        ...(category === undefined ? {} : { category }),
+        ...(code === undefined ? {} : { code }),
+        favorite: Number(row["favorite"]) === 1,
         count: Number(row["count"]),
       };
     });
   }
 
-  createLibrary(name: string, description?: string, color?: string): string {
-    const id = newId();
-    const next = Number(this.#get("SELECT COUNT(*) AS n FROM libraries")?.["n"] ?? 0);
-    this.#run(
-      "INSERT INTO libraries (id, name, description, color, position) VALUES (?, ?, ?, ?, ?)",
-      id,
-      name,
-      description ?? null,
-      color ?? null,
-      next,
-    );
-    return id;
+  /** Una sigla appartiene a una sola libreria: "INN 245" deve portare in un posto solo. */
+  #checkCode(code: string | null | undefined, exceptId?: string): void {
+    if (code === null || code === undefined) return;
+    const other = this.#get("SELECT id FROM libraries WHERE code = ?", code);
+    if (other !== undefined && str(other, "id") !== exceptId) {
+      throw new RpcError(ErrorCode.InvalidParameters, "core.error.libraryCodeInUse");
+    }
+  }
+
+  createLibrary(fields: {
+    name: string;
+    description?: string | undefined;
+    color?: string | undefined;
+    category?: string | undefined;
+    code?: string | undefined;
+  }): string {
+    return this.#transaction(() => {
+      this.#checkCode(fields.code);
+      const id = newId();
+      const next = Number(this.#get("SELECT COUNT(*) AS n FROM libraries")?.["n"] ?? 0);
+      this.#run(
+        `INSERT INTO libraries (id, name, description, color, category, code, favorite, position)
+         VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+        id,
+        fields.name,
+        fields.description ?? null,
+        fields.color ?? null,
+        fields.category ?? null,
+        fields.code ?? null,
+        next,
+      );
+      return id;
+    });
   }
 
   updateLibrary(
@@ -171,16 +205,31 @@ export class LibraryStore {
       name?: string | undefined;
       description?: string | null | undefined;
       color?: string | null | undefined;
+      category?: string | null | undefined;
+      code?: string | null | undefined;
+      favorite?: boolean | undefined;
     },
   ): void {
-    this.#requireLibrary(id);
-    if (patch.name !== undefined)
-      this.#run("UPDATE libraries SET name = ? WHERE id = ?", patch.name, id);
-    if (patch.description !== undefined) {
-      this.#run("UPDATE libraries SET description = ? WHERE id = ?", patch.description, id);
-    }
-    if (patch.color !== undefined)
-      this.#run("UPDATE libraries SET color = ? WHERE id = ?", patch.color, id);
+    this.#transaction(() => {
+      this.#requireLibrary(id);
+      this.#checkCode(patch.code, id);
+      const columns = ["name", "description", "color", "category", "code"] as const;
+      for (const column of columns) {
+        const value = patch[column];
+        if (value !== undefined) {
+          this.#run(`UPDATE libraries SET ${column} = ? WHERE id = ?`, value, id);
+        }
+      }
+      if (patch.favorite !== undefined) {
+        this.#run("UPDATE libraries SET favorite = ? WHERE id = ?", patch.favorite ? 1 : 0, id);
+      }
+    });
+  }
+
+  /** Libreria con questa sigla (senza badare a maiuscole), se c'e'. */
+  libraryByCode(code: string): string | undefined {
+    const row = this.#get("SELECT id FROM libraries WHERE code = ?", code.toUpperCase());
+    return row === undefined ? undefined : str(row, "id");
   }
 
   deleteLibrary(id: string): void {
@@ -369,7 +418,21 @@ export class LibraryStore {
     });
   }
 
-  items(query: ItemQuery): { items: LibraryItemSummary[]; total: number } {
+  /**
+   * "INN 245" o "inn luce": se la prima parola e' la sigla di una libreria si
+   * cerca dentro quella (per numero o testo). Solo nella ricerca in tutto l'archivio.
+   */
+  #byCode(query: ItemQuery): ItemQuery {
+    if (query.libraryId !== undefined || query.query === undefined) return query;
+    const match = /^\s*([A-Za-z0-9]{1,8})\s+(.+)$/.exec(query.query);
+    if (match === null) return query;
+    const [, code = "", rest = ""] = match;
+    const libraryId = this.libraryByCode(code);
+    return libraryId === undefined ? query : { ...query, libraryId, query: rest };
+  }
+
+  items(request: ItemQuery): { items: LibraryItemSummary[]; total: number } {
+    const query = this.#byCode(request);
     const where: string[] = [];
     const params: SQLInputValue[] = [];
     const inLibrary = query.libraryId !== undefined;
@@ -402,18 +465,52 @@ export class LibraryStore {
     );
     const order = inLibrary ? "e.position" : "i.title COLLATE NOCASE, i.id";
     const columns = inLibrary
-      ? "i.data, i.updated_at, e.id AS entry_id, e.number"
-      : "i.data, i.updated_at";
+      ? "i.id, i.data, i.updated_at, e.id AS entry_id, e.number"
+      : "i.id, i.data, i.updated_at";
     const rows = this.#all(
       `SELECT ${columns} FROM ${from} ${clause} ORDER BY ${order} LIMIT ? OFFSET ?`,
       ...params,
       query.limit ?? 200,
       query.offset ?? 0,
     );
-    return { items: rows.map((row) => this.#summary(row)), total };
+    const memberships = this.#memberships(rows.map((row) => str(row, "id")));
+    return {
+      items: rows.map((row) => {
+        const summary = this.#summary(row);
+        return { ...summary, libraries: memberships.get(summary.id) ?? [] };
+      }),
+      total,
+    };
   }
 
-  #summary(row: Row): LibraryItemSummary {
+  /** Per ogni elemento: in quali librerie sta, con sigla e numero (una sola query). */
+  #memberships(ids: readonly string[]): Map<string, LibraryItemSummary["libraries"]> {
+    const result = new Map<string, LibraryItemSummary["libraries"]>();
+    if (ids.length === 0) return result;
+    const rows = this.#all(
+      `SELECT e.item_id, l.id, l.name, l.code, e.number
+       FROM entries e JOIN libraries l ON l.id = e.library_id
+       WHERE e.item_id IN (${ids.map(() => "?").join(", ")})
+       ORDER BY l.position, e.position`,
+      ...ids,
+    );
+    for (const row of rows) {
+      const itemId = str(row, "item_id");
+      const code = optStr(row, "code");
+      const number = optStr(row, "number");
+      const list = result.get(itemId) ?? [];
+      list.push({
+        libraryId: str(row, "id"),
+        name: str(row, "name"),
+        ...(code === undefined ? {} : { code }),
+        ...(number === undefined ? {} : { number }),
+      });
+      result.set(itemId, list);
+    }
+    return result;
+  }
+
+  #summary(row: Row): Omit<LibraryItemSummary, "libraries"> {
     const item = ItemSchema.parse(JSON.parse(str(row, "data")));
     const entryId = optStr(row, "entry_id");
     const number = optStr(row, "number");
