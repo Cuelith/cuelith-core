@@ -88,7 +88,7 @@ test("librerie: canto con crediti, tag e base; ricerca, versioni, in scaletta e 
   await tab(station, "Scaletta").click();
   const entries = station.getByRole("list", { name: "Voci della scaletta" }).getByRole("listitem");
   await expect(entries).toHaveCount(1);
-  await entries.first().click();
+  await entries.first().click({ position: { x: 24, y: 12 } });
   await expect(station.getByTestId("library-link")).toContainText("Dalla libreria");
 
   // In onda fino all'ultima slide: compaiono i crediti.
@@ -132,7 +132,7 @@ test("l'originale cambia in libreria: la copia in scaletta si aggiorna a richies
     .getByRole("list", { name: "Voci della scaletta" })
     .getByRole("listitem")
     .first()
-    .click();
+    .click({ position: { x: 24, y: 12 } });
   const link = station.getByTestId("library-link");
   await expect(link).toContainText("C’è una versione più recente in libreria.");
   await link.getByRole("button", { name: "Aggiorna" }).click();

@@ -331,7 +331,7 @@ export function LibraryPanel() {
                     .join(" · ")}
                 </span>
               </button>
-              <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-1 rounded-md bg-inherit pl-2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+              <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-1 rounded-md bg-inherit pl-2 opacity-0 pointer-events-none group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
                 <Button
                   size="sm"
                   tone="cue"
