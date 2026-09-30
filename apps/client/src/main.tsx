@@ -14,6 +14,10 @@ declare global {
       readonly chooseShowFile: (kind: "open" | "save") => Promise<string | undefined>;
       /** Finestra nativa per scegliere file da importare nell'archivio media. */
       readonly chooseMediaFiles: (kind: "audio" | "image") => Promise<string[]>;
+      /** Finestra nativa per scegliere un pacchetto di modulo (.cpkg). */
+      readonly chooseModuleFile: () => Promise<string | undefined>;
+      /** Apre un indirizzo https nel browser del sistema (documentazione dei moduli). */
+      readonly openExternal: (url: string) => Promise<void>;
     };
   }
 }

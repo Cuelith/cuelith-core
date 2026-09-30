@@ -6,7 +6,7 @@ import { useCueShortcuts } from "../station/shortcuts.js";
 import { StationProvider, useStation } from "../station/station.js";
 import { Dock } from "./Dock.js";
 import { ModeView } from "./ModeView.js";
-import { ModulesDialog } from "./ModulesDialog.js";
+import { ModulesWindow } from "./modules/ModulesWindow.js";
 import { Notices } from "./Notices.js";
 import { OutputsDialog } from "./OutputsDialog.js";
 import { RecoveryBanner } from "./RecoveryBanner.js";
@@ -102,12 +102,13 @@ function ShellBody() {
         />
         <ModeView mode={mode} />
       </div>
-      <ModulesDialog
-        open={modulesOpen}
-        onClose={() => {
-          setModulesOpen(false);
-        }}
-      />
+      {modulesOpen && (
+        <ModulesWindow
+          onClose={() => {
+            setModulesOpen(false);
+          }}
+        />
+      )}
       {editor !== undefined && (
         <ItemEditorDialog
           key={"itemId" in editor ? `${editor.mode}:${editor.itemId}` : editor.mode}

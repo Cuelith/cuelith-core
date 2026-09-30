@@ -194,10 +194,8 @@ export class EngineConnection {
       return;
     }
     const auth = await this.call("session.auth", { token });
-    const locales = await this.call("locale.list", {});
-    const { catalog } = await this.call("locale.catalog", { lang: locales.active });
-    writeCachedCatalog({ lang: locales.active, catalog });
-    this.#set({ lang: locales.active, catalog, role: auth.role });
+    this.#set({ role: auth.role });
+    await this.#loadCatalog();
     await this.#resync();
     this.#retryMs = RETRY_MIN_MS;
     this.#set({ status: { kind: "connected" } });
@@ -236,6 +234,14 @@ export class EngineConnection {
     this.#set({ state: current });
   }
 
+  /** Lingua attiva e testi: all'accesso e ogni volta che i moduli cambiano. */
+  async #loadCatalog(): Promise<void> {
+    const locales = await this.call("locale.list", {});
+    const { catalog } = await this.call("locale.catalog", { lang: locales.active });
+    writeCachedCatalog({ lang: locales.active, catalog });
+    this.#set({ lang: locales.active, catalog });
+  }
+
   #onMessage(raw: string): void {
     const parsed = parseRpcMessage(raw);
     if (parsed.kind === "response") {
@@ -258,6 +264,10 @@ export class EngineConnection {
       const next = applyStatePatch(state, patch.data.ops);
       this.#rev = patch.data.rev;
       this.#set({ state: next });
+      // Un modulo acceso, spento o aggiornato puo' portare o togliere testi e lingue.
+      if (patch.data.ops.some((op) => op.path.startsWith("/live/plugins"))) {
+        this.#loadCatalog().catch(() => undefined);
+      }
     } catch {
       this.#resync().catch(() => this.#ws?.close());
     }

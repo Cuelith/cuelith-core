@@ -136,7 +136,8 @@ export function OutputsDialog({ open, onClose }: { open: boolean; onClose: () =>
   return (
     <dialog
       ref={dialog}
-      onClose={() => {
+      onClose={(event) => {
+        if (event.target !== event.currentTarget) return;
         setDraft(undefined);
         setDeleting(undefined);
         onClose();

@@ -29,7 +29,11 @@ export function ModalDialog({
   return (
     <dialog
       ref={setElement}
-      onClose={onClose}
+      // React fa risalire l'evento "close" di una finestra interna a quelle che
+      // la contengono: ognuna reagisce solo alla propria chiusura.
+      onClose={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       aria-labelledby={titleId}
       className={wide ? DIALOG.replace("460px", "720px") : DIALOG}
     >

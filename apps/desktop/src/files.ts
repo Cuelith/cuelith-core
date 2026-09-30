@@ -100,6 +100,20 @@ export async function confirmUnsaved(parent: BrowserWindow, engine: Engine): Pro
   }
 }
 
+/** Finestra nativa per scegliere un pacchetto di modulo (.cpkg) da installare. */
+export async function chooseModuleFile(
+  parent: BrowserWindow,
+  engine: Engine,
+): Promise<string | undefined> {
+  const { locales } = engine.context;
+  const result = await dialog.showOpenDialog(parent, {
+    title: locales.t("core.file.chooseModule"),
+    filters: [{ name: locales.t("core.file.filter.module"), extensions: ["cpkg"] }],
+    properties: ["openFile"],
+  });
+  return result.canceled ? undefined : result.filePaths[0];
+}
+
 /** Finestra nativa per scegliere file audio o immagini da mettere nell'archivio media. */
 export async function chooseMediaFiles(
   parent: BrowserWindow,

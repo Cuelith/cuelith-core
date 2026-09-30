@@ -23,6 +23,8 @@ export interface TestEngineOptions {
   /** Cartella dati da riusare (per simulare un riavvio). */
   readonly data?: string;
   readonly autosaveIntervalMs?: number;
+  /** Rete finta per il marketplace. */
+  readonly fetch?: typeof fetch;
 }
 
 export async function startTestEngine(options: TestEngineOptions = {}): Promise<Engine> {
@@ -44,6 +46,7 @@ export async function startTestEngine(options: TestEngineOptions = {}): Promise<
       bundledPlugins: [LOCALE_IT_DIR],
       data: options.data ?? join(root, "data"),
     },
+    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
     ...(options.autosaveIntervalMs === undefined
       ? {}
       : { autosaveIntervalMs: options.autosaveIntervalMs }),

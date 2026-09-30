@@ -3,6 +3,7 @@ import type { DisplayProvider } from "./displays.js";
 import type { Logger } from "./log.js";
 import type { LibraryService } from "./library/service.js";
 import type { Locales } from "./modules/locales.js";
+import type { Marketplace } from "./modules/marketplace.js";
 import type { ModuleRegistry } from "./modules/registry.js";
 import type { ShowService } from "./show/service.js";
 import type { StateStore } from "./state/store.js";
@@ -13,6 +14,8 @@ export interface EngineContext {
   readonly store: StateStore;
   readonly locales: Locales;
   readonly modules: ModuleRegistry;
+  /** Indice dei moduli (GitHub Pages) e download dei pacchetti. */
+  readonly marketplace: Marketplace;
   /** Librerie, archivio e media. */
   readonly library: LibraryService;
   /** File dello show e copia automatica. */

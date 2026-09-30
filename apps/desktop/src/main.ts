@@ -3,11 +3,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { consoleLogger, startEngine, type Engine } from "@cuelith-core/engine";
 import { DEFAULT_ENGINE_PORT } from "@cuelith/protocol";
-import { app, BrowserWindow, ipcMain, Menu, session } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, session, shell } from "electron";
 import { electronDisplays } from "./displays.js";
-import { chooseMediaFiles, chooseShowFile, confirmUnsaved } from "./files.js";
+import { chooseMediaFiles, chooseModuleFile, chooseShowFile, confirmUnsaved } from "./files.js";
 import { OutputWindows } from "./outputs.js";
 import { resolveAppPaths } from "./paths.js";
+import { folderFetch } from "./test-registry.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BACKGROUND = "#0B0C0E";
@@ -18,6 +19,7 @@ if (userDataOverride !== undefined && userDataOverride !== "")
   app.setPath("userData", userDataOverride);
 const portOverride = process.env["CUELITH_PORT"];
 const autosaveOverride = process.env["CUELITH_AUTOSAVE_MS"];
+const testRegistryDir = process.env["CUELITH_TEST_REGISTRY_DIR"];
 
 app.enableSandbox();
 
@@ -45,6 +47,7 @@ async function launchEngine(): Promise<Engine> {
     version: app.getVersion(),
     paths: { ...paths, data: app.getPath("userData") },
     ...(autosaveOverride === undefined ? {} : { autosaveIntervalMs: Number(autosaveOverride) }),
+    ...(testRegistryDir === undefined ? {} : { fetch: folderFetch(testRegistryDir) }),
     displays: electronDisplays,
     logger: consoleLogger,
   };
@@ -164,6 +167,24 @@ async function main(): Promise<void> {
       throw new Error("richiesta non autorizzata");
     }
     return chooseMediaFiles(station, engine, kind === "image" ? "image" : "audio");
+  });
+
+  ipcMain.handle("cuelith:choose-module-file", async (event) => {
+    const role = trusted.get(event.sender.id);
+    if (role !== "station" || station === undefined || engine === undefined) {
+      throw new Error("richiesta non autorizzata");
+    }
+    return chooseModuleFile(station, engine);
+  });
+
+  // Documentazione dei moduli nel browser del sistema: solo indirizzi https.
+  ipcMain.handle("cuelith:open-external", async (event, url: unknown) => {
+    if (trusted.get(event.sender.id) !== "station" || typeof url !== "string") {
+      throw new Error("richiesta non autorizzata");
+    }
+    const parsed = URL.canParse(url) ? new URL(url) : undefined;
+    if (parsed?.protocol !== "https:") throw new Error("indirizzo non consentito");
+    await shell.openExternal(parsed.href);
   });
 
   station = openStation();

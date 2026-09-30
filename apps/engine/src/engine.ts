@@ -1,13 +1,15 @@
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
-import { DEFAULT_ENGINE_PORT, type Lang } from "@cuelith/protocol";
+import { DEFAULT_ENGINE_PORT, REGISTRY_INDEX_URL, type Lang } from "@cuelith/protocol";
 import { Tokens } from "./auth.js";
 import type { EngineContext } from "./context.js";
 import type { DisplayProvider } from "./displays.js";
 import { createHttpServer, type StaticPaths } from "./http/server.js";
 import { consoleLogger, type Logger } from "./log.js";
 import { Locales } from "./modules/locales.js";
+import { Marketplace, type Fetch } from "./modules/marketplace.js";
 import { ModuleRegistry } from "./modules/registry.js";
+import { pluginHandlers } from "./rpc/handlers/plugins.js";
 import type { HandlerMap } from "./rpc/dispatch.js";
 import { cueHandlers } from "./rpc/handlers/cue.js";
 import { editHandlers } from "./rpc/handlers/edit.js";
@@ -40,6 +42,10 @@ export interface EngineOptions {
   readonly displays: DisplayProvider;
   readonly lang?: Lang;
   readonly logger?: Logger;
+  /** Indice del marketplace (predefinito: GitHub Pages di Cuelith). */
+  readonly registryUrl?: string;
+  /** Solo per le prove: rete finta per indice e pacchetti. */
+  readonly fetch?: Fetch;
 }
 
 export interface Engine {
@@ -64,6 +70,7 @@ const handlers: HandlerMap = {
   ...outputHandlers,
   ...showHandlers,
   ...libraryHandlers,
+  ...pluginHandlers,
 };
 
 export async function startEngine(options: EngineOptions): Promise<Engine> {
@@ -72,6 +79,14 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
 
   const modules = new ModuleRegistry(logger);
   await modules.loadBundled(options.paths.bundledPlugins, options.version);
+  await modules.loadInstalled(join(options.paths.data, "plugins"));
+  const marketplace = new Marketplace({
+    url: options.registryUrl ?? REGISTRY_INDEX_URL,
+    cacheFile: join(options.paths.data, "registry-cache.json"),
+    engineVersion: options.version,
+    logger,
+    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+  });
   const locales = new Locales(() => modules.active(), options.lang ?? "it");
   if (locales.available().length === 0)
     logger.error("nessuna lingua installata: l'interfaccia mostrerà le chiavi");
@@ -107,6 +122,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     store,
     locales,
     modules,
+    marketplace,
     library,
     shows,
     displays: options.displays,
@@ -114,7 +130,22 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     logger,
   };
 
-  const http = createHttpServer({ ...options.paths, media: library.media.dir }, logger);
+  const preferredLang = options.lang ?? "it";
+  modules.onChange(() => {
+    locales.refresh(preferredLang);
+    store.update((draft) => {
+      draft.live.plugins = modules.statuses();
+    });
+  });
+
+  const http = createHttpServer(
+    {
+      ...options.paths,
+      media: library.media.dir,
+      pluginDir: (id, version) => modules.dirOf(id, version),
+    },
+    logger,
+  );
   const rpc = attachRpcServer(http, context, handlers);
 
   await new Promise<void>((resolve, reject) => {

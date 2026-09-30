@@ -48,6 +48,18 @@ export class Locales {
     return mergeCatalogs([...core, ...others].map((m) => m.catalogs.get(lang) ?? {}));
   }
 
+  /**
+   * Dopo che i moduli cambiano: se la lingua in uso non c'e' piu' si passa
+   * alla prima disponibile. Restituisce true se la lingua e' cambiata.
+   */
+  refresh(preferred: Lang): boolean {
+    const available = this.available().map((l) => l.lang);
+    const next = available.includes(preferred) ? preferred : (available[0] ?? this.#active);
+    const changed = next !== this.#active;
+    this.#active = next;
+    return changed;
+  }
+
   t(key: string, params?: MessageParams): string {
     return translate(this.catalog(this.#active), this.#active, key, params);
   }

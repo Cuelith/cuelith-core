@@ -14,7 +14,19 @@ export interface StaticPaths {
   readonly ui: string;
   /** Archivio media (cartella dati/media), servito sotto /media/. */
   readonly media?: string;
+  /** Cartella di un modulo installato (id + versione), per i suoi file (guide, pannelli). */
+  readonly pluginDir?: (id: string, version: string) => string | undefined;
 }
+
+/**
+ * File di un modulo: stanno in un'area a parte. Le pagine dei moduli girano
+ * isolate (sandbox) e senza rete verso l'esterno (cap. 24 e 27).
+ */
+const PLUGIN_HEADERS = {
+  "Content-Security-Policy":
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; frame-ancestors 'self'; form-action 'none'; base-uri 'none'; sandbox allow-scripts",
+  "Referrer-Policy": "no-referrer",
+};
 
 /** Politica di sicurezza delle pagine del nucleo: niente risorse esterne. */
 function csp(host: string): string {
@@ -61,6 +73,15 @@ export function createHttpServer(paths: StaticPaths, logger: Logger): Server {
     }
     if (path.startsWith("/ui/")) {
       if (!(await serveFile(res, paths.ui, path.slice("/ui".length), { head }))) send(res, 404);
+      return;
+    }
+    const plugin = /^\/plugins\/([a-z0-9.-]+)\/([0-9A-Za-z.+-]+)(\/.*)$/.exec(path);
+    if (plugin !== null) {
+      const [, id = "", version = "", rest = "/"] = plugin;
+      const dir = paths.pluginDir?.(id, version);
+      const served =
+        dir !== undefined && (await serveFile(res, dir, rest, { head, headers: PLUGIN_HEADERS }));
+      if (!served) send(res, 404);
       return;
     }
     if (path.startsWith("/media/")) {

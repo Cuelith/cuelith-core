@@ -210,7 +210,8 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
   return (
     <dialog
       ref={dialog}
-      onClose={() => {
+      onClose={(event) => {
+        if (event.target !== event.currentTarget) return;
         closeEditor();
         // Il fuoco tornerebbe al pulsante che ha aperto l'editor: Invio e Spazio
         // devono tornare subito ai comandi della regia.

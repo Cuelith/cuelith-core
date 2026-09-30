@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { silentLogger, startEngine, type Engine } from "@cuelith-core/engine";
+import { PROTOCOL_VERSION } from "@cuelith/protocol";
 import { afterEach, describe, expect, it } from "vitest";
 import { EngineConnection, type EngineSnapshot } from "../src/index.js";
 
@@ -100,5 +101,43 @@ describe("EngineConnection", () => {
     const second = await engineOn(port);
     cleanup.push(() => second.stop());
     await until(connection, (s) => s.status.kind === "unpaired", 10_000);
+  });
+});
+
+describe("moduli e testi", () => {
+  it("installando un modulo i suoi testi arrivano alla postazione senza ricollegarsi", async () => {
+    const engine = await engineOn();
+    cleanup.push(() => engine.stop());
+    const connection = connect(engine, engine.tokens.station);
+    await until(connection, (s) => s.status.kind === "connected");
+
+    const dir = mkdtempSync(join(tmpdir(), "cuelith-module-"));
+    mkdirSync(join(dir, "locales"));
+    writeFileSync(
+      join(dir, "cuelith-plugin.json"),
+      JSON.stringify({
+        id: "cuelith.greetings",
+        name: "Saluti",
+        description: "Modulo di prova.",
+        version: "1.0.0",
+        publisher: "Prove",
+        license: "Apache-2.0",
+        repository: "https://github.com/Cuelith/plugin-greetings",
+        family: "function",
+        engines: { cuelith: "^0.1.0", protocol: `^${PROTOCOL_VERSION}` },
+        runtime: { type: "none" },
+        permissions: [],
+        dependencies: {},
+        extends: [],
+        provides: [],
+        contributes: { locales: [{ lang: "it", file: "locales/it.json" }] },
+      }),
+    );
+    writeFileSync(
+      join(dir, "locales", "it.json"),
+      JSON.stringify({ "cuelith.greetings.hello": "Ciao" }),
+    );
+    await connection.call("plugin.install", { path: dir });
+    await until(connection, (s) => s.catalog["cuelith.greetings.hello"] === "Ciao");
   });
 });

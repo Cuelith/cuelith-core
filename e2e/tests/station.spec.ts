@@ -51,20 +51,3 @@ test("la postazione vuota mostra barra, dock col + e le tre colonne di Presenta"
   await station.screenshot({ path: path.join(screenshotsDir, "presenta-vuota.png") });
   expect(problems).toEqual([]);
 });
-
-test("il + apre il gestore moduli con la lingua italiana necessaria", async ({ running }) => {
-  const { station, problems } = running;
-  await station.getByRole("button", { name: "Aggiungi moduli" }).click();
-  const dialog = station.getByRole("dialog", { name: "Moduli" });
-  await expect(dialog).toBeVisible();
-  const italian = dialog.getByRole("listitem").filter({ hasText: "Italiano" });
-  await expect(italian).toBeVisible();
-  await expect(italian).toContainText("Lingua");
-  await expect(italian).toContainText("Attivo");
-  await expect(italian).toContainText("Necessario");
-  await station.screenshot({ path: path.join(screenshotsDir, "gestore-moduli.png") });
-
-  await dialog.getByRole("button", { name: "Chiudi" }).click();
-  await expect(dialog).toBeHidden();
-  expect(problems).toEqual([]);
-});

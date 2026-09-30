@@ -20,7 +20,8 @@ export function UnsavedDialog({ question }: { question: number }) {
     <dialog
       ref={dialog}
       // Esc o chiusura = Annulla.
-      onClose={() => {
+      onClose={(event) => {
+        if (event.target !== event.currentTarget) return;
         answerUnsaved(question, "cancel");
       }}
       aria-labelledby={titleId}

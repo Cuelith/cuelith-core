@@ -162,7 +162,9 @@ function RenameDialog({ current, onClose }: { current: string; onClose: () => vo
   return (
     <dialog
       ref={dialog}
-      onClose={onClose}
+      onClose={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
       aria-labelledby={titleId}
       className="m-auto w-[min(420px,calc(100vw-32px))] rounded-xl border border-line-2 bg-bg-2 p-0 text-fg backdrop:bg-black/60"
     >
