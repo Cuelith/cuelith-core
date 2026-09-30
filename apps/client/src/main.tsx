@@ -12,6 +12,8 @@ declare global {
       readonly getLocalSession: () => Promise<{ name: string; token: string }>;
       /** Finestra nativa Apri/Salva: percorso scelto o undefined se annullato. */
       readonly chooseShowFile: (kind: "open" | "save") => Promise<string | undefined>;
+      /** Finestra nativa per scegliere file da importare nell'archivio media. */
+      readonly chooseMediaFiles: (kind: "audio" | "image") => Promise<string[]>;
     };
   }
 }

@@ -6,7 +6,7 @@ Il contenitore di Cuelith: motore live, applicazione desktop (Electron), postazi
 
 ## Struttura
 
-- `apps/engine` — motore (Node puro, senza Electron): stato dello show, comandi, moduli, server HTTP + WebSocket (`/rpc`) su `127.0.0.1:7420`. Unica fonte di verità.
+- `apps/engine` — motore (Node puro, senza Electron): stato dello show, comandi, moduli, server HTTP + WebSocket (`/rpc`) su `127.0.0.1:7420`. Unica fonte di verità. File `.cuelith` e copia automatica in `src/show/`; librerie e archivio (SQLite `node:sqlite`, `library.sqlite` nella cartella dati) e archivio media (`media/`, nomi = SHA-256) in `src/library/`. I comandi che toccano file del computer del motore sono solo per la postazione locale.
 - `apps/desktop` — Electron: avvia il motore, apre la postazione (`http://127.0.0.1:<porta>/`) e una finestra per ogni uscita display (`src/outputs.ts`: monitor scelto, schermo intero o finestra; monitor scollegato = uscita in errore e riapertura automatica al ritorno). Preload in sandbox che consegna le credenziali solo alle finestre del motore: regia alla postazione, sola lettura alle uscite.
 - `apps/renderer` — finestre di uscita (PixiJS, WebGL): `src/frame.ts` decide cosa mostrare (logica pura, provata a parte), `src/painter.ts` disegna. Eseguono solo lo stato ricevuto; mai messaggi d'errore al pubblico.
 - `apps/client` — postazione React + Vite + Tailwind 4, servita dal motore (anche da browser in rete locale).

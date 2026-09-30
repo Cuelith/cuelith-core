@@ -1,9 +1,12 @@
-import { useId, type ReactNode } from "react";
+import { createContext, useContext, useId, type ReactNode } from "react";
+
+/** Come si presenta un pannello nel suo contenitore: dentro una scheda il nome e' gia' sulla scheda. */
+export const PanelChrome = createContext<{ labelHidden: boolean }>({ labelHidden: false });
 
 /**
  * Riquadro di un pannello: etichetta in maiuscoletto (cap. 17) e contenuto.
- * Con `labelHidden` l'etichetta resta solo per i lettori di schermo, quando il
- * contenuto porta gia' la sua (programma e anteprima hanno il tag sullo schermo).
+ * Con `labelHidden` (o dentro una scheda) l'etichetta resta solo per i
+ * lettori di schermo; le azioni restano visibili.
  */
 export function Panel({
   label,
@@ -17,14 +20,25 @@ export function Panel({
   labelHidden?: boolean;
 }) {
   const id = useId();
+  const chrome = useContext(PanelChrome);
+  const hidden = labelHidden || chrome.labelHidden;
+  const onlyActions = hidden && actions !== undefined;
   return (
-    <section aria-labelledby={id} className="flex min-h-0 min-w-0 flex-col gap-2.5 p-3">
+    <section aria-labelledby={id} className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 p-3">
       <header
-        className={labelHidden ? "sr-only" : "flex min-h-6 items-center justify-between gap-2"}
+        className={
+          hidden && !onlyActions ? "sr-only" : "flex min-h-6 items-center justify-between gap-2"
+        }
       >
-        <h2 id={id} className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+        <h2
+          id={id}
+          className={
+            hidden ? "sr-only" : "text-[11px] font-semibold uppercase tracking-[0.12em] text-muted"
+          }
+        >
           {label}
         </h2>
+        {onlyActions && <span />}
         {actions}
       </header>
       {children}

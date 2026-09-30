@@ -203,8 +203,30 @@ export class Painter {
       }
     }
 
+    const band = h * 0.12;
+    if (frame.kind === "fullscreen" && frame.credits !== undefined) {
+      // Crediti in piccolo in basso, sopra l'eventuale fascia dei messaggi.
+      const credits = new Text({
+        text: frame.credits,
+        style: {
+          fontFamily: FONT.body,
+          fontSize: 26 * scale,
+          fill: frame.style.color,
+          align: "center",
+          wordWrap: true,
+          wordWrapWidth: w - 2 * margin,
+        },
+      });
+      credits.alpha = 0.75;
+      credits.anchor.set(0.5, 1);
+      credits.position.set(
+        w / 2,
+        h - (frame.message === undefined ? margin * 0.6 : band + margin * 0.3),
+      );
+      layer.addChild(credits);
+    }
+
     if (frame.message !== undefined) {
-      const band = h * 0.12;
       layer.addChild(new Graphics().rect(0, h - band, w, band).fill(BAND));
       const message = new Text({
         text: frame.message,

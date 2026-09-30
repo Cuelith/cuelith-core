@@ -1,4 +1,5 @@
 import {
+  creditsFor,
   FullscreenStyleSchema,
   PRESENTATION_SOURCE_TYPE,
   StageStyleSchema,
@@ -25,6 +26,8 @@ export type Frame =
       readonly text: string | undefined;
       readonly style: TextStyle;
       readonly message: string | undefined;
+      /** Riga dei crediti (prima o ultima slide, se l'elemento li prevede). */
+      readonly credits: string | undefined;
     }
   | {
       readonly kind: "stage";
@@ -73,10 +76,15 @@ const textOf = (slide: Slide | undefined): string | undefined => {
 function presentation(doc: StateDocument) {
   const content = doc.live.layers.content;
   const item = content.itemId === undefined ? undefined : doc.show.items[content.itemId];
+  const sequence = item === undefined ? [] : slideSequence(item);
   const onAir =
     content.visible && item !== undefined && content.slideIndex !== undefined
-      ? slideSequence(item)[content.slideIndex]
+      ? sequence[content.slideIndex]
       : undefined;
+  const credits =
+    onAir === undefined || item === undefined || content.slideIndex === undefined
+      ? undefined
+      : creditsFor(item, content.slideIndex, sequence.length);
   const { preview } = doc.live;
   const previewEntry = doc.show.playlist.find((e) => e.id === preview.entryId);
   const previewItem = previewEntry === undefined ? undefined : doc.show.items[previewEntry.itemId];
@@ -84,7 +92,7 @@ function presentation(doc: StateDocument) {
     previewItem === undefined ? undefined : slideSequence(previewItem)[preview.slideIndex];
   const key =
     onAir === undefined ? "none" : `${item?.id ?? ""}/${String(content.slideIndex)}/${onAir.id}`;
-  return { onAir, next, key };
+  return { onAir, next, key, credits };
 }
 
 function messageOf(doc: StateDocument, look: Look): string | undefined {
@@ -116,7 +124,7 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
   const look = feed.lookId === undefined ? undefined : doc.show.looks[feed.lookId];
   if (source?.type !== PRESENTATION_SOURCE_TYPE || look === undefined) return black;
 
-  const { onAir, next, key } = presentation(doc);
+  const { onAir, next, key, credits } = presentation(doc);
   const showContent = look.layers.includes("content");
   const text = showContent && look.fields.includes("text") ? textOf(onAir) : undefined;
   const message = messageOf(doc, look);
@@ -135,6 +143,7 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
         text,
         style: style.data.text,
         message,
+        credits: showContent ? credits : undefined,
       },
     };
   }

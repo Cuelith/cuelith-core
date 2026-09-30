@@ -1,6 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import type { Engine } from "@cuelith-core/engine";
+import { MEDIA_FORMATS, type Engine } from "@cuelith-core/engine";
 import { SHOW_FILE_EXTENSION } from "@cuelith/protocol";
 import { app, dialog, type BrowserWindow } from "electron";
 
@@ -98,4 +98,22 @@ export async function confirmUnsaved(parent: BrowserWindow, engine: Engine): Pro
     });
     return false;
   }
+}
+
+/** Finestra nativa per scegliere file audio o immagini da mettere nell'archivio media. */
+export async function chooseMediaFiles(
+  parent: BrowserWindow,
+  engine: Engine,
+  kind: "audio" | "image",
+): Promise<string[]> {
+  const { locales } = engine.context;
+  const extensions = Object.entries(MEDIA_FORMATS)
+    .filter(([, format]) => format.kind === kind)
+    .map(([ext]) => ext);
+  const result = await dialog.showOpenDialog(parent, {
+    title: locales.t(kind === "audio" ? "core.file.chooseAudio" : "core.file.chooseImage"),
+    filters: [{ name: locales.t(`core.file.filter.${kind}`), extensions }],
+    properties: ["openFile", "multiSelections"],
+  });
+  return result.canceled ? [] : result.filePaths;
 }

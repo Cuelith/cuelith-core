@@ -139,6 +139,20 @@ describe("describeOutput", () => {
     expect(describeOutput(doc, stage)?.frame).toMatchObject({ message: "Cinque minuti" });
   });
 
+  it("Sala: i crediti compaiono sull'ultima slide se l'elemento lo prevede", () => {
+    const { doc, room, stage } = makeDoc();
+    const item = Object.values(doc.show.items)[0];
+    if (item === undefined) throw new Error("elemento mancante");
+    item.credits = { authors: [{ name: "Anna Rossi", role: "artist" }], ccli: "123", show: "last" };
+    expect(describeOutput(doc, room)?.frame).toMatchObject({ credits: undefined });
+    doc.live.layers.content.slideIndex = 1;
+    expect(describeOutput(doc, room)?.frame).toMatchObject({
+      credits: "Canto — Anna Rossi · CCLI 123",
+    });
+    // Il palco non mostra i crediti.
+    expect(describeOutput(doc, stage)?.frame).not.toHaveProperty("credits");
+  });
+
   it("uscita inesistente: nulla da disegnare", () => {
     const { doc } = makeDoc();
     expect(describeOutput(doc, newId())).toBeUndefined();

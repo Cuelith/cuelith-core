@@ -8,10 +8,19 @@ export interface Notice {
   readonly id: number;
   readonly key: string;
   readonly params: Readonly<Record<string, string>>;
+  /** "error" per i comandi non riusciti, "info" per le conferme. */
+  readonly tone: "error" | "info";
 }
 
-/** Richiesta di apertura dell'editor di testo: nuovo elemento o esistente. */
-export type EditorRequest = { readonly mode: "create" } | { readonly mode: "edit"; itemId: string };
+/**
+ * Richiesta di apertura dell'editor: un elemento dello show (nuovo o
+ * esistente) o un elemento dell'archivio (nuovo, eventualmente in una libreria).
+ */
+export type EditorRequest =
+  | { readonly mode: "create" }
+  | { readonly mode: "edit"; readonly itemId: string }
+  | { readonly mode: "libraryCreate"; readonly libraryId: string | undefined }
+  | { readonly mode: "libraryEdit"; readonly itemId: string };
 
 /** Risposta alla domanda "salvare le modifiche?". */
 export type UnsavedChoice = "save" | "discard" | "cancel";
@@ -24,7 +33,11 @@ interface StationContextValue {
   readonly openEditor: (request: EditorRequest) => void;
   readonly closeEditor: () => void;
   readonly notices: readonly Notice[];
-  readonly notify: (key: string, params?: Readonly<Record<string, string>>) => void;
+  readonly notify: (
+    key: string,
+    params?: Readonly<Record<string, string>>,
+    tone?: Notice["tone"],
+  ) => void;
   readonly dismiss: (id: number) => void;
   /** Domanda in corso "salvare le modifiche?", se c'e'. */
   /** Id della domanda in corso: una risposta vale solo per la sua domanda. */
@@ -67,10 +80,17 @@ export function StationProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback((id: number) => {
     setNotices((list) => list.filter((n) => n.id !== id));
   }, []);
-  const notify = useCallback((key: string, params: Readonly<Record<string, string>> = {}) => {
-    const notice = { id: nextNotice++, key, params };
-    setNotices((list) => [...list.slice(-2), notice]);
-  }, []);
+  const notify = useCallback(
+    (
+      key: string,
+      params: Readonly<Record<string, string>> = {},
+      tone: Notice["tone"] = "error",
+    ) => {
+      const notice = { id: nextNotice++, key, params, tone };
+      setNotices((list) => [...list.slice(-2), notice]);
+    },
+    [],
+  );
 
   const value = useMemo<StationContextValue>(
     () => ({

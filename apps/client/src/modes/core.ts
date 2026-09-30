@@ -23,7 +23,7 @@ export const PRESENT_MODE: Mode = {
       ["playlist", "slides", "preview"],
     ],
     panels: {
-      playlist: "core.playlist",
+      playlist: ["core.playlist", "core.library"],
       slides: "core.slides",
       program: "core.program",
       preview: "core.preview",

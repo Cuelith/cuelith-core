@@ -11,7 +11,7 @@ import { Notices } from "./Notices.js";
 import { OutputsDialog } from "./OutputsDialog.js";
 import { RecoveryBanner } from "./RecoveryBanner.js";
 import { UnsavedDialog } from "./UnsavedDialog.js";
-import { TextEditorDialog } from "./TextEditorDialog.js";
+import { ItemEditorDialog } from "./ItemEditorDialog.js";
 import { TopBar } from "./TopBar.js";
 
 const MODE_KEY = "cuelith.mode";
@@ -109,7 +109,10 @@ function ShellBody() {
         }}
       />
       {editor !== undefined && (
-        <TextEditorDialog key={editor.mode === "edit" ? editor.itemId : "new"} request={editor} />
+        <ItemEditorDialog
+          key={"itemId" in editor ? `${editor.mode}:${editor.itemId}` : editor.mode}
+          request={editor}
+        />
       )}
       <OutputsDialog
         open={outputsOpen}

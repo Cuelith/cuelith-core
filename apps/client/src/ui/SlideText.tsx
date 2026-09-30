@@ -13,7 +13,16 @@ const FONT: Record<FullscreenStyle["text"]["font"], string> = {
  * all'altezza del riquadro (unita' cq del contenitore). Cosi' anteprima,
  * programma e miniature mostrano esattamente l'impaginazione delle uscite.
  */
-export function SlideText({ text, style }: { text: string; style: FullscreenStyle | undefined }) {
+export function SlideText({
+  text,
+  style,
+  credits,
+}: {
+  text: string;
+  style: FullscreenStyle | undefined;
+  /** Riga dei crediti, in piccolo in basso come sulle uscite. */
+  credits?: string | undefined;
+}) {
   const css: CSSProperties =
     style === undefined
       ? {}
@@ -30,6 +39,15 @@ export function SlideText({ text, style }: { text: string; style: FullscreenStyl
       style={css}
     >
       <span className="w-full">{text}</span>
+      {credits !== undefined && (
+        <span
+          data-testid="credits"
+          className="absolute inset-x-0 text-center font-body opacity-75"
+          style={{ bottom: "3cqh", fontSize: "calc(26 / 1080 * 100cqh)" }}
+        >
+          {credits}
+        </span>
+      )}
     </div>
   );
 }

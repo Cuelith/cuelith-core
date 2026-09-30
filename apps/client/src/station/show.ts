@@ -1,4 +1,4 @@
-import { FullscreenStyleSchema, type FullscreenStyle } from "@cuelith-core/core-looks";
+import { creditsFor, FullscreenStyleSchema, type FullscreenStyle } from "@cuelith-core/core-looks";
 import { slideSequence, type Item, type Slide, type StateDocument } from "@cuelith/protocol";
 
 /** Slide pronta da disegnare, con l'identita' che serve alle dissolvenze. */
@@ -8,6 +8,8 @@ export interface ShownSlide {
   readonly index: number;
   readonly count: number;
   readonly slide: Slide;
+  /** Riga dei crediti se va mostrata su questa slide (come sulle uscite Sala). */
+  readonly credits: string | undefined;
 }
 
 export function itemOfEntry(doc: StateDocument, entryId: string | undefined): Item | undefined {
@@ -22,7 +24,14 @@ function shown(item: Item | undefined, index: number | undefined): ShownSlide | 
   const slide = slides[index];
   return slide === undefined
     ? undefined
-    : { key: `${item.id}/${String(index)}/${slide.id}`, item, index, count: slides.length, slide };
+    : {
+        key: `${item.id}/${String(index)}/${slide.id}`,
+        item,
+        index,
+        count: slides.length,
+        slide,
+        credits: creditsFor(item, index, slides.length),
+      };
 }
 
 /** Cio' che e' in onda: il layer del contenuto, non il cursore (dopo "pulisci" e' vuoto). */

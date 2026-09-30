@@ -2,6 +2,7 @@ import { slideSequence } from "@cuelith/protocol";
 import { useState, type DragEvent, type KeyboardEvent } from "react";
 import { useEngine, useT } from "../engine/react.js";
 import { useChooseEntry } from "../station/choose.js";
+import { LIBRARY_ITEM_DRAG } from "../station/library.js";
 import { useRun, useStation } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { EmptyState, Panel } from "../ui/Panel.js";
@@ -44,8 +45,13 @@ export function PlaylistPanel() {
     return event.clientY < rect.top + rect.height / 2 ? index : index + 1;
   };
 
+  /** Si accettano voci della scaletta (riordino) ed elementi delle Librerie (copia). */
+  const accepts = (event: DragEvent) =>
+    event.dataTransfer.types.includes(DRAG_TYPE) ||
+    event.dataTransfer.types.includes(LIBRARY_ITEM_DRAG);
+
   const onDragOver = (event: DragEvent<HTMLLIElement>, index: number) => {
-    if (!event.dataTransfer.types.includes(DRAG_TYPE)) return;
+    if (!accepts(event)) return;
     event.preventDefault();
     setDropIndex(insertionAt(event, index));
   };
@@ -56,7 +62,15 @@ export function PlaylistPanel() {
     event.preventDefault();
     event.stopPropagation();
     const entryId = event.dataTransfer.getData(DRAG_TYPE);
+    const libraryItem = event.dataTransfer.getData(LIBRARY_ITEM_DRAG);
     setDropIndex(undefined);
+    if (entryId === "" && libraryItem !== "") {
+      void run("playlist.addFromLibrary", {
+        itemId: libraryItem,
+        ...(target === undefined ? {} : { index: target }),
+      });
+      return;
+    }
     if (entryId === "" || target === undefined) return;
     const from = playlist.findIndex((e) => e.id === entryId);
     move(entryId, target > from ? target - 1 : target);
@@ -82,7 +96,18 @@ export function PlaylistPanel() {
       }
     >
       {playlist.length === 0 ? (
-        <EmptyState title={t("core.playlist.empty")} hint={t("core.playlist.emptyHint")} />
+        <div
+          className="flex flex-1 flex-col"
+          data-testid="playlist-drop"
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes(LIBRARY_ITEM_DRAG)) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            onDrop(event, 0);
+          }}
+        >
+          <EmptyState title={t("core.playlist.empty")} hint={t("core.playlist.emptyHint")} />
+        </div>
       ) : (
         <ol
           aria-label={t("core.playlist.label")}
@@ -161,7 +186,7 @@ export function PlaylistPanel() {
                         : t("core.playlist.slideCount", { count })}
                   </span>
                 </button>
-                <div className="flex shrink-0 gap-1 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
+                <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 gap-1 rounded-md bg-inherit pl-2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
                   <Button
                     size="sm"
                     onClick={() => {

@@ -55,7 +55,7 @@ export function ProgramPanel() {
             shown === undefined ? (
               <ScreenEmpty text={t("core.program.empty")} />
             ) : (
-              <SlideText text={slideText(shown.slide)} style={style} />
+              <SlideText text={slideText(shown.slide)} style={style} credits={shown.credits} />
             )
           }
         />
@@ -94,7 +94,7 @@ export function PreviewPanel() {
             {slide === undefined ? (
               <ScreenEmpty text={t("core.preview.empty")} />
             ) : (
-              <SlideText text={slideText(slide.slide)} style={style} />
+              <SlideText text={slideText(slide.slide)} style={style} credits={slide.credits} />
             )}
           </Screen>
         </div>

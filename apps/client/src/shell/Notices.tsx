@@ -16,7 +16,12 @@ function NoticeItem({ notice }: { notice: Notice }) {
     };
   }, [notice.id, dismiss]);
   return (
-    <li className="flex items-start gap-3 rounded-lg border border-live/60 bg-bg-2 px-4 py-3 text-sm shadow-lg">
+    <li
+      data-tone={notice.tone}
+      className={`flex items-start gap-3 rounded-lg border bg-bg-2 px-4 py-3 text-sm shadow-lg ${
+        notice.tone === "error" ? "border-live/60" : "border-cue/60"
+      }`}
+    >
       <span className="flex-1">{t(notice.key, notice.params)}</span>
       <button
         type="button"
@@ -37,7 +42,8 @@ export function Notices() {
   const { notices } = useStation();
   return (
     <ol
-      role="alert"
+      role="status"
+      aria-live="polite"
       className="pointer-events-auto fixed right-4 bottom-4 z-40 flex w-[min(380px,calc(100vw-32px))] flex-col gap-2"
     >
       {notices.map((notice) => (

@@ -5,7 +5,7 @@ import { consoleLogger, startEngine, type Engine } from "@cuelith-core/engine";
 import { DEFAULT_ENGINE_PORT } from "@cuelith/protocol";
 import { app, BrowserWindow, ipcMain, Menu, session } from "electron";
 import { electronDisplays } from "./displays.js";
-import { chooseShowFile, confirmUnsaved } from "./files.js";
+import { chooseMediaFiles, chooseShowFile, confirmUnsaved } from "./files.js";
 import { OutputWindows } from "./outputs.js";
 import { resolveAppPaths } from "./paths.js";
 
@@ -156,6 +156,14 @@ async function main(): Promise<void> {
       throw new Error("richiesta non autorizzata");
     }
     return chooseShowFile(station, engine, kind === "save" ? "save" : "open");
+  });
+
+  ipcMain.handle("cuelith:choose-media-files", async (event, kind: unknown) => {
+    const role = trusted.get(event.sender.id);
+    if (role !== "station" || station === undefined || engine === undefined) {
+      throw new Error("richiesta non autorizzata");
+    }
+    return chooseMediaFiles(station, engine, kind === "image" ? "image" : "audio");
   });
 
   station = openStation();

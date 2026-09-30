@@ -6,4 +6,6 @@ electron.contextBridge.exposeInMainWorld("cuelithDesktop", {
   getLocalSession: (): Promise<unknown> => electron.ipcRenderer.invoke("cuelith:local-session"),
   chooseShowFile: (kind: unknown): Promise<unknown> =>
     electron.ipcRenderer.invoke("cuelith:choose-show-file", kind === "save" ? "save" : "open"),
+  chooseMediaFiles: (kind: unknown): Promise<unknown> =>
+    electron.ipcRenderer.invoke("cuelith:choose-media-files", kind === "image" ? "image" : "audio"),
 });

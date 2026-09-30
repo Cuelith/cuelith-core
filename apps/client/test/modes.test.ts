@@ -1,4 +1,4 @@
-import { CORE_PANELS, ModeContributionSchema, qualify } from "@cuelith/protocol";
+import { areaPanelIds, CORE_PANELS, ModeContributionSchema, qualify } from "@cuelith/protocol";
 import { describe, expect, it } from "vitest";
 import { CORE_MODES, PRESENT_MODE } from "../src/modes/core.js";
 import { CORE_PANEL_COMPONENTS } from "../src/panels/core-panels.js";
@@ -15,14 +15,15 @@ describe("modalita' del nucleo", () => {
 
   it("ogni pannello usato dal nucleo esiste ed e' disegnato", () => {
     for (const mode of CORE_MODES) {
-      for (const panel of Object.values(mode.layout.panels)) {
+      for (const panel of Object.values(mode.layout.panels).flatMap(areaPanelIds)) {
         expect(CORE_PANELS).toContain(panel);
         expect(CORE_PANEL_COMPONENTS[panel]).toBeDefined();
       }
     }
   });
 
-  it("Presenta: scaletta | slide | programma sopra l'anteprima, proporzioni del cap. 04", () => {
+  it("Presenta: scaletta e librerie a schede | slide | programma sopra l'anteprima (cap. 04)", () => {
+    expect(PRESENT_MODE.layout.panels["playlist"]).toEqual(["core.playlist", "core.library"]);
     expect(PRESENT_MODE.shortcut).toBe("Mod+1");
     expect(PRESENT_MODE.layout.columns).toEqual(["25fr", "40fr", "33fr"]);
     expect(PRESENT_MODE.layout.areas).toEqual([
