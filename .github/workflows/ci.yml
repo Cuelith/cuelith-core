@@ -25,6 +25,13 @@ jobs:
           repository: Cuelith/plugin-locale-it
           ref: ${{ github.base_ref || github.ref_name }}
           path: plugin-locale-it
+      # Il modulo Canti vero, per la prova con l'app (e2e/tests/songs.spec.ts).
+      # Ramo dev finche' il modulo non ha la prima release su main.
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/plugin-songs
+          ref: dev
+          path: plugin-songs
       - uses: pnpm/action-setup@v6
         with:
           package_json_file: cuelith-core/package.json
@@ -34,6 +41,9 @@ jobs:
 
       - name: SDK
         working-directory: cuelith-sdk
+        run: pnpm install --frozen-lockfile && pnpm build
+      - name: Modulo Canti
+        working-directory: plugin-songs
         run: pnpm install --frozen-lockfile && pnpm build
 
       - name: Installazione

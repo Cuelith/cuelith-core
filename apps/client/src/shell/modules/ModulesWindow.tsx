@@ -379,8 +379,12 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
     const path = await desktop.chooseModuleFile();
     if (path === undefined) return;
     const done = await run("plugin.install", { path });
-    if (done !== undefined)
-      notify("core.modules.installedNotice", { id: done.id, version: done.version }, "info");
+    if (done === undefined) return;
+    notify("core.modules.installedNotice", { id: done.id, version: done.version }, "info");
+    // Come dal marketplace: subito la guida al primo uso, se il modulo ne ha una.
+    const list = await run("plugin.list", {});
+    const manifest = list?.plugins.find((p) => p.manifest.id === done.id)?.manifest;
+    if (manifest?.onboarding !== undefined) onGuide(manifest);
   };
 
   return (
