@@ -8,7 +8,8 @@
   "scripts": {
     "e2e": "playwright test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint tests playwright.config.ts"
+    "lint": "eslint tests site playwright.config.ts playwright.site.config.ts",
+    "site:shots": "playwright test --config playwright.site.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
