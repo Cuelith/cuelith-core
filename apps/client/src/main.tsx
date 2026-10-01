@@ -25,6 +25,15 @@ declare global {
       readonly stationReady: () => void;
       /** Apre (o riusa) la finestra di un pannello di modulo, es. l'editor dei canti. */
       readonly openPanelWindow: (path: string) => Promise<void>;
+      /** Prepara nascoste le finestre degli editor dei moduli attivi. */
+      readonly preparePanelWindows: (paths: readonly string[]) => Promise<void>;
+      /** Nasconde questa finestra di pannello (l'editor ha finito). */
+      readonly hidePanelWindow: () => void;
+      /** Richieste per questa finestra di pannello; restituisce la funzione per smettere. */
+      readonly onPanelEvents: (handlers: {
+        open: (context: unknown) => void;
+        closed: () => void;
+      }) => () => void;
     };
   }
 }
@@ -51,7 +60,11 @@ createRoot(root).render(
       {panelRequest === undefined ? (
         <App />
       ) : (
-        <PanelWindow panelId={panelRequest.panelId} context={panelRequest.context} />
+        <PanelWindow
+          panelId={panelRequest.panelId}
+          context={panelRequest.context}
+          warm={panelRequest.warm}
+        />
       )}
     </ConnectionProvider>
   </StrictMode>,

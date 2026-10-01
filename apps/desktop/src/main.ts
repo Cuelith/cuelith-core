@@ -153,27 +153,24 @@ function openSplash(paths: AppPaths): BrowserWindow {
   return window;
 }
 
-/** Finestre proprie dei pannelli dei moduli (gli editor), una per pannello. */
+/**
+ * Finestre proprie dei pannelli dei moduli (gli editor), una per pannello.
+ * Si preparano nascoste all'avvio (gia' collegate, col modulo caricato) e
+ * chiudendole si nascondono: cosi' aprire un editor e' istantaneo.
+ */
 const panelWindows = new Map<string, BrowserWindow>();
 
-/**
- * Apre la finestra di un pannello di modulo, o riusa quella gia' aperta per
- * lo stesso pannello (col nuovo contesto). E' una postazione a tutti gli
- * effetti (stesse credenziali), ma chiuderla non chiude Cuelith.
- */
-function openPanelWindow(path: string): void {
+/** Indirizzo di una finestra di pannello: della postazione, col pannello indicato. */
+function panelUrl(path: string): { url: URL; panelId: string } {
   const url = new URL(path, engineOrigin());
   const panelId = url.searchParams.get("panelWindow");
   if (url.origin !== engineOrigin() || url.pathname !== "/" || panelId === null) {
     throw new Error("finestra non consentita");
   }
-  const existing = panelWindows.get(panelId);
-  if (existing !== undefined && !existing.isDestroyed()) {
-    void existing.loadURL(url.href);
-    if (existing.isMinimized()) existing.restore();
-    existing.focus();
-    return;
-  }
+  return { url, panelId };
+}
+
+function createPanelWindow(panelId: string, url: URL): BrowserWindow {
   const window = createWindow("station", {
     title: "Cuelith",
     icon: ICON,
@@ -185,14 +182,66 @@ function openPanelWindow(path: string): void {
     backgroundColor: BACKGROUND,
     autoHideMenuBar: true,
   });
-  window.once("ready-to-show", () => {
-    window.show();
+  // Chiusa dall'operatore: si nasconde e prepara un editor pulito per la
+  // prossima volta. Si chiude davvero solo quando esce Cuelith.
+  window.on("close", (event) => {
+    if (quitAllowed) return;
+    event.preventDefault();
+    window.hide();
+    window.webContents.send("cuelith:panel-closed");
   });
   window.on("closed", () => {
     if (panelWindows.get(panelId) === window) panelWindows.delete(panelId);
   });
   panelWindows.set(panelId, window);
   void window.loadURL(url.href);
+  return window;
+}
+
+/** Mostra la finestra di un pannello col contesto chiesto (es. il canto da modificare). */
+function openPanelWindow(path: string): void {
+  const { url, panelId } = panelUrl(path);
+  const existing = panelWindows.get(panelId);
+  if (existing !== undefined && !existing.isDestroyed()) {
+    if (existing.webContents.isLoading()) {
+      // Ancora in preparazione (appena avviato): si carica direttamente con la richiesta.
+      void existing.loadURL(url.href);
+      existing.show();
+      existing.focus();
+      return;
+    }
+    const raw = url.searchParams.get("context");
+    let context: unknown;
+    try {
+      context = raw === null ? undefined : JSON.parse(raw);
+    } catch {
+      context = undefined;
+    }
+    existing.webContents.send("cuelith:panel-open", context ?? null);
+    if (existing.isMinimized()) existing.restore();
+    existing.show();
+    existing.focus();
+    return;
+  }
+  const window = createPanelWindow(panelId, url);
+  window.once("ready-to-show", () => {
+    window.show();
+  });
+}
+
+/**
+ * Prepara (nascoste) le finestre degli editor dei moduli attivi e toglie
+ * quelle dei moduli non piu' attivi.
+ */
+function preparePanelWindows(paths: readonly string[]): void {
+  const wanted = new Map(paths.map((path) => [panelUrl(path).panelId, panelUrl(path).url]));
+  for (const [panelId, window] of panelWindows) {
+    if (!wanted.has(panelId) && !window.isDestroyed()) window.destroy();
+  }
+  for (const [panelId, url] of wanted) {
+    const existing = panelWindows.get(panelId);
+    if (existing === undefined || existing.isDestroyed()) createPanelWindow(panelId, url);
+  }
 }
 
 /** Vero se la finestra di avvio e' stata chiusa prima che nascesse la postazione. */
@@ -267,6 +316,25 @@ async function main(): Promise<void> {
     }
     if (path.length > 4 * 1024 * 1024) throw new Error("contesto troppo grande");
     openPanelWindow(path);
+  });
+
+  ipcMain.handle("cuelith:prepare-panel-windows", (event, paths: unknown) => {
+    if (
+      trusted.get(event.sender.id) !== "station" ||
+      !Array.isArray(paths) ||
+      paths.length > 50 ||
+      !paths.every((p): p is string => typeof p === "string" && p.length < 2048)
+    ) {
+      throw new Error("richiesta non autorizzata");
+    }
+    preparePanelWindows(paths);
+  });
+
+  // L'editor ha finito (Chiudi nel pannello): la sua finestra si nasconde.
+  ipcMain.on("cuelith:hide-panel-window", (event) => {
+    if (trusted.get(event.sender.id) !== "station") return;
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window !== null && [...panelWindows.values()].includes(window)) window.hide();
   });
 
   ipcMain.on("cuelith:station-ready", (event) => {

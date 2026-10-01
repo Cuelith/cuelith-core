@@ -9,7 +9,7 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-import { chooseFiles, screenshotsDir, test } from "./app.js";
+import { chooseFiles, panelWindowVisible, screenshotsDir, shownPanelWindow, test } from "./app.js";
 
 /**
  * Il modulo Canti vero (repo affiancato plugin-songs, costruito con
@@ -94,18 +94,23 @@ async function openSongs(station: Page): Promise<FrameLocator> {
 
 const EDITOR = '[data-module-panel="cuelith.songs.editor"]';
 
-/** L'editor si apre in una finestra propria: la zona centrale resta dell'operatore. */
+const EDITOR_ID = "cuelith.songs.editor";
+/** Tempi di apertura dell'editor (ms), per controllare che sia immediata. */
+const openingTimes: number[] = [];
+
+/**
+ * L'editor si apre in una finestra propria (la zona centrale resta
+ * dell'operatore). La finestra e' preparata in anticipo: qui si mostra.
+ */
 async function editorOpenedBy(app: ElectronApplication, click: Locator) {
   for (let attempt = 1; ; attempt++) {
-    const opening = app.waitForEvent("window", {
-      predicate: (window) => window.url().includes("panelWindow=cuelith.songs.editor"),
-      timeout: 6000,
-    });
+    const started = Date.now();
     await click.click();
     try {
-      const page = await opening;
+      const page = await shownPanelWindow(app, EDITOR_ID);
       const editor = page.frameLocator(EDITOR);
       await expect(editor.getByRole("button", { name: "Salva", exact: true })).toBeVisible();
+      openingTimes.push(Date.now() - started);
       return { page, editor };
     } catch (error) {
       if (attempt === 3) throw error;
@@ -113,11 +118,10 @@ async function editorOpenedBy(app: ElectronApplication, click: Locator) {
   }
 }
 
-/** «Chiudi» dell'editor chiude la sua finestra. */
-async function closeEditor(page: Page, editor: FrameLocator): Promise<void> {
+/** «Chiudi» dell'editor nasconde la sua finestra (pronta per la prossima volta). */
+async function closeEditor(app: ElectronApplication, editor: FrameLocator): Promise<void> {
   for (let attempt = 1; ; attempt++) {
-    if (page.isClosed()) return;
-    // Su una finestra gia' in chiusura il clic puo' fallire: va bene cosi'.
+    if (!(await panelWindowVisible(app, EDITOR_ID))) return;
     await editor
       .getByRole("button", { name: "Chiudi", exact: true })
       .click({ timeout: 5000 })
@@ -129,7 +133,7 @@ async function closeEditor(page: Page, editor: FrameLocator): Promise<void> {
       .catch(() => false);
     expect(unsaved, "l'editor chiede di salvare: non dovrebbe").toBe(false);
     try {
-      await expect.poll(() => page.isClosed(), { timeout: 10_000 }).toBe(true);
+      await expect.poll(() => panelWindowVisible(app, EDITOR_ID), SOON).toBe(false);
       return;
     } catch (error) {
       if (attempt === 3) throw error;
@@ -205,7 +209,7 @@ test("modulo Canti: nuovo canto nell'editor, scaletta, tasti delle sezioni, impo
       .toContain("<title>Santo</title>"),
   );
   expect(readFileSync(exported, "utf8")).toContain("<verseOrder>v1 c1 v2 c1</verseOrder>");
-  await closeEditor(page, editor);
+  await closeEditor(app, editor);
   await expect(songRow(side, "Santo")).toBeVisible();
 
   // Backup: tutti i canti in un file ChordPro, scritto dove sceglie l'operatore.
@@ -273,8 +277,10 @@ test("modulo Canti: nuovo canto nell'editor, scaletta, tasti delle sezioni, impo
   const completing = await editorOpenedBy(app, report.getByRole("button", { name: "Completa" }));
   await expect(completing.editor.getByLabel("Titolo")).toHaveValue("Alleluia");
   await expect(completing.editor.getByLabel("Testo della sezione C1")).toHaveValue("Alleluia");
-  await closeEditor(completing.page, completing.editor);
+  await closeEditor(app, completing.editor);
 
+  // Editor preparato in anticipo: si apre all'istante (sotto il mezzo secondo).
+  expect(Math.min(...openingTimes)).toBeLessThan(500);
   expect(problems).toEqual([]);
 });
 
@@ -316,7 +322,7 @@ test("scheda Canti: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C
   await clickUntil(editor.getByRole("button", { name: "Salva", exact: true }), () =>
     expect(page.getByText("«Glorioso giorno» salvato.")).toBeVisible({ timeout: 6000 }),
   );
-  await closeEditor(page, editor);
+  await closeEditor(app, editor);
 
   // Un clic seleziona e basta (nessun editor si apre); senza selezione le azioni sono spente.
   const actions = bar(side);
@@ -326,7 +332,7 @@ test("scheda Canti: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C
   await clickUntil(songRow(side, "Glorioso giorno"), () =>
     expect(glorioso).toHaveAttribute("aria-selected", "true", SOON),
   );
-  expect(app.windows()).toHaveLength(1);
+  expect(await panelWindowVisible(app, EDITOR_ID)).toBe(false);
 
   // Doppio clic = in anteprima, senza scaletta.
   await clickUntil(
@@ -388,7 +394,7 @@ test("scheda Canti: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C
   await clickUntil(second.editor.getByRole("button", { name: "Salva", exact: true }), () =>
     expect(second.page.getByText("«Alba» salvato.")).toBeVisible({ timeout: 6000 }),
   );
-  await closeEditor(second.page, second.editor);
+  await closeEditor(app, second.editor);
   await clickUntil(songRow(side, "Glorioso giorno"), () =>
     expect(glorioso).toHaveAttribute("aria-selected", "true", SOON),
   );
@@ -408,5 +414,7 @@ test("scheda Canti: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C
   await station.getByRole("tab", { name: "Scaletta", exact: true }).click();
   await expect(entries).toHaveText([/Glorioso giorno/, /Glorioso giorno/, /Alba/]);
 
+  // Editor preparato in anticipo: si apre all'istante (sotto il mezzo secondo).
+  expect(Math.min(...openingTimes)).toBeLessThan(500);
   expect(problems).toEqual([]);
 });

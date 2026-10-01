@@ -35,11 +35,17 @@ function ownCatalog(catalog: Catalog, pluginId: string): Catalog {
 export function ModulePanelFrame({
   panel,
   context,
+  connect = true,
   onClose,
 }: {
   panel: ModulePanel;
   /** Contesto passato da chi ha aperto il pannello (es. il canto da modificare). */
   context?: unknown;
+  /**
+   * Falso = il pannello si carica ma aspetta a collegarsi (finestra dell'editor
+   * preparata in anticipo): alla richiesta il collegamento e' istantaneo.
+   */
+  connect?: boolean;
   onClose?: () => void;
 }) {
   const connection = useConnection();
@@ -60,9 +66,10 @@ export function ModulePanelFrame({
     onClose,
     context,
     panels,
+    connect,
   });
   useEffect(() => {
-    latest.current = { state, catalog, lang, notify, onClose, context, panels };
+    latest.current = { state, catalog, lang, notify, onClose, context, panels, connect };
   });
 
   useEffect(() => {
@@ -182,13 +189,18 @@ export function ModulePanelFrame({
     // memoria): il caricamento lo registra `onLoad` sull'elemento e il
     // collegamento si fa subito, invece di restare scollegati.
     connectOnLoad.current = onLoad;
-    if (loaded.current) onLoad();
+    if (loaded.current && latest.current.connect) onLoad();
     return () => {
       connectOnLoad.current = undefined;
       port.current?.close();
       port.current = undefined;
     };
   }, [connection, panel.pluginId, panel.panelId, panel.src]);
+
+  // Richiesta arrivata a pannello gia' caricato: ci si collega subito.
+  useEffect(() => {
+    if (connect && loaded.current && port.current === undefined) connectOnLoad.current?.();
+  }, [connect]);
 
   // Stato e testi aggiornati arrivano al pannello man mano.
   useEffect(() => {
@@ -213,7 +225,7 @@ export function ModulePanelFrame({
       data-module-panel={panel.id}
       onLoad={() => {
         loaded.current = true;
-        connectOnLoad.current?.();
+        if (latest.current.connect) connectOnLoad.current?.();
       }}
     />
   );

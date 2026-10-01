@@ -159,3 +159,25 @@ export async function chooseFiles(
       });
   }, filePath);
 }
+
+/** Vero se la finestra propria del pannello (es. l'editor dei canti) e' visibile. */
+export function panelWindowVisible(app: ElectronApplication, panelId: string): Promise<boolean> {
+  return app.evaluate(
+    ({ BrowserWindow }, id) =>
+      BrowserWindow.getAllWindows().some(
+        (w) => w.isVisible() && w.webContents.getURL().includes(`panelWindow=${id}`),
+      ),
+    panelId,
+  );
+}
+
+/**
+ * La finestra propria di un pannello: le finestre degli editor sono preparate
+ * in anticipo (nascoste) e si mostrano alla richiesta.
+ */
+export async function shownPanelWindow(app: ElectronApplication, panelId: string): Promise<Page> {
+  await expect.poll(() => panelWindowVisible(app, panelId), { timeout: 6000 }).toBe(true);
+  const page = app.windows().find((w) => w.url().includes(`panelWindow=${panelId}`));
+  if (page === undefined) throw new Error(`finestra del pannello ${panelId} mancante`);
+  return page;
+}

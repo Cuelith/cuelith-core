@@ -43,6 +43,16 @@ export function openPanelWindow(panelId: string, context?: unknown): void {
   else window.open(path, `cuelith-${panelId}`);
 }
 
+/**
+ * Sul computer del motore prepara, nascoste, le finestre degli editor dei
+ * moduli attivi: gia' collegate e col modulo caricato, si aprono all'istante.
+ */
+export function preparePanelWindows(panelIds: readonly string[]): void {
+  const desktop = window.cuelithDesktop;
+  if (desktop === undefined) return;
+  void desktop.preparePanelWindows(panelIds.map((id) => `${panelWindowPath(id)}&warm=1`));
+}
+
 /** Risposta alla domanda "salvare le modifiche?". */
 export type UnsavedChoice = "save" | "discard" | "cancel";
 

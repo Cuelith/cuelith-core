@@ -4,7 +4,7 @@ import { CORE_MODES, PRESENT_MODE, type Mode } from "../modes/core.js";
 import { useShowFiles, type ShowFiles } from "../station/files.js";
 import { ModuleEditorsContext, useModuleUi } from "../station/modulePanels.js";
 import { useCueShortcuts } from "../station/shortcuts.js";
-import { StationProvider, useStation } from "../station/station.js";
+import { preparePanelWindows, StationProvider, useStation } from "../station/station.js";
 import { Dock } from "./Dock.js";
 import { ModeView } from "./ModeView.js";
 import { ModulesWindow } from "./modules/ModulesWindow.js";
@@ -57,6 +57,14 @@ function ShellBody() {
   const { panels: modulePanels, editors } = useModuleUi();
   useCueShortcuts();
   useFollowDirect();
+  // Editor dei moduli pronti in anticipo (finestre nascoste): si aprono all'istante.
+  const editorIds = modulePanels
+    .filter((panel) => panel.placement === "center")
+    .map((panel) => panel.id)
+    .join(" ");
+  useEffect(() => {
+    preparePanelWindows(editorIds === "" ? [] : editorIds.split(" "));
+  }, [editorIds]);
   useFileShortcuts(files);
   const modes = CORE_MODES;
   const [mode, setMode] = useState<Mode>(() => readSavedMode(modes));

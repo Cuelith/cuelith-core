@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, type FrameLocator, type Page } from "@playwright/test";
 import { strToU8, zipSync } from "fflate";
-import { chooseFiles, screenshotsDir, test } from "./app.js";
+import { chooseFiles, panelWindowVisible, screenshotsDir, shownPanelWindow, test } from "./app.js";
 
 /**
  * Pannello di prova scritto a mano col protocollo del ponte (come farebbe
@@ -180,12 +180,10 @@ test("pannelli dei moduli: scheda laterale e pannello centrale isolati, con i so
   // Gli editor (pannelli "center") non stanno nel dock e non prendono mai la
   // zona centrale: si aprono su richiesta in una finestra propria, col contesto.
   await expect(dock.getByRole("button", { name: "Editor saluti" })).toHaveCount(0);
-  const [editorWindow] = await Promise.all([
-    app.waitForEvent("window", {
-      predicate: (page) => page.url().includes("panelWindow=cuelith.greetings.editor"),
-    }),
-    side.getByRole("button", { name: "Apri editor" }).click(),
-  ]);
+  // La finestra dell'editor e' gia' pronta (nascosta): la richiesta la mostra.
+  expect(await panelWindowVisible(app, "cuelith.greetings.editor")).toBe(false);
+  await side.getByRole("button", { name: "Apri editor" }).click();
+  const editorWindow = await shownPanelWindow(app, "cuelith.greetings.editor");
   const center = editorWindow.frameLocator('[data-module-panel="cuelith.greetings.editor"]');
   await expect(line(center, "pannello")).toHaveText("pannello: editor");
   await expect(line(center, "contesto")).toHaveText('contesto: {"da":"lista"}');
@@ -194,7 +192,8 @@ test("pannelli dei moduli: scheda laterale e pannello centrale isolati, con i so
   await editorWindow.screenshot({
     path: path.join(screenshotsDir, "pannello-modulo-finestra.png"),
   });
+  // «Chiudi» la nasconde (resta pronta per la prossima volta).
   await center.getByRole("button", { name: "Chiudi pannello" }).click();
-  await expect.poll(() => editorWindow.isClosed()).toBe(true);
+  await expect.poll(() => panelWindowVisible(app, "cuelith.greetings.editor")).toBe(false);
   expect(problems.filter((p) => !p.includes("example.com"))).toEqual([]);
 });

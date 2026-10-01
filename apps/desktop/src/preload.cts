@@ -25,4 +25,32 @@ electron.contextBridge.exposeInMainWorld("cuelithDesktop", {
   /** Finestra propria di un pannello di modulo (es. l'editor dei canti). */
   openPanelWindow: (path: unknown): Promise<unknown> =>
     electron.ipcRenderer.invoke("cuelith:open-panel-window", typeof path === "string" ? path : ""),
+  /** Prepara nascoste le finestre degli editor dei moduli attivi (apertura istantanea). */
+  preparePanelWindows: (paths: unknown): Promise<unknown> =>
+    electron.ipcRenderer.invoke(
+      "cuelith:prepare-panel-windows",
+      Array.isArray(paths) ? paths.filter((p) => typeof p === "string") : [],
+    ),
+  /** Nasconde questa finestra di pannello (l'editor ha finito). */
+  hidePanelWindow: (): void => {
+    electron.ipcRenderer.send("cuelith:hide-panel-window");
+  },
+  /** Richieste per questa finestra di pannello: apri col contesto, oppure chiusa. */
+  onPanelEvents: (handlers: {
+    open: (context: unknown) => void;
+    closed: () => void;
+  }): (() => void) => {
+    const open = (_event: unknown, context: unknown) => {
+      handlers.open(context);
+    };
+    const closed = () => {
+      handlers.closed();
+    };
+    electron.ipcRenderer.on("cuelith:panel-open", open);
+    electron.ipcRenderer.on("cuelith:panel-closed", closed);
+    return () => {
+      electron.ipcRenderer.off("cuelith:panel-open", open);
+      electron.ipcRenderer.off("cuelith:panel-closed", closed);
+    };
+  },
 });
