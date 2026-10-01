@@ -120,7 +120,7 @@ export function LibraryDialog({
                 value={code}
                 maxLength={8}
                 aria-invalid={codeInvalid}
-                placeholder="INN"
+                placeholder={t("core.library.codePlaceholder")}
                 onChange={(event) => {
                   setCode(event.target.value.toUpperCase().replace(/\s/g, ""));
                 }}

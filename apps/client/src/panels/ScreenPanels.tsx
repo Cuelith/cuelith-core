@@ -14,6 +14,7 @@ import { Button } from "../ui/Button.js";
 import { Crossfade } from "../ui/Crossfade.js";
 import { Panel } from "../ui/Panel.js";
 import { Screen, ScreenEmpty } from "../ui/Screen.js";
+import { backgroundUrl } from "../station/backgrounds.js";
 import { SlideText } from "../ui/SlideText.js";
 
 const keyOf = (slide: ShownSlide | undefined): string => slide?.key ?? "empty";
@@ -56,7 +57,12 @@ export function ProgramPanel() {
             shown === undefined ? (
               <ScreenEmpty text={t("core.program.empty")} />
             ) : (
-              <SlideText text={slideText(shown.slide)} style={style} credits={shown.credits} />
+              <SlideText
+                text={slideText(shown.slide)}
+                style={style}
+                credits={shown.credits}
+                background={backgroundUrl(style, shown.item, shown.slide)}
+              />
             )
           }
         />
@@ -97,7 +103,12 @@ export function PreviewPanel() {
             {slide === undefined ? (
               <ScreenEmpty text={t("core.preview.empty")} />
             ) : (
-              <SlideText text={slideText(slide.slide)} style={style} credits={slide.credits} />
+              <SlideText
+                text={slideText(slide.slide)}
+                style={style}
+                credits={slide.credits}
+                background={backgroundUrl(style, slide.item, slide.slide)}
+              />
             )}
           </Screen>
         </div>

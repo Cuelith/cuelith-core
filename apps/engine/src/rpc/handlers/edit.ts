@@ -1,9 +1,12 @@
 import { isDeepStrictEqual } from "node:util";
+import { CORE_LOOK_TEMPLATES, isCoreLookTemplate } from "@cuelith-core/core-looks";
 import {
   ErrorCode,
+  mediaIdOf,
   newId,
   RpcError,
   type Item,
+  type MediaRef,
   type Slide,
   type SlideInput,
   type StateDocument,
@@ -58,6 +61,15 @@ function checkArrangement(item: Item): void {
   if (item.arrangement.some((g) => !groups.has(g))) throw invalid("core.error.groupMissing");
 }
 
+/** Uno sfondo e' un'immagine gia' nell'archivio media (decisione 0003). */
+function checkBackground(ctx: EngineContext, background: MediaRef | null | undefined): void {
+  if (background === null || background === undefined) return;
+  const id = mediaIdOf(background.uri);
+  if (background.kind !== "image" || id === undefined || !ctx.library.db.hasMedia(id)) {
+    throw invalid("core.error.backgroundInvalid");
+  }
+}
+
 /** Gli allegati devono essere file gia' nell'archivio media. */
 function checkAttachments(ctx: EngineContext, attachments: Item["attachments"]): void {
   for (const attachment of attachments ?? []) {
@@ -75,12 +87,15 @@ export const editHandlers: HandlerMap = {
     const rev = edit(ctx, (draft) => {
       declareItemType(draft, params.type, ctx.modules);
       checkAttachments(ctx, params.attachments);
+      checkBackground(ctx, params.background);
+      for (const slide of params.slides ?? []) checkBackground(ctx, slide.background);
       draft.show.items[id] = {
         id,
         type: params.type,
         title: params.title,
         slides: (params.slides ?? []).map(toSlide),
         meta: params.meta ?? {},
+        ...(params.background === undefined ? {} : { background: params.background }),
         ...(params.credits === undefined ? {} : { credits: params.credits }),
         ...(params.tags === undefined ? {} : { tags: params.tags }),
         ...(params.attachments === undefined ? {} : { attachments: params.attachments }),
@@ -96,6 +111,9 @@ export const editHandlers: HandlerMap = {
       if (params.meta !== undefined) item.meta = params.meta;
       if (params.arrangement === null) delete item.arrangement;
       else if (params.arrangement !== undefined) item.arrangement = params.arrangement;
+      checkBackground(ctx, params.background);
+      if (params.background === null) delete item.background;
+      else if (params.background !== undefined) item.background = params.background;
       if (params.credits === null) delete item.credits;
       else if (params.credits !== undefined) item.credits = params.credits;
       if (params.tags !== undefined) item.tags = params.tags;
@@ -118,6 +136,7 @@ export const editHandlers: HandlerMap = {
 
   "slide.insert": (ctx, _session, params) => {
     const slide = toSlide(params.slide);
+    checkBackground(ctx, slide.background);
     const rev = edit(ctx, (draft) => {
       const item = itemOf(draft, params.itemId);
       const index = params.index ?? item.slides.length;
@@ -137,9 +156,32 @@ export const editHandlers: HandlerMap = {
       else if (params.group !== undefined) slide.group = params.group;
       if (params.media === null) delete slide.media;
       else if (params.media !== undefined) slide.media = params.media;
+      checkBackground(ctx, params.background);
       if (params.background === null) delete slide.background;
       else if (params.background !== undefined) slide.background = params.background;
       checkArrangement(item);
+    }),
+  }),
+
+  /**
+   * Modifica di un look (nome, campi, layer, stile). Lo stile dei look del
+   * nucleo si valida col suo schema: un look rotto manderebbe in nero le uscite.
+   */
+  "look.update": (ctx, _session, params) => ({
+    rev: edit(ctx, (draft) => {
+      const look = draft.show.looks[params.id];
+      if (look === undefined) throw new RpcError(ErrorCode.NotFound, "core.error.lookNotFound");
+      if (params.name !== undefined) look.name = params.name;
+      if (params.fields !== undefined) look.fields = params.fields;
+      if (params.layers !== undefined) look.layers = params.layers;
+      if (params.template !== undefined) look.template = params.template;
+      if (params.style !== undefined) look.style = params.style;
+      if (isCoreLookTemplate(look.template)) {
+        const style = CORE_LOOK_TEMPLATES[look.template].safeParse(look.style);
+        if (!style.success) throw invalid("core.error.lookStyleInvalid");
+        const image = (style.data.background as { image?: string }).image;
+        if (image !== undefined) checkBackground(ctx, { uri: image, kind: "image" });
+      }
     }),
   }),
 

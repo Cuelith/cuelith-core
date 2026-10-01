@@ -32,6 +32,13 @@ async function start(): Promise<void> {
     return desktop.getLocalSession();
   });
 
+  // Cio' che l'uscita mostra davvero: si aggiorna a ogni disegno, anche quando
+  // uno sfondo arriva dopo lo stato.
+  painter.onDrawn = () => {
+    body.dataset["text"] = painter.shownText;
+    body.dataset["background"] = painter.shownImage;
+  };
+
   const render = () => {
     const { state, lang, status } = connection.getSnapshot();
     body.dataset["connection"] = status.kind;
@@ -43,6 +50,7 @@ async function start(): Promise<void> {
     body.dataset["blackout"] = String(view?.blackout ?? false);
     body.dataset["freeze"] = String(view?.freeze ?? false);
     body.dataset["text"] = painter.shownText;
+    body.dataset["background"] = painter.shownImage;
     body.dataset["state"] = "ready";
   };
   connection.subscribe(render);

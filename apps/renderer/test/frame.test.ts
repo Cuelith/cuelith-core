@@ -176,4 +176,71 @@ describe("describeOutput", () => {
     const { doc } = makeDoc();
     expect(describeOutput(doc, newId())).toBeUndefined();
   });
+
+  describe("sfondi (decisione 0003)", () => {
+    const uri = (letter: string) => `media:${letter.repeat(64)}.jpg`;
+    const url = (letter: string) => `/media/${letter.repeat(64)}.jpg`;
+    const image = (letter: string) => ({ uri: uri(letter), kind: "image" as const });
+    const fullscreen = (doc: StateDocument, output: string) => {
+      const view = describeOutput(doc, output);
+      if (view?.frame.kind !== "fullscreen") throw new Error("non e' il look Sala");
+      return { view, frame: view.frame };
+    };
+    const setLook = (doc: StateDocument, output: string, background: object) => {
+      const feed = doc.show.outputs[output]?.feed;
+      const look = feed?.type === "source" ? doc.show.looks[feed.lookId ?? ""] : undefined;
+      if (look === undefined) throw new Error("look mancante");
+      look.style = { ...look.style, background };
+      return look;
+    };
+
+    it("ordine: slide, poi elemento, poi look; col velo del look", () => {
+      const { doc, room } = makeDoc();
+      const item = Object.values(doc.show.items)[0];
+      if (item === undefined) throw new Error("elemento mancante");
+      expect(fullscreen(doc, room).frame).toMatchObject({ image: undefined, dim: 0 });
+
+      setLook(doc, room, { color: "#000000", image: uri("c"), dim: 0.35 });
+      expect(fullscreen(doc, room).frame).toMatchObject({ image: url("c"), dim: 0.35 });
+      item.background = image("b");
+      expect(fullscreen(doc, room).frame.image).toBe(url("b"));
+      const first = item.slides[0];
+      if (first !== undefined) first.background = image("a");
+      expect(fullscreen(doc, room).frame.image).toBe(url("a"));
+    });
+
+    it("cambiare sfondo cambia la chiave (dissolvenza); la prossima immagine si carica prima", () => {
+      const { doc, room } = makeDoc();
+      const item = Object.values(doc.show.items)[0];
+      const [first, second] = item?.slides ?? [];
+      if (first === undefined || second === undefined) throw new Error("slide mancanti");
+      first.background = image("a");
+      second.background = image("b");
+      const now = fullscreen(doc, room).view;
+      // In anteprima c'e' la seconda slide: il suo sfondo e' gia' in arrivo.
+      expect(now.preload).toEqual([url("b")]);
+      const plain = makeDoc();
+      expect(describeOutput(plain.doc, plain.room)?.preload).toEqual([]);
+      expect(now.key).toContain(url("a"));
+    });
+
+    it("il Palco non mostra sfondi, e nemmeno un look senza il layer dello sfondo", () => {
+      const { doc, room, stage } = makeDoc();
+      const item = Object.values(doc.show.items)[0];
+      if (item === undefined) throw new Error("elemento mancante");
+      item.background = image("a");
+      expect(describeOutput(doc, stage)?.frame).not.toHaveProperty("image");
+      expect(describeOutput(doc, stage)?.preload).toEqual([]);
+      const look = setLook(doc, room, { color: "#000000", image: uri("c") });
+      look.layers = look.layers.filter((layer) => layer !== "background");
+      expect(fullscreen(doc, room).frame.image).toBeUndefined();
+    });
+
+    it("niente in onda: resta lo sfondo predefinito del look", () => {
+      const { doc, room } = makeDoc();
+      setLook(doc, room, { color: "#101010", image: uri("c") });
+      doc.live.layers.content = { visible: false };
+      expect(fullscreen(doc, room).frame).toMatchObject({ image: url("c"), text: undefined });
+    });
+  });
 });

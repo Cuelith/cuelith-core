@@ -20,8 +20,22 @@ const TextStyle = z.strictObject({
   margin: z.number().min(0).max(0.4),
 });
 
+/**
+ * Sfondo del look Sala (decisione 0003): colore, immagine predefinita
+ * dell'archivio media (la usano le slide senza sfondo proprio) e velo scuro
+ * sopra le immagini perche' il testo resti leggibile (0 = nessuno).
+ */
+const Background = z.strictObject({
+  color: Color,
+  image: z
+    .string()
+    .regex(/^media:[a-f0-9]{64}\.[a-z0-9]{1,5}$/)
+    .optional(),
+  dim: z.number().min(0).max(0.9).optional(),
+});
+
 export const FullscreenStyleSchema = z.strictObject({
-  background: z.strictObject({ color: Color }),
+  background: Background,
   text: TextStyle,
   transition: Transition,
 });

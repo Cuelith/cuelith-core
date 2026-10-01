@@ -8,6 +8,8 @@ import {
 import {
   cursorItem,
   itemById,
+  mediaUrl,
+  slideBackground,
   slideSequence,
   type Feed,
   type Look,
@@ -26,6 +28,10 @@ export type Frame =
   | {
       readonly kind: "fullscreen";
       readonly background: string;
+      /** Immagine di sfondo (indirizzo sul motore): della slide, dell'elemento o del look. */
+      readonly image: string | undefined;
+      /** Velo scuro sopra l'immagine, 0..0.9, perche' il testo resti leggibile. */
+      readonly dim: number;
       readonly text: string | undefined;
       readonly style: TextStyle;
       readonly message: string | undefined;
@@ -52,6 +58,8 @@ export interface OutputView {
   /** Cambia quando cambia il contenuto: e' il momento di una transizione. */
   readonly key: string;
   readonly transition: Transition;
+  /** Immagini che serviranno subito dopo (la prossima slide): da caricare in anticipo. */
+  readonly preload: readonly string[];
 }
 
 const CUT: Transition = { type: "cut", durationMs: 0 };
@@ -97,7 +105,15 @@ function presentation(doc: StateDocument) {
     previewItem === undefined ? undefined : slideSequence(previewItem)[preview.slideIndex];
   const key =
     onAir === undefined ? "none" : `${item?.id ?? ""}/${String(content.slideIndex)}/${onAir.id}`;
-  return { onAir, next, key, credits };
+  return {
+    onAir,
+    next,
+    key,
+    credits,
+    // Sfondo della slide, altrimenti dell'elemento (decisione 0003).
+    background: onAir === undefined ? undefined : slideBackground(item, onAir),
+    nextBackground: next === undefined ? undefined : slideBackground(previewItem, next),
+  };
 }
 
 /** Messaggio dell'uscita (protocollo 1.7), altrimenti quello generale, se il look lo mostra. */
@@ -120,7 +136,7 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
   if (output === undefined || live === undefined) return undefined;
   const base = { name: output.name, freeze: live.freeze };
   const { feed, blackout } = resolve(doc, output);
-  const black = { ...base, blackout, frame: BLACK, key: "black", transition: CUT };
+  const black = { ...base, blackout, frame: BLACK, key: "black", transition: CUT, preload: [] };
 
   // Scene (camere, composizioni) arrivano con i moduli: finche' non ci sono, nero.
   if (feed.type !== "source") return black;
@@ -128,7 +144,7 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
   const look = feed.lookId === undefined ? undefined : doc.show.looks[feed.lookId];
   if (source?.type !== PRESENTATION_SOURCE_TYPE || look === undefined) return black;
 
-  const { onAir, next, key, credits } = presentation(doc);
+  const { onAir, next, key, credits, background, nextBackground } = presentation(doc);
   const showContent = look.layers.includes("content");
   const text = showContent && look.fields.includes("text") ? textOf(onAir) : undefined;
   const message = messageOf(doc, look, outputId);
@@ -136,14 +152,25 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
   if (look.template === "core.fullscreen") {
     const style = FullscreenStyleSchema.safeParse(look.style);
     if (!style.success) return black;
+    // Ordine: slide, elemento, look. Un look senza il layer "background" non ne mostra.
+    const withBackground = look.layers.includes("background");
+    const fallback = style.data.background.image;
+    const urlOf = (uri: string | undefined) =>
+      !withBackground || uri === undefined ? undefined : mediaUrl(uri);
+    const image = urlOf(background?.uri ?? fallback);
+    const upcoming = urlOf(nextBackground?.uri ?? fallback);
     return {
       ...base,
       blackout,
-      key,
+      // Cambiare sfondo e' un cambio di contenuto: vale la dissolvenza.
+      key: image === undefined ? key : `${key}|${image}`,
       transition: style.data.transition,
+      preload: upcoming === undefined || upcoming === image ? [] : [upcoming],
       frame: {
         kind: "fullscreen",
         background: style.data.background.color,
+        image,
+        dim: style.data.background.dim ?? 0,
         text,
         style: style.data.text,
         message,
@@ -159,6 +186,8 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
       blackout,
       key,
       transition: style.data.transition,
+      // Il look Palco per definizione non mostra sfondi.
+      preload: [],
       frame: {
         kind: "stage",
         background: style.data.background.color,

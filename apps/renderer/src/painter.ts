@@ -1,5 +1,5 @@
 import "pixi.js/unsafe-eval";
-import { Application, Container, Graphics, Text, type Ticker } from "pixi.js";
+import { Application, Container, Graphics, Sprite, Text, Texture, type Ticker } from "pixi.js";
 import { formatTimer, timerPhase, timerRemaining } from "@cuelith/protocol";
 import type { Frame, OutputView, TextStyle } from "./frame.js";
 
@@ -9,6 +9,8 @@ const FONT: Record<TextStyle["font"], string> = {
   mono: "JetBrains Mono Variable",
 };
 const MUTED = "#A9ADB4";
+/** Oltre questo tempo un'immagine di sfondo non blocca piu' il cambio di slide. */
+const IMAGE_TIMEOUT_MS = 4000;
 const BAND = "#0B0C0E";
 
 /** Font inclusi nel pacchetto: vanno caricati prima di disegnare testo su canvas. */
@@ -49,6 +51,11 @@ export class Painter {
   readonly #app = new Application();
   readonly #stage = new Container();
   readonly #cover = new Graphics();
+  /** Immagini di sfondo gia' caricate (undefined = non caricabile: si disegna senza). */
+  readonly #images = new Map<string, Texture | undefined>();
+  readonly #loading = new Map<string, Promise<void>>();
+  /** Cresce a ogni nuovo stato: un'immagine arrivata tardi non sovrascrive uno stato piu' nuovo. */
+  #ticket = 0;
   #current: Container | undefined;
   #leaving: Container | undefined;
   #fade = { elapsed: 0, duration: 0 };
@@ -83,8 +90,45 @@ export class Painter {
   update(view: OutputView | undefined): void {
     this.#latest = view;
     this.#drawCover();
+    const ticket = ++this.#ticket;
     // Freeze: l'immagine resta quella di prima (il blackout vale comunque).
     if (view === undefined || view.freeze) return;
+    // La prossima slide avra' bisogno di queste immagini: si caricano adesso.
+    for (const url of view.preload) void this.#load(url);
+    const image = view.frame.kind === "fullscreen" ? view.frame.image : undefined;
+    if (image !== undefined && !this.#images.has(image)) {
+      // Mai un fotogramma vuoto (decisione 0003): resta cio' che c'e' finche'
+      // lo sfondo non e' pronto, poi si cambia tutto insieme.
+      void this.#load(image).then(() => {
+        if (ticket === this.#ticket) this.#show(view);
+      });
+      return;
+    }
+    this.#show(view);
+  }
+
+  /** Scarica e decodifica un'immagine di sfondo; se non riesce si disegnera' senza. */
+  #load(url: string): Promise<void> {
+    if (this.#images.has(url)) return Promise.resolve();
+    let loading = this.#loading.get(url);
+    if (loading === undefined) {
+      const image = new Image();
+      image.src = url;
+      loading = Promise.race([
+        image.decode().then(() => Texture.from(image)),
+        new Promise<undefined>((resolve) => setTimeout(resolve, IMAGE_TIMEOUT_MS, undefined)),
+      ])
+        .catch(() => undefined)
+        .then((texture) => {
+          this.#images.set(url, texture);
+          this.#loading.delete(url);
+        });
+      this.#loading.set(url, loading);
+    }
+    return loading;
+  }
+
+  #show(view: OutputView): void {
     const previous = this.#shown;
     if (
       previous !== undefined &&
@@ -100,6 +144,16 @@ export class Painter {
 
   get blackout(): boolean {
     return this.#latest?.blackout ?? false;
+  }
+
+  /** Chiamata dopo ogni disegno (anche quando uno sfondo finisce di caricarsi). */
+  onDrawn: (() => void) | undefined;
+
+  /** Immagine di sfondo attualmente disegnata, se c'e' (per le prove automatiche). */
+  get shownImage(): string {
+    const frame = this.#shown?.frame;
+    if (frame?.kind !== "fullscreen" || frame.image === undefined) return "";
+    return this.#images.get(frame.image) === undefined ? "" : frame.image;
   }
 
   /** Testo attualmente disegnato (per le prove automatiche). */
@@ -146,6 +200,7 @@ export class Painter {
     }
     this.#current = next;
     this.#stage.addChild(next);
+    this.onDrawn?.();
   }
 
   #render(frame: Frame): Container {
@@ -160,6 +215,22 @@ export class Painter {
     if (frame.kind === "black") return layer;
 
     layer.addChild(new Graphics().rect(0, 0, w, h).fill(frame.background));
+    const texture =
+      frame.kind === "fullscreen" && frame.image ? this.#images.get(frame.image) : undefined;
+    if (texture !== undefined && frame.kind === "fullscreen") {
+      // L'immagine riempie l'uscita senza deformarsi (il di piu' resta fuori).
+      const sprite = new Sprite(texture);
+      const fit = Math.max(w / texture.width, h / texture.height);
+      sprite.anchor.set(0.5);
+      sprite.scale.set(fit);
+      sprite.position.set(w / 2, h / 2);
+      layer.addChild(sprite);
+      if (frame.dim > 0) {
+        layer.addChild(
+          new Graphics().rect(0, 0, w, h).fill({ color: "#000000", alpha: frame.dim }),
+        );
+      }
+    }
     const scale = h / 1080;
     const margin = frame.style.margin * Math.min(w, h);
     const size = frame.style.size * scale;

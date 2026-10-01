@@ -9,7 +9,9 @@ import { useRun, useStation } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { FieldLabel, INPUT, ModalDialog } from "../ui/Dialogs.js";
 import { EmptyState, Panel } from "../ui/Panel.js";
+import { backgroundUrl } from "../station/backgrounds.js";
 import { SlideText } from "../ui/SlideText.js";
+import { BackgroundMenu } from "./BackgroundMenu.js";
 
 /**
  * Slide dell'elemento scelto, in miniature 16:9 disegnate col look Sala.
@@ -49,6 +51,8 @@ export function SlidesPanel() {
   const liveIndex =
     live.layers.content.visible && here(live.cursor) ? live.cursor.slideIndex : undefined;
   const previewIndex = here(live.preview) ? live.preview.slideIndex : undefined;
+  // La slide a cui si riferisce "sfondo della slide": quella in anteprima, o quella in onda.
+  const chosenIndex = previewIndex ?? liveIndex;
 
   return (
     <Panel
@@ -58,6 +62,11 @@ export function SlidesPanel() {
           <DirectActions item={item} />
         ) : (
           <div className="flex gap-1.5">
+            <BackgroundMenu
+              item={item}
+              slide={chosenIndex === undefined ? undefined : slides[chosenIndex]}
+              slideNumber={chosenIndex === undefined ? undefined : chosenIndex + 1}
+            />
             <SaveToLibrary item={item} />
             <Button
               size="sm"
@@ -117,7 +126,11 @@ export function SlidesPanel() {
                   }`}
                 >
                   <span className="absolute inset-0" style={{ containerType: "size" }}>
-                    <SlideText text={slideText(slide)} style={style} />
+                    <SlideText
+                      text={slideText(slide)}
+                      style={style}
+                      background={backgroundUrl(style, item, slide)}
+                    />
                   </span>
                   {slide.group !== undefined && (
                     <span

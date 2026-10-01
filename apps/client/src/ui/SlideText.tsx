@@ -17,9 +17,12 @@ export function SlideText({
   text,
   style,
   credits,
+  background,
 }: {
   text: string;
   style: FullscreenStyle | undefined;
+  /** Immagine di sfondo (indirizzo sul motore), col velo del look sopra. */
+  background?: string | undefined;
   /** Riga dei crediti, in piccolo in basso come sulle uscite. */
   credits?: string | undefined;
 }) {
@@ -38,7 +41,23 @@ export function SlideText({
       className="absolute inset-0 flex items-center justify-center leading-[1.25] whitespace-pre-line"
       style={css}
     >
-      <span className="w-full">{text}</span>
+      {background !== undefined && (
+        <span
+          data-testid="slide-background"
+          data-background={background}
+          aria-hidden="true"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url("${background}")` }}
+        />
+      )}
+      {background !== undefined && (style?.background.dim ?? 0) > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 bg-black"
+          style={{ opacity: style?.background.dim }}
+        />
+      )}
+      <span className="relative w-full">{text}</span>
       {credits !== undefined && (
         <span
           data-testid="credits"
