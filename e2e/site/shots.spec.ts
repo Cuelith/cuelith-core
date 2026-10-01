@@ -49,50 +49,50 @@ function backdrop(name: string, from: string, to: string, glow: string): string 
 
 const SONGS = [
   {
-    name: "luce-del-mattino.cho",
-    text: `{title: Luce del mattino}
-{artist: Tradizionale}
+    name: "strade-di-sera.cho",
+    text: `{title: Strade di sera}
+{artist: Cuelith demo}
 {start_of_verse: Verse 1}
-Luce del mattino, vieni su di noi
-riempi questo luogo, resta in mezzo a noi
+Strade di sera, luci accese su di noi
+la città respira piano insieme a noi
 {end_of_verse}
 {start_of_chorus: Chorus 1}
-Sei la nostra luce
-sei la nostra pace
+Resta ancora un po'
+la notte è appena qui
 {end_of_chorus}
 {start_of_verse: Verse 2}
-Quando scende sera, tu rimani qui
-ogni nostro passo lo conosci già
+Passi sul selciato, voci che non so
+ogni finestra accesa è una storia in più
 {end_of_verse}
 {start_of_bridge: Bridge 1}
-Dal mattino a sera
-canteremo a te
+E quando tornerà il mattino
+saremo ancora qui
 {end_of_bridge}
 `,
   },
   {
-    name: "sopra-ogni-cosa.cho",
-    text: `{title: Sopra ogni cosa}
-{artist: Tradizionale}
+    name: "mare-aperto.cho",
+    text: `{title: Mare aperto}
+{artist: Cuelith demo}
 {start_of_verse: Verse 1}
-Sopra ogni cosa il tuo nome sta
-più alto del cielo, più grande del mar
+Vento sulla prua, il porto è già lontano
+davanti solo il blu, il resto lo lasciamo
 {end_of_verse}
 {start_of_chorus: Chorus 1}
-A te la gloria
-a te l'onore
+Mare aperto
+portaci più in là
 {end_of_chorus}
 `,
   },
   {
-    name: "terra-nuova.cho",
-    text: `{title: Terra nuova}
-{artist: Tradizionale}
+    name: "il-viaggio.cho",
+    text: `{title: Il viaggio}
+{artist: Cuelith demo}
 {start_of_verse: Verse 1}
-Camminiamo insieme verso terra nuova
+Una valigia, un treno e poco più
 {end_of_verse}
 {start_of_chorus: Chorus 1}
-Una strada, un canto solo
+Il viaggio comincia da qui
 {end_of_chorus}
 `,
   },
@@ -148,11 +148,11 @@ test("schermate per il sito", async ({ running }) => {
   await station.getByRole("button", { name: /Nuovo show/ }).click();
   await station.getByRole("menuitem", { name: "Rinomina…" }).click();
   const rename = station.getByRole("dialog", { name: "Rinomina lo show" });
-  await rename.getByLabel("Nome").fill("Culto di domenica");
+  await rename.getByLabel("Nome").fill("Serata d'estate");
   await rename.getByRole("button", { name: "Salva" }).click();
   await expect(rename).toBeHidden();
 
-  // Uno show come quello di una domenica: canti, un saluto, gli avvisi.
+  // Uno show come quello di una serata: canzoni, un saluto, il programma.
   const side = await installSongs(running, songsPackage ?? "");
   await side.getByTestId("songs-import").setInputFiles(
     SONGS.map((song) => ({
@@ -162,13 +162,13 @@ test("schermate per il sito", async ({ running }) => {
     })),
   );
   const row = (title: string) => side.getByRole("option").filter({ hasText: title });
-  await expect(row("Terra nuova")).toBeVisible();
+  await expect(row("Il viaggio")).toBeVisible();
   const actions = side.getByRole("toolbar", { name: "Azioni sui canti selezionati" });
   const entries = station.getByRole("list", { name: "Voci della scaletta" }).getByRole("listitem");
   const playlist = station.getByRole("tab", { name: "Scaletta", exact: true });
   const songsTab = station.getByRole("tab", { name: "Canti", exact: true });
   let count = 0;
-  for (const title of ["Luce del mattino", "Sopra ogni cosa", "Terra nuova"]) {
+  for (const title of ["Strade di sera", "Mare aperto", "Il viaggio"]) {
     count++;
     const wanted = count;
     await expect(async () => {
@@ -182,10 +182,10 @@ test("schermate per il sito", async ({ running }) => {
   }
   await shotSongs(station, songsTab);
   await playlist.click();
-  await createText(station, "Benvenuti", ["Benvenuti\nSiamo felici che tu sia qui"]);
-  await createText(station, "Avvisi della settimana", [
-    "Giovedì ore 20:30\nIncontro di preghiera",
-    "Sabato ore 16\nProve del coro",
+  await createText(station, "Benvenuti", ["Benvenuti\nLa serata inizia tra poco"]);
+  await createText(station, "Programma della serata", [
+    "Ore 21:00\nApertura e saluti",
+    "Ore 22:30\nOspiti sul palco",
   ]);
   await expect(entries).toHaveCount(5);
 
@@ -198,7 +198,7 @@ test("schermate per il sito", async ({ running }) => {
   // Sfondi: uno per il primo canto, uno predefinito per tutto il resto.
   const backgrounds = station.getByRole("region", { name: "Sfondi" });
   const add = backgrounds.getByRole("button", { name: "Aggiungi un'immagine dal computer" });
-  await entries.filter({ hasText: "Luce del mattino" }).click();
+  await entries.filter({ hasText: "Strade di sera" }).click();
   await backgrounds.getByRole("radio", { name: /^Predefinito/ }).click();
   await chooseFiles(app, backdrop("notte", "#0E1B3A", "#1D3F6E", "#3E7FC4"));
   await add.click();
@@ -215,7 +215,7 @@ test("schermate per il sito", async ({ running }) => {
   // In onda la prima strofa, in anteprima il ritornello.
   await station.getByRole("button", { name: "Slide 1" }).dblclick();
   await station.getByRole("button", { name: "Slide 2" }).click();
-  await expect(projector.locator("body")).toHaveAttribute("data-text", /Luce del mattino/);
+  await expect(projector.locator("body")).toHaveAttribute("data-text", /Strade di sera/);
   await expect(projector.locator("body")).toHaveAttribute("data-background", /^\/media\//);
   await station.locator("header").first().hover();
   await station.waitForTimeout(600);
@@ -260,7 +260,7 @@ test("schermate per il sito", async ({ running }) => {
     await phone.page.getByLabel("Nome di questa postazione").fill("Telefono");
     await phone.page.getByRole("button", { name: "Abbina" }).click();
     await expect(phone.page.getByRole("region", { name: "Programma" })).toContainText(
-      "Luce del mattino",
+      "Strade di sera",
     );
     await shot(phone.page, "telecomando");
   } finally {
