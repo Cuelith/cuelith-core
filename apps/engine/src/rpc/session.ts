@@ -33,6 +33,8 @@ export class Session {
   local = false;
   subscribed = false;
   connectedAt: string | undefined;
+  /** Postazione abbinata in rete: il suo id stabile (per la revoca). */
+  pairedId: string | undefined;
   /** Solo per i processi dei moduli: il modulo e gli eventi che ascolta. */
   pluginId: string | undefined;
   events: ReadonlySet<string> = new Set();

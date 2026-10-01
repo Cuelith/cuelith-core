@@ -6,7 +6,9 @@ import type { Locales } from "./modules/locales.js";
 import type { Marketplace } from "./modules/marketplace.js";
 import type { ModuleRegistry } from "./modules/registry.js";
 import type { ModuleSupervisor } from "./modules/supervisor.js";
+import type { NetworkService } from "./network.js";
 import type { ResourceMonitor } from "./resources.js";
+import type { Session } from "./rpc/session.js";
 import type { ShowService } from "./show/service.js";
 import type { StateStore } from "./state/store.js";
 
@@ -28,5 +30,9 @@ export interface EngineContext {
   readonly shows: ShowService;
   readonly displays: DisplayProvider;
   readonly tokens: Tokens;
+  /** Connessioni aperte (postazioni e uscite): per scollegare una postazione revocata. */
+  readonly sessions: Set<Session>;
+  /** Ascolto in rete locale per le altre postazioni (passo 8). */
+  readonly network: NetworkService;
   readonly logger: Logger;
 }

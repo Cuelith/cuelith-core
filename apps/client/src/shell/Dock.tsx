@@ -1,3 +1,4 @@
+import { useCan } from "../station/roles.js";
 import { useT } from "../engine/react.js";
 import type { ModulePanel } from "../station/modulePanels.js";
 import { showTab } from "../station/tabs.js";
@@ -26,6 +27,7 @@ export function Dock({
 }) {
   const t = useT();
   const tools = panels.filter((panel) => panel.placement === "side");
+  const canManage = useCan("plugins");
   return (
     <nav
       aria-label={t("core.dock.label")}
@@ -49,15 +51,17 @@ export function Dock({
           )}
         </button>
       ))}
-      <button
-        type="button"
-        onClick={onManageModules}
-        aria-label={t("core.dock.addModule")}
-        title={t("core.dock.addModule")}
-        className="grid h-9 w-9 place-items-center rounded-lg border border-dashed border-faint text-lg leading-none text-muted hover:border-muted hover:text-fg"
-      >
-        +
-      </button>
+      {canManage && (
+        <button
+          type="button"
+          onClick={onManageModules}
+          aria-label={t("core.dock.addModule")}
+          title={t("core.dock.addModule")}
+          className="grid h-9 w-9 place-items-center rounded-lg border border-dashed border-faint text-lg leading-none text-muted hover:border-muted hover:text-fg"
+        >
+          +
+        </button>
+      )}
     </nav>
   );
 }

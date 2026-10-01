@@ -16,6 +16,7 @@
     "@cuelith-core/engine-client": "workspace:*",
     "@cuelith/protocol": "link:../../../cuelith-sdk/packages/protocol",
     "@cuelith/ui": "link:../../../cuelith-sdk/packages/ui",
+    "qrcode-generator": "2.0.4",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

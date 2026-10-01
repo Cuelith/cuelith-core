@@ -1,3 +1,4 @@
+import { useCan } from "../station/roles.js";
 import { ResourcesIndicator } from "./Resources.js";
 import { useEngine, useT } from "../engine/react.js";
 import type { Mode } from "../modes/core.js";
@@ -122,6 +123,7 @@ function OutputsBar({ onManage }: { onManage: () => void }) {
   const { state } = useEngine();
   const run = useRun();
   const outputs = Object.values(state?.show.outputs ?? {});
+  const canConfigure = useCan("output.config");
   return (
     <div
       role="group"
@@ -175,9 +177,11 @@ function OutputsBar({ onManage }: { onManage: () => void }) {
           </div>
         );
       })}
-      <Button size="sm" onClick={onManage}>
-        {t(outputs.length === 0 ? "core.outputs.add" : "core.outputs.manage")}
-      </Button>
+      {canConfigure && (
+        <Button size="sm" onClick={onManage}>
+          {t(outputs.length === 0 ? "core.outputs.add" : "core.outputs.manage")}
+        </Button>
+      )}
     </div>
   );
 }

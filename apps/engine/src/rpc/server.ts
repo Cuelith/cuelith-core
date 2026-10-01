@@ -29,7 +29,7 @@ export interface RpcServer {
 
 export function attachRpcServer(http: Server, ctx: EngineContext, handlers: HandlerMap): RpcServer {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD });
-  const sessions = new Set<Session>();
+  const sessions = ctx.sessions;
   const alive = new WeakMap<WebSocket, boolean>();
 
   http.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) => {

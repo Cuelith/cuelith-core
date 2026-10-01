@@ -51,6 +51,9 @@ export async function startTestEngine(options: TestEngineOptions = {}): Promise<
     },
     ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
     ...(options.moduleTimings === undefined ? {} : { moduleTimings: options.moduleTimings }),
+    // Nelle prove: porta di rete qualsiasi e nessun annuncio in rete.
+    lanPort: 0,
+    announce: false,
     ...(options.autosaveIntervalMs === undefined
       ? {}
       : { autosaveIntervalMs: options.autosaveIntervalMs }),
@@ -92,9 +95,10 @@ export class TestClient {
     });
   }
 
-  static async connect(engine: Engine, origin?: string): Promise<TestClient> {
+  /** `host` = indirizzo:porta dell'ascolto in rete; assente = il motore locale. */
+  static async connect(engine: Engine, origin?: string, host?: string): Promise<TestClient> {
     const ws = new WebSocket(
-      `ws://127.0.0.1:${engine.port}/rpc`,
+      `ws://${host ?? `127.0.0.1:${String(engine.port)}`}/rpc`,
       origin === undefined ? {} : { origin },
     );
     await new Promise<void>((resolveOpen, reject) => {
@@ -104,6 +108,11 @@ export class TestClient {
       ws.once("error", reject);
     });
     return new TestClient(ws);
+  }
+
+  /** Vero quando il motore ha chiuso il collegamento (es. postazione revocata). */
+  get closed(): boolean {
+    return this.#ws.readyState === WebSocket.CLOSED;
   }
 
   call(method: string, params?: unknown): Promise<RpcResponse> {

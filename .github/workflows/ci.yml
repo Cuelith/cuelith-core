@@ -81,7 +81,7 @@ jobs:
         working-directory: cuelith-core
         run: |
           pnpm -C apps/desktop run dist:dir
-          CUELITH_E2E_EXECUTABLE="$PWD/apps/desktop/pack/release/linux-unpacked/cuelith"             xvfb-run -a pnpm -C e2e exec playwright test station processes
+          CUELITH_E2E_EXECUTABLE="$PWD/apps/desktop/pack/release/linux-unpacked/cuelith"             xvfb-run -a pnpm -C e2e exec playwright test station processes network
       - name: Screenshot delle prove
         if: always()
         uses: actions/upload-artifact@v7

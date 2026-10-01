@@ -1,4 +1,5 @@
 import type { AddressInfo } from "node:net";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_ENGINE_PORT, REGISTRY_INDEX_URL, type Lang } from "@cuelith/protocol";
 import { Tokens } from "./auth.js";
@@ -12,6 +13,7 @@ import { ModuleRegistry } from "./modules/registry.js";
 import type { NodeRuntime } from "./modules/sandbox.js";
 import { ModuleSupervisor, type SupervisorTimings } from "./modules/supervisor.js";
 import { pluginSelfHandlers } from "./rpc/handlers/pluginSelf.js";
+import { NetworkService } from "./network.js";
 import { processMetrics, ResourceMonitor, type MetricsProvider } from "./resources.js";
 import { pluginHandlers } from "./rpc/handlers/plugins.js";
 import { dispatch, type HandlerMap } from "./rpc/dispatch.js";
@@ -52,6 +54,10 @@ export interface EngineOptions {
   readonly fetch?: Fetch;
   /** Eseguibile Node per i moduli (predefinito: quello del motore, vedi sandbox.ts). */
   readonly nodeRuntime?: NodeRuntime;
+  /** Porta dell'ascolto in rete per le altre postazioni (predefinita 7420; 0 nelle prove). */
+  readonly lanPort?: number;
+  /** Annuncio in rete `_cuelith._tcp` (predefinito acceso; spento nelle prove). */
+  readonly announce?: boolean;
   /** Misure dei processi (il desktop usa quelle di Electron); predefinito: solo il motore. */
   readonly metrics?: MetricsProvider;
   /** Solo per le prove: tempi dei processi dei moduli. */
@@ -157,6 +163,27 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     logger,
   });
 
+  const tokens = new Tokens();
+  await tokens.load(join(options.paths.data, "stations.json"));
+
+  const http = createHttpServer(
+    {
+      ...options.paths,
+      media: library.media.dir,
+      pluginDir: (id, version) => modules.dirOf(id, version),
+    },
+    logger,
+  );
+  const network = new NetworkService({
+    local: http,
+    store,
+    logger,
+    file: join(options.paths.data, "network.json"),
+    port: options.lanPort ?? DEFAULT_ENGINE_PORT,
+    name: `Cuelith (${hostname()})`,
+    announce: options.announce ?? true,
+  });
+
   const context: EngineContext = {
     version: options.version,
     store,
@@ -168,7 +195,9 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     library,
     shows,
     displays: options.displays,
-    tokens: new Tokens(),
+    tokens,
+    sessions: new Set(),
+    network,
     logger,
   };
 
@@ -178,14 +207,6 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     supervisor.sync();
   });
 
-  const http = createHttpServer(
-    {
-      ...options.paths,
-      media: library.media.dir,
-      pluginDir: (id, version) => modules.dirOf(id, version),
-    },
-    logger,
-  );
   const rpc = attachRpcServer(http, context, handlers);
 
   await new Promise<void>((resolve, reject) => {
@@ -199,6 +220,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   await shows.start();
   await supervisor.start();
   await resources.start();
+  await network.start();
   logger.info(`motore in ascolto su http://${host}:${port}`);
 
   return {
@@ -216,6 +238,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
       });
     },
     stop: async () => {
+      await network.stop();
       await resources.stop();
       await supervisor.stop();
       await shows.stop();

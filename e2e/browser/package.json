@@ -1,0 +1,5 @@
+{
+  "name": "cuelith-e2e-browser",
+  "private": true,
+  "main": "main.cjs"
+}

@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
-import { EngineConnection, type Credentials } from "@cuelith-core/engine-client";
+import { EngineConnection, type Credentials, type PairingStore } from "@cuelith-core/engine-client";
 import { ConnectionProvider } from "./engine/react.js";
 import { PanelWindow, panelWindowRequest } from "./shell/PanelWindow.js";
 import type { DesktopApp } from "./station/appInfo.js";
@@ -39,15 +39,54 @@ declare global {
   }
 }
 
+/** Postazione da browser: il token ricevuto con l'abbinamento resta in questo browser. */
+const STATION_KEY = "cuelith.station";
+
+function storedStation(): { token: string; name: string } | undefined {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STATION_KEY) ?? "null") as {
+      token?: unknown;
+      name?: unknown;
+    } | null;
+    return typeof raw?.token === "string" && typeof raw.name === "string"
+      ? { token: raw.token, name: raw.name }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const pairing: PairingStore = {
+  save: (token, name) => {
+    try {
+      localStorage.setItem(STATION_KEY, JSON.stringify({ token, name }));
+    } catch {
+      // Senza memoria locale l'abbinamento vale finche' la pagina resta aperta.
+    }
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem(STATION_KEY);
+    } catch {
+      // Niente da dimenticare.
+    }
+  },
+};
+
 async function credentials(): Promise<Credentials> {
   const desktop = window.cuelithDesktop;
   if (desktop !== undefined) return desktop.getLocalSession();
-  // Postazione da browser: il token arriva con l'abbinamento delle postazioni in rete.
-  return { name: navigator.userAgent, token: undefined };
+  // In rete: il token dell'abbinamento, se questa postazione e' gia' abbinata.
+  const station = storedStation();
+  return { name: station?.name ?? "Browser", token: station?.token };
 }
 
 const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/rpc`;
-const connection = new EngineConnection(url, credentials);
+const connection = new EngineConnection(
+  url,
+  credentials,
+  window.cuelithDesktop === undefined ? pairing : undefined,
+);
 connection.start();
 
 // La stessa pagina fa anche da finestra propria di un pannello di modulo.

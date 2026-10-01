@@ -1,17 +1,21 @@
 import { isOnAir, PROTOCOL_VERSION, type Lang } from "@cuelith/protocol";
 import { useAppInfo, type AppInfo } from "../station/appInfo.js";
+import { useCan } from "../station/roles.js";
+import { NetworkSection } from "./NetworkSection.js";
 import { ResourcesSection } from "./Resources.js";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
 import { Button } from "../ui/Button.js";
 import { ModalDialog } from "../ui/Dialogs.js";
 
-export type Section = "general" | "shortcuts" | "outputs" | "modules" | "resources" | "about";
+export type Section =
+  "general" | "shortcuts" | "outputs" | "modules" | "network" | "resources" | "about";
 const SECTIONS: readonly Section[] = [
   "general",
   "shortcuts",
   "outputs",
   "modules",
+  "network",
   "resources",
   "about",
 ];
@@ -50,6 +54,13 @@ export function SettingsDialog({
   const t = useT();
   const baseId = useId();
   const [section, setSection] = useState<Section>(initialSection);
+  // Solo le sezioni che il ruolo di questa postazione puo' usare.
+  const can = {
+    outputs: useCan("output.config"),
+    modules: useCan("plugins"),
+    network: useCan("admin"),
+  };
+  const sections = SECTIONS.filter((id) => !(id in can) || can[id as keyof typeof can]);
   return (
     <ModalDialog title={t("core.settings.title")} onClose={onClose} wide>
       {(close) => (
@@ -58,7 +69,7 @@ export function SettingsDialog({
             aria-label={t("core.settings.sections")}
             className="flex shrink-0 flex-wrap gap-1 border-b border-line p-2 sm:w-48 sm:flex-col sm:flex-nowrap sm:border-r sm:border-b-0"
           >
-            {SECTIONS.map((id) => (
+            {sections.map((id) => (
               <button
                 key={id}
                 type="button"
@@ -105,6 +116,7 @@ export function SettingsDialog({
                 </Button>
               </Row>
             )}
+            {section === "network" && <NetworkSection />}
             {section === "resources" && <ResourcesSection />}
             {section === "about" && <About />}
             <div className="mt-auto flex justify-end">

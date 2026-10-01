@@ -54,6 +54,14 @@ export interface Credentials {
   readonly token: string | undefined;
 }
 
+/** Per le postazioni in rete: dove tenere il token ricevuto con l'abbinamento. */
+export interface PairingStore {
+  /** Abbinata: il token va conservato per i prossimi collegamenti. */
+  save(token: string, name: string): void;
+  /** Il motore non riconosce piu' il token (postazione revocata): va dimenticato. */
+  clear(): void;
+}
+
 const CALL_TIMEOUT_MS = 10_000;
 const RETRY_MIN_MS = 500;
 const RETRY_MAX_MS = 5_000;
@@ -96,6 +104,7 @@ function writeCachedCatalog(value: CachedCatalog): void {
 export class EngineConnection {
   readonly #url: string;
   readonly #credentials: () => Promise<Credentials>;
+  readonly #pairing: PairingStore | undefined;
   readonly #listeners = new Set<() => void>();
   readonly #pending = new Map<number, Pending>();
   #ws: WebSocket | undefined;
@@ -107,9 +116,10 @@ export class EngineConnection {
   #buffer: { rev: number; ops: readonly JsonPatchOperation[] }[] | undefined;
   #snapshot: EngineSnapshot;
 
-  constructor(url: string, credentials: () => Promise<Credentials>) {
+  constructor(url: string, credentials: () => Promise<Credentials>, pairing?: PairingStore) {
     this.#url = url;
     this.#credentials = credentials;
+    this.#pairing = pairing;
     const cached = readCachedCatalog();
     this.#snapshot = {
       status: { kind: "connecting" },
@@ -193,16 +203,33 @@ export class EngineConnection {
       client: { name, kind: "client" },
     });
     this.#set({ engineVersion: hello.engine.version });
+    // I testi prima dell'accesso: servono anche alla schermata di abbinamento.
+    await this.#loadCatalog();
     if (token === undefined) {
       this.#set({ status: { kind: "unpaired" } });
       return;
     }
+    await this.#enter(token);
+  }
+
+  /** Accesso col token, poi lo stato: da qui la postazione e' collegata. */
+  async #enter(token: string): Promise<void> {
     const auth = await this.call("session.auth", { token });
     this.#set({ role: auth.role });
-    await this.#loadCatalog();
     await this.#resync();
     this.#retryMs = RETRY_MIN_MS;
     this.#set({ status: { kind: "connected" } });
+  }
+
+  /**
+   * Abbinamento di una postazione in rete (cap. 23): col codice a 6 cifre
+   * mostrato sul motore si riceve un token, che resta in questa postazione.
+   * Lancia EngineCallError se il codice e' sbagliato o scaduto.
+   */
+  async pair(code: string, name: string): Promise<void> {
+    const { token } = await this.call("session.pair", { code, name });
+    this.#pairing?.save(token, name);
+    await this.#enter(token);
   }
 
   #onHandshakeError(error: unknown): void {
@@ -215,7 +242,9 @@ export class EngineConnection {
       return;
     }
     if (error instanceof EngineCallError && error.code === ErrorCode.NotPaired) {
-      this.#set({ status: { kind: "unpaired" } });
+      // Token non piu' valido (postazione revocata): si torna all'abbinamento.
+      this.#pairing?.clear();
+      this.#set({ status: { kind: "unpaired" }, state: undefined, role: undefined });
       return;
     }
     this.#ws?.close();

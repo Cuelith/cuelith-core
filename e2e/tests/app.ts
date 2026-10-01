@@ -58,6 +58,9 @@ export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp
         CUELITH_PORT: "0",
         // L'app impacchettata nelle prove non controlla gli aggiornamenti su GitHub.
         CUELITH_UPDATES: "off",
+        // Postazioni in rete: porta qualsiasi e nessun annuncio (prove in parallelo, CI).
+        CUELITH_LAN_PORT: "0",
+        CUELITH_ANNOUNCE: "off",
       },
     });
   } catch (error) {
@@ -236,4 +239,58 @@ export async function outputWindow(running: RunningApp, name: string): Promise<P
   if (window === undefined) throw new Error(`finestra di ${name} non trovata`);
   await expect(window.locator("body")).toHaveAttribute("data-state", "ready");
   return window;
+}
+
+export interface BrowserStation {
+  readonly page: Page;
+  /** Errori in console e richieste verso host diversi dal motore. */
+  readonly problems: string[];
+  close(): Promise<void>;
+}
+
+/**
+ * Apre un indirizzo come farebbe un altro dispositivo in rete (tablet,
+ * telefono): un browser senza nulla di Cuelith (e2e/browser), con un
+ * profilo suo.
+ */
+export async function launchBrowser(
+  url: string,
+  size: { width: number; height: number } = { width: 1280, height: 800 },
+): Promise<BrowserStation> {
+  const userData = await mkdtemp(path.join(os.tmpdir(), "cuelith-browser-"));
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && key !== "ELECTRON_RUN_AS_NODE") env[key] = value;
+  }
+  const app = await electron.launch({
+    executablePath: electronPath,
+    args: [path.resolve(here, "../browser")],
+    env: {
+      ...env,
+      CUELITH_BROWSER_PROFILE: userData,
+      CUELITH_BROWSER_URL: url,
+      CUELITH_BROWSER_SIZE: `${String(size.width)}x${String(size.height)}`,
+    },
+  });
+  const page = await app.firstWindow();
+  const host = new URL(url).hostname;
+  const problems: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") problems.push(`console: ${message.text()}`);
+  });
+  page.on("pageerror", (error) => problems.push(`pagina: ${error.message}`));
+  page.on("request", (request) => {
+    const target = new URL(request.url());
+    if (target.hostname !== host && !["data:", "blob:"].includes(target.protocol)) {
+      problems.push(`richiesta esterna: ${request.url()}`);
+    }
+  });
+  return {
+    page,
+    problems,
+    close: async () => {
+      await app.close().catch(() => undefined);
+      await rm(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    },
+  };
 }

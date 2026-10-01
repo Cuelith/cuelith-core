@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { useEngine, useT } from "./engine/react.js";
+import { PairingScreen } from "./shell/Pairing.js";
+import { RemoteView } from "./shell/RemoteView.js";
 import { Shell } from "./shell/Shell.js";
 
 /**
@@ -20,7 +22,7 @@ function Splash({ status, busy }: { status: string; busy: boolean }) {
 
 export function App() {
   const t = useT();
-  const { status, state, lang } = useEngine();
+  const { status, state, lang, role } = useEngine();
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -43,10 +45,17 @@ export function App() {
     );
   }
   if (status.kind === "unpaired") {
-    return <Splash busy={false} status={t("core.pairing.required")} />;
+    // In rete: la postazione si abbina col codice mostrato sul motore.
+    return window.cuelithDesktop === undefined ? (
+      <PairingScreen />
+    ) : (
+      <Splash busy={false} status={t("core.pairing.required")} />
+    );
   }
   if (state === undefined) {
     return <Splash busy status={t("core.connection.connecting")} />;
   }
+  // Telecomando e visualizzatore hanno una schermata loro, semplice (cap. 9).
+  if (role === "remote" || role === "viewer") return <RemoteView canControl={role === "remote"} />;
   return <Shell />;
 }

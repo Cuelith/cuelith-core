@@ -141,3 +141,52 @@ describe("moduli e testi", () => {
     await until(connection, (s) => s.catalog["cuelith.greetings.hello"] === "Ciao");
   });
 });
+
+describe("postazioni in rete: abbinamento", () => {
+  it("senza token legge i testi, si abbina col codice, conserva il token; revocata torna da abbinare", async () => {
+    const engine = await engineOn();
+    cleanup.push(() => engine.stop());
+    const saved: { token?: string; name?: string } = {};
+    const connection = new EngineConnection(
+      `ws://127.0.0.1:${engine.port}/rpc`,
+      () => Promise.resolve({ name: "Tablet", token: saved.token }),
+      {
+        save: (token, name) => {
+          saved.token = token;
+          saved.name = name;
+        },
+        clear: () => {
+          delete saved.token;
+        },
+      },
+    );
+    connection.start();
+    cleanup.push(() => {
+      connection.stop();
+    });
+    // Da abbinare, ma coi testi gia' in italiano per la schermata del codice.
+    const waiting = await until(connection, (s) => s.status.kind === "unpaired");
+    expect(waiting.catalog["core.mode.present"]).toBe("Presenta");
+    expect(waiting.state).toBeUndefined();
+
+    await expect(connection.pair("000000", "Tablet")).rejects.toMatchObject({
+      message: "core.pairing.codeExpired",
+    });
+    const { code } = engine.context.tokens.startPairing("operator");
+    await connection.pair(code, "Tablet del palco");
+    const paired = await until(connection, (s) => s.status.kind === "connected");
+    expect(paired.role).toBe("operator");
+    expect(paired.state?.show.name).toBe("Nuovo show");
+    expect(saved.name).toBe("Tablet del palco");
+
+    // Revocata dal motore: scollegata, token dimenticato, di nuovo da abbinare.
+    const id = engine.context.tokens.paired()[0]?.id ?? "";
+    await engine.context.tokens.revoke(id);
+    for (const session of engine.context.sessions) {
+      if (session.pairedId === id) session.close(4010, "revoked");
+    }
+    const revoked = await until(connection, (s) => s.status.kind === "unpaired", 10_000);
+    expect(revoked.state).toBeUndefined();
+    expect(saved.token).toBeUndefined();
+  });
+});

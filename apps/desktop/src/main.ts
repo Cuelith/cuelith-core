@@ -39,6 +39,9 @@ const autosaveOverride = process.env["CUELITH_AUTOSAVE_MS"];
 const testRegistryDir = process.env["CUELITH_TEST_REGISTRY_DIR"];
 // Prove sull'app impacchettata: niente controlli verso GitHub.
 const updatesOff = process.env["CUELITH_UPDATES"] === "off";
+// Prove delle postazioni in rete: porta qualsiasi e nessun annuncio in rete.
+const lanPortOverride = process.env["CUELITH_LAN_PORT"];
+const announceOff = process.env["CUELITH_ANNOUNCE"] === "off";
 
 app.enableSandbox();
 
@@ -73,6 +76,8 @@ async function launchEngine(): Promise<Engine> {
     ...(autosaveOverride === undefined ? {} : { autosaveIntervalMs: Number(autosaveOverride) }),
     ...(testRegistryDir === undefined ? {} : { fetch: folderFetch(testRegistryDir) }),
     displays: electronDisplays,
+    ...(lanPortOverride === undefined ? {} : { lanPort: Number(lanPortOverride) }),
+    ...(announceOff ? { announce: false } : {}),
     metrics: electronMetrics({
       stationPid: () =>
         station === undefined || station.isDestroyed()
