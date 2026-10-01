@@ -32,6 +32,13 @@ jobs:
           repository: Cuelith/plugin-songs
           ref: dev
           path: plugin-songs
+      # Il modulo d'esempio hello-panel, per la prova dei processi dei moduli
+      # (e2e/tests/processes.spec.ts).
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/plugin-template
+          ref: dev
+          path: plugin-template
       - uses: pnpm/action-setup@v6
         with:
           package_json_file: cuelith-core/package.json
@@ -44,6 +51,10 @@ jobs:
         run: pnpm install --frozen-lockfile && pnpm build
       - name: Modulo Canti
         working-directory: plugin-songs
+        run: pnpm install --frozen-lockfile && pnpm build
+
+      - name: Modulo d'esempio
+        working-directory: plugin-template
         run: pnpm install --frozen-lockfile && pnpm build
 
       - name: Installazione

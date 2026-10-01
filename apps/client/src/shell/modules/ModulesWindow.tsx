@@ -1,4 +1,5 @@
 import {
+  hasFullAccess,
   isActivePlugin,
   type InstalledPlugin,
   type PluginManifest,
@@ -354,6 +355,9 @@ function Marketplace({
                     ))}
                   </ul>
                 )}
+                {hasFullAccess(permissions) && (
+                  <p className="text-sm text-stage">{t("core.modules.fullAccess")}</p>
+                )}
                 {!confirm.plugin.verified && (
                   <p className="text-sm text-stage">{t("core.modules.unverifiedHint")}</p>
                 )}
@@ -381,9 +385,9 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
   const [removing, setRemoving] = useState<InstalledPlugin | undefined>();
   const desktop = window.cuelithDesktop;
 
-  const installFromFile = async () => {
+  const installFromFile = async (kind: "file" | "folder") => {
     if (desktop === undefined) return;
-    const path = await desktop.chooseModuleFile();
+    const path = await desktop.chooseModuleFile(kind);
     if (path === undefined) return;
     const done = await run("plugin.install", { path });
     if (done === undefined) return;
@@ -472,8 +476,19 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
         })}
       </ul>
       <div className="flex items-center gap-3 border-t border-line pt-3">
-        <Button size="sm" disabled={desktop === undefined} onClick={() => void installFromFile()}>
+        <Button
+          size="sm"
+          disabled={desktop === undefined}
+          onClick={() => void installFromFile("file")}
+        >
           {t("core.modules.installFromFile")}
+        </Button>
+        <Button
+          size="sm"
+          disabled={desktop === undefined}
+          onClick={() => void installFromFile("folder")}
+        >
+          {t("core.modules.installFromFolder")}
         </Button>
         <span className="text-xs text-faint">{t("core.modules.installFromFileHint")}</span>
       </div>

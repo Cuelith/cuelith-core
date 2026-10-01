@@ -376,12 +376,12 @@ async function main(): Promise<void> {
     await saveTextFile(station, engine, name, content);
   });
 
-  ipcMain.handle("cuelith:choose-module-file", async (event) => {
+  ipcMain.handle("cuelith:choose-module-file", async (event, kind: unknown) => {
     const role = trusted.get(event.sender.id);
     if (role !== "station" || station === undefined || engine === undefined) {
       throw new Error("richiesta non autorizzata");
     }
-    return chooseModuleFile(station, engine);
+    return chooseModuleFile(station, engine, kind === "folder" ? "folder" : "file");
   });
 
   // Documentazione dei moduli nel browser del sistema: solo indirizzi https.

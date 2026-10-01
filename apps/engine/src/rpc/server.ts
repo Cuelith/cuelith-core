@@ -4,7 +4,7 @@ import { parseRpcMessage, rpcNotification, RPC_PATH } from "@cuelith/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { EngineContext } from "../context.js";
 import { dispatch, type HandlerMap } from "./dispatch.js";
-import { Session } from "./session.js";
+import { Session, socketTransport } from "./session.js";
 
 const HEARTBEAT_MS = 10_000;
 /** Dimensione massima di un messaggio in arrivo: nessun comando e' cosi' grande. */
@@ -43,7 +43,7 @@ export function attachRpcServer(http: Server, ctx: EngineContext, handlers: Hand
   });
 
   wss.on("connection", (ws: WebSocket) => {
-    const session = new Session(ws);
+    const session = new Session(socketTransport(ws));
     sessions.add(session);
     alive.set(ws, true);
     ws.on("pong", () => alive.set(ws, true));

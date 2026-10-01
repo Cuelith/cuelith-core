@@ -1,7 +1,13 @@
 import { randomBytes } from "node:crypto";
 import { cp, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
-import { ErrorCode, RpcError, type InstalledPlugin, type PluginStatus } from "@cuelith/protocol";
+import {
+  ErrorCode,
+  RpcError,
+  type InstalledPlugin,
+  type PluginState,
+  type PluginStatus,
+} from "@cuelith/protocol";
 import { z } from "zod";
 import type { Logger } from "../log.js";
 import { writeFileAtomic } from "../show/files.js";
@@ -46,8 +52,9 @@ const EMPTY_STATE: State = { schema: 1, installed: {}, disabled: [] };
  * Moduli noti al motore (cap. 13 e 24). Il nucleo non conosce i moduli: li
  * trova nelle cartelle dei preinstallati e in quella dei moduli installati
  * (una sottocartella per versione, cap. 26). Attivare o disattivare un modulo
- * non richiede riavvii. I moduli con codice (runtime node/native) si
- * installano ma partono col passo 9b.
+ * non richiede riavvii. I moduli con codice (runtime node/native) girano
+ * nei loro processi, seguiti dal ModuleSupervisor (passo 9b): il loro stato
+ * arriva da li' (setRuntimeStatus).
  */
 export class ModuleRegistry {
   readonly #bundled = new Map<string, LoadedModule>();
@@ -58,6 +65,8 @@ export class ModuleRegistry {
   #engineVersion = "0.0.0";
   #queue: Promise<unknown> = Promise.resolve();
   readonly #listeners = new Set<() => void>();
+  #runtimeStatus: (id: string) => { state: PluginState; error?: string } | undefined = () =>
+    undefined;
 
   constructor(logger: Logger) {
     this.#logger = logger;
@@ -176,9 +185,16 @@ export class ModuleRegistry {
     return [...new Set([...this.#bundled.keys(), ...this.#installed.keys()])];
   }
 
-  /** Motivo per cui un modulo acceso non gira ancora (chiave), o undefined. */
-  #runtimeBlock(module: LoadedModule): string | undefined {
-    return module.manifest.runtime.type === "none" ? undefined : "core.module.runtimeNotYet";
+  /** Stato dei processi dei moduli con codice (dal ModuleSupervisor). */
+  setRuntimeStatus(
+    provider: (id: string) => { state: PluginState; error?: string } | undefined,
+  ): void {
+    this.#runtimeStatus = provider;
+  }
+
+  /** Il modulo attivo con quell'id, se c'e'. */
+  find(id: string): LoadedModule | undefined {
+    return this.active().find((m) => m.manifest.id === id);
   }
 
   /** Cartella del modulo in uso con quell'id e quella versione (per servirne i file). */
@@ -191,12 +207,7 @@ export class ModuleRegistry {
   active(): LoadedModule[] {
     return this.#ids().flatMap((id) => {
       const { module, enabled, error } = this.#current(id);
-      return module !== undefined &&
-        enabled &&
-        error === undefined &&
-        this.#runtimeBlock(module) === undefined
-        ? [module]
-        : [];
+      return module !== undefined && enabled && error === undefined ? [module] : [];
     });
   }
 
@@ -211,10 +222,11 @@ export class ModuleRegistry {
         ];
       }
       if (!enabled) return [{ id, version, state: "disabled" as const }];
-      const blocked = this.#runtimeBlock(module);
-      return blocked === undefined
-        ? [{ id, version, state: "active" as const }]
-        : [{ id, version, state: "installed" as const, error: blocked }];
+      if (module.manifest.runtime.type === "none")
+        return [{ id, version, state: "active" as const }];
+      // Modulo con codice: lo stato del suo processo (in avvio finche' non risponde).
+      const runtime = this.#runtimeStatus(id) ?? { state: "enabled" as const };
+      return [{ id, version, ...runtime }];
     });
   }
 
@@ -267,7 +279,8 @@ export class ModuleRegistry {
         else
           await cp(input.dir, staging, {
             recursive: true,
-            filter: (src) => !src.includes("node_modules"),
+            // Una cartella di sviluppo: niente dipendenze e niente storia di git.
+            filter: (src) => !/[\\/](?:node_modules|\.git)(?:[\\/]|$)/.test(src),
           });
 
         let module: LoadedModule;

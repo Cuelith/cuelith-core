@@ -8,8 +8,7 @@ import {
   PANEL_CONNECT,
   PANEL_HOST_METHODS,
   PanelToHostSchema,
-  pluginRole,
-  roleAllows,
+  panelAllows,
   type Catalog,
   type HostToPanel,
 } from "@cuelith/protocol";
@@ -75,8 +74,6 @@ export function ModulePanelFrame({
   useEffect(() => {
     const element = frame.current;
     if (element === null) return;
-    const role = pluginRole(panel.pluginId);
-
     const send = (message: HostToPanel) => {
       port.current?.postMessage(message);
     };
@@ -143,7 +140,8 @@ export function ModulePanelFrame({
         fail(ErrorCode.MethodNotFound, "core.error.methodNotFound");
         return;
       }
-      if (!roleAllows(role, method, EngineMethods[method].scope)) {
+      // Come il modulo, senza i metodi del suo processo; comandi solo i propri.
+      if (!panelAllows(panel.pluginId, method, EngineMethods[method].scope, params)) {
         fail(ErrorCode.Forbidden, "core.error.forbidden");
         return;
       }

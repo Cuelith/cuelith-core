@@ -49,4 +49,14 @@ export const pluginHandlers: HandlerMap = {
     await ctx.modules.uninstall(params.pluginId);
     return {};
   },
+
+  /** Comando di un modulo, eseguito nel suo processo (risposta entro 5 secondi). */
+  "plugin.command": async (ctx, session, params) => ({
+    result: await ctx.supervisor.command(
+      session.pluginId,
+      params.pluginId,
+      params.command,
+      params.params ?? {},
+    ),
+  }),
 };

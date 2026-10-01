@@ -15,8 +15,8 @@ declare global {
       readonly chooseShowFile: (kind: "open" | "save") => Promise<string | undefined>;
       /** Finestra nativa per scegliere file da importare nell'archivio media. */
       readonly chooseMediaFiles: (kind: "audio" | "image") => Promise<string[]>;
-      /** Finestra nativa per scegliere un pacchetto di modulo (.cpkg). */
-      readonly chooseModuleFile: () => Promise<string | undefined>;
+      /** Finestra nativa per scegliere un pacchetto di modulo (.cpkg) o la sua cartella. */
+      readonly chooseModuleFile: (kind: "file" | "folder") => Promise<string | undefined>;
       /** Finestra "Salva" del sistema per un file di testo (es. un canto esportato). */
       readonly saveTextFile: (name: string, content: string) => Promise<void>;
       /** Apre un indirizzo https nel browser del sistema (documentazione dei moduli). */

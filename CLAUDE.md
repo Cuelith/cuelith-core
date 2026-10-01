@@ -6,7 +6,7 @@ Il contenitore di Cuelith: motore live, applicazione desktop (Electron), postazi
 
 ## Struttura
 
-- `apps/engine` — motore (Node puro, senza Electron): stato dello show, comandi, moduli, server HTTP + WebSocket (`/rpc`) su `127.0.0.1:7420`. Unica fonte di verità. File `.cuelith` e copia automatica in `src/show/`; librerie e archivio (SQLite `node:sqlite`, `library.sqlite` nella cartella dati) e archivio media (`media/`, nomi = SHA-256) in `src/library/`. I comandi che toccano file del computer del motore sono solo per la postazione locale.
+- `apps/engine` — motore (Node puro, senza Electron): stato dello show, comandi, moduli, server HTTP + WebSocket (`/rpc`) su `127.0.0.1:7420`. Unica fonte di verità. I moduli con codice girano in processi separati (`src/modules/supervisor.ts`, decisione 0007): permessi di Node + controllo della rete (`sandbox.ts`), JSON-RPC su stdio (`process.ts`), riavvii 3 in 60 s, risposta entro 5 s. File `.cuelith` e copia automatica in `src/show/`; librerie e archivio (SQLite `node:sqlite`, `library.sqlite` nella cartella dati) e archivio media (`media/`, nomi = SHA-256) in `src/library/`. I comandi che toccano file del computer del motore sono solo per la postazione locale.
 - `apps/desktop` — Electron: avvia il motore, apre la postazione (`http://127.0.0.1:<porta>/`) e una finestra per ogni uscita display (`src/outputs.ts`: monitor scelto, schermo intero o finestra; monitor scollegato = uscita in errore e riapertura automatica al ritorno). Preload in sandbox che consegna le credenziali solo alle finestre del motore: regia alla postazione, sola lettura alle uscite.
 - `apps/renderer` — finestre di uscita (PixiJS, WebGL): `src/frame.ts` decide cosa mostrare (logica pura, provata a parte), `src/painter.ts` disegna. Eseguono solo lo stato ricevuto; mai messaggi d'errore al pubblico.
 - `apps/client` — postazione React + Vite + Tailwind 4, servita dal motore (anche da browser in rete locale).
@@ -16,12 +16,13 @@ Il contenitore di Cuelith: motore live, applicazione desktop (Electron), postazi
 
 ## Regole
 
-- **Repo affiancati**: `cuelith-sdk` e `plugin-locale-it` devono stare nella stessa cartella di `cuelith-core` (dipendenze `link:../../../cuelith-sdk/...`, lingua italiana preinstallata letta da `../plugin-locale-it`). Dopo una modifica all'SDK: `pnpm build` in `cuelith-sdk`.
+- **Repo affiancati**: `cuelith-sdk` e `plugin-locale-it` devono stare nella stessa cartella di `cuelith-core` (per le prove e2e anche `plugin-songs` e `plugin-template`, costruiti con `pnpm build`) (dipendenze `link:../../../cuelith-sdk/...`, lingua italiana preinstallata letta da `../plugin-locale-it`). Dopo una modifica all'SDK: `pnpm build` in `cuelith-sdk`.
 - **Nessun testo nel codice**: solo chiavi (`core.*`) tradotte dal modulo lingua. Una chiave nuova si aggiunge anche a `plugin-locale-it/locales/it.json`.
 - **Nessuna risorsa esterna**: font e file inclusi nel pacchetto, serviti dal motore. La CSP del motore blocca tutto il resto (anche i `data:` per font e script: per questo Vite ha `assetsInlineLimit: 0`).
 - **Le modalità sono layout dichiarativi** (`src/modes/core.ts`) validati con lo schema dei moduli; il nucleo non ha percorsi privilegiati.
 - **Verifica dell'interfaccia**: ogni cambiamento visibile si prova con `pnpm e2e` e si guardano gli screenshot, confrontandoli col documento.
-- `ELECTRON_RUN_AS_NODE` (impostato dai processi delle estensioni di VS Code) fa partire Electron come Node: `pnpm start` ed e2e lo tolgono da soli.
+- `ELECTRON_RUN_AS_NODE` (impostato dai processi delle estensioni di VS Code) fa partire Electron come Node: `pnpm start` ed e2e lo tolgono da soli. Il motore invece lo usa apposta per avviare i moduli Node con l'Electron incluso: nei pacchetti il "fuse" RunAsNode deve restare acceso.
+- **Le uscite non cadono**: nessun modulo gira dentro il motore o le uscite. La prova `e2e/tests/processes.spec.ts` uccide il processo di un modulo durante la proiezione e misura i fotogrammi: non si rompe per nessun motivo.
 - Le decisioni prese durante il lavoro stanno in `cuelith-docs/decisioni/` e valgono come il documento.
 - Prima di ogni commit: `pnpm check` e `pnpm exec prettier --check .` verdi, e `pnpm e2e` se è cambiata l'interfaccia o l'app desktop.
 - Lavoro su `dev`; `main` riceve solo release taggate (SemVer).

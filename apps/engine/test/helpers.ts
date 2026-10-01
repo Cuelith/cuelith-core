@@ -14,6 +14,7 @@ import {
 } from "@cuelith/protocol";
 import WebSocket from "ws";
 import { silentLogger, startEngine, type Engine } from "../src/index.js";
+import type { SupervisorTimings } from "../src/modules/supervisor.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** Il modulo lingua vero, dal repo affiancato. */
@@ -25,6 +26,8 @@ export interface TestEngineOptions {
   readonly autosaveIntervalMs?: number;
   /** Rete finta per il marketplace. */
   readonly fetch?: typeof fetch;
+  /** Tempi dei processi dei moduli (riavvii, risposte) accorciati per le prove. */
+  readonly moduleTimings?: Partial<SupervisorTimings>;
 }
 
 export async function startTestEngine(options: TestEngineOptions = {}): Promise<Engine> {
@@ -47,6 +50,7 @@ export async function startTestEngine(options: TestEngineOptions = {}): Promise<
       data: options.data ?? join(root, "data"),
     },
     ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+    ...(options.moduleTimings === undefined ? {} : { moduleTimings: options.moduleTimings }),
     ...(options.autosaveIntervalMs === undefined
       ? {}
       : { autosaveIntervalMs: options.autosaveIntervalMs }),

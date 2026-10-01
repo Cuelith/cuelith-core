@@ -352,27 +352,6 @@ describe("attiva, disattiva, disinstalla", () => {
       source: "registry",
     });
   });
-
-  it("un modulo con codice si installa ma parte solo col passo 9b", async () => {
-    const net = new FakeNet();
-    net.publish(
-      "cuelith.coded",
-      "1.0.0",
-      cpkg({
-        "cuelith-plugin.json": manifest("cuelith.coded", "1.0.0", {
-          runtime: { type: "node", entry: "dist/index.js" },
-          contributes: {},
-        }),
-        "dist/index.js": "export {}",
-      }),
-    );
-    const { ok, plugin } = await start(net);
-    await ok("plugin.installFromRegistry", { id: "cuelith.coded" });
-    expect(await plugin("cuelith.coded")).toMatchObject({
-      enabled: true,
-      status: { state: "installed", error: "core.module.runtimeNotYet" },
-    });
-  });
 });
 
 describe("file dei moduli", () => {

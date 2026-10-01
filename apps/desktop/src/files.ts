@@ -100,17 +100,26 @@ export async function confirmUnsaved(parent: BrowserWindow, engine: Engine): Pro
   }
 }
 
-/** Finestra nativa per scegliere un pacchetto di modulo (.cpkg) da installare. */
+/**
+ * Finestra nativa per scegliere un modulo da installare: un pacchetto .cpkg
+ * oppure la cartella di un modulo (per chi lo sta sviluppando, cap. 28).
+ */
 export async function chooseModuleFile(
   parent: BrowserWindow,
   engine: Engine,
+  kind: "file" | "folder",
 ): Promise<string | undefined> {
   const { locales } = engine.context;
-  const result = await dialog.showOpenDialog(parent, {
-    title: locales.t("core.file.chooseModule"),
-    filters: [{ name: locales.t("core.file.filter.module"), extensions: ["cpkg"] }],
-    properties: ["openFile"],
-  });
+  const result = await dialog.showOpenDialog(
+    parent,
+    kind === "folder"
+      ? { title: locales.t("core.file.chooseModuleFolder"), properties: ["openDirectory"] }
+      : {
+          title: locales.t("core.file.chooseModule"),
+          filters: [{ name: locales.t("core.file.filter.module"), extensions: ["cpkg"] }],
+          properties: ["openFile"],
+        },
+  );
   return result.canceled ? undefined : result.filePaths[0];
 }
 

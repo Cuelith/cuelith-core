@@ -9,8 +9,11 @@ import { consoleLogger, type Logger } from "./log.js";
 import { Locales } from "./modules/locales.js";
 import { Marketplace, type Fetch } from "./modules/marketplace.js";
 import { ModuleRegistry } from "./modules/registry.js";
+import type { NodeRuntime } from "./modules/sandbox.js";
+import { ModuleSupervisor, type SupervisorTimings } from "./modules/supervisor.js";
+import { pluginSelfHandlers } from "./rpc/handlers/pluginSelf.js";
 import { pluginHandlers } from "./rpc/handlers/plugins.js";
-import type { HandlerMap } from "./rpc/dispatch.js";
+import { dispatch, type HandlerMap } from "./rpc/dispatch.js";
 import { cueHandlers } from "./rpc/handlers/cue.js";
 import { editHandlers } from "./rpc/handlers/edit.js";
 import { outputHandlers } from "./rpc/handlers/outputs.js";
@@ -46,6 +49,10 @@ export interface EngineOptions {
   readonly registryUrl?: string;
   /** Solo per le prove: rete finta per indice e pacchetti. */
   readonly fetch?: Fetch;
+  /** Eseguibile Node per i moduli (predefinito: quello del motore, vedi sandbox.ts). */
+  readonly nodeRuntime?: NodeRuntime;
+  /** Solo per le prove: tempi dei processi dei moduli. */
+  readonly moduleTimings?: Partial<SupervisorTimings>;
 }
 
 export interface Engine {
@@ -71,6 +78,7 @@ const handlers: HandlerMap = {
   ...showHandlers,
   ...libraryHandlers,
   ...pluginHandlers,
+  ...pluginSelfHandlers,
 };
 
 export async function startEngine(options: EngineOptions): Promise<Engine> {
@@ -117,11 +125,32 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   const library = new LibraryService({ store, modules, dataDir: options.paths.data });
   await library.start();
 
+  const preferredLang = options.lang ?? "it";
+  const refreshPlugins = () => {
+    store.update((draft) => {
+      draft.live.plugins = modules.statuses();
+    });
+  };
+  const supervisor = new ModuleSupervisor({
+    registry: modules,
+    store,
+    logger,
+    dataDir: options.paths.data,
+    lang: () => locales.active,
+    // Le richieste dei moduli passano dagli stessi controlli delle postazioni.
+    dispatch: (request, session) => dispatch(request, session, context, handlers),
+    ...(options.nodeRuntime === undefined ? {} : { nodeRuntime: options.nodeRuntime }),
+    ...(options.moduleTimings === undefined ? {} : { timings: options.moduleTimings }),
+    onStatus: refreshPlugins,
+  });
+  modules.setRuntimeStatus((id) => supervisor.status(id));
+
   const context: EngineContext = {
     version: options.version,
     store,
     locales,
     modules,
+    supervisor,
     marketplace,
     library,
     shows,
@@ -130,12 +159,10 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     logger,
   };
 
-  const preferredLang = options.lang ?? "it";
   modules.onChange(() => {
     locales.refresh(preferredLang);
-    store.update((draft) => {
-      draft.live.plugins = modules.statuses();
-    });
+    refreshPlugins();
+    supervisor.sync();
   });
 
   const http = createHttpServer(
@@ -157,6 +184,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   });
   const port = (http.address() as AddressInfo).port;
   await shows.start();
+  await supervisor.start();
   logger.info(`motore in ascolto su http://${host}:${port}`);
 
   return {
@@ -174,6 +202,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
       });
     },
     stop: async () => {
+      await supervisor.stop();
       await shows.stop();
       await rpc.close();
       library.stop();

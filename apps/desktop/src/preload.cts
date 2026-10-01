@@ -12,8 +12,11 @@ electron.contextBridge.exposeInMainWorld("cuelithDesktop", {
       typeof name === "string" ? name : "file.txt",
       typeof content === "string" ? content : "",
     ),
-  chooseModuleFile: (): Promise<unknown> =>
-    electron.ipcRenderer.invoke("cuelith:choose-module-file"),
+  chooseModuleFile: (kind: unknown): Promise<unknown> =>
+    electron.ipcRenderer.invoke(
+      "cuelith:choose-module-file",
+      kind === "folder" ? "folder" : "file",
+    ),
   openExternal: (url: unknown): Promise<unknown> =>
     electron.ipcRenderer.invoke("cuelith:open-external", typeof url === "string" ? url : ""),
   chooseMediaFiles: (kind: unknown): Promise<unknown> =>

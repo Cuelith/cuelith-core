@@ -3,7 +3,27 @@ import type { WebSocket } from "ws";
 
 export type SessionState = "new" | "hello" | "authed";
 
-/** Una connessione WebSocket di una postazione o di una finestra di uscita. */
+/** Dove vanno i messaggi di una sessione: un WebSocket o lo stdin di un modulo. */
+export interface SessionTransport {
+  send(text: string): void;
+  close(code: number, reason: string): void;
+}
+
+export function socketTransport(socket: WebSocket): SessionTransport {
+  return {
+    send: (text) => {
+      if (socket.readyState === socket.OPEN) socket.send(text);
+    },
+    close: (code, reason) => {
+      socket.close(code, reason);
+    },
+  };
+}
+
+/**
+ * Una connessione al motore: postazione o finestra di uscita (WebSocket),
+ * oppure il processo di un modulo (stdio, dal passo 9b).
+ */
 export class Session {
   readonly id = newId();
   state: SessionState = "new";
@@ -13,17 +33,20 @@ export class Session {
   local = false;
   subscribed = false;
   connectedAt: string | undefined;
-  readonly #socket: WebSocket;
+  /** Solo per i processi dei moduli: il modulo e gli eventi che ascolta. */
+  pluginId: string | undefined;
+  events: ReadonlySet<string> = new Set();
+  readonly #transport: SessionTransport;
 
-  constructor(socket: WebSocket) {
-    this.#socket = socket;
+  constructor(transport: SessionTransport) {
+    this.#transport = transport;
   }
 
   send(message: RpcMessage): void {
-    if (this.#socket.readyState === this.#socket.OPEN) this.#socket.send(JSON.stringify(message));
+    this.#transport.send(JSON.stringify(message));
   }
 
   close(code: number, reason: string): void {
-    this.#socket.close(code, reason);
+    this.#transport.close(code, reason);
   }
 }

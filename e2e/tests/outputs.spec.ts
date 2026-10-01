@@ -1,37 +1,6 @@
 import path from "node:path";
 import { expect, type Page } from "@playwright/test";
-import { createText, screenshotsDir, test, type RunningApp } from "./app.js";
-
-/** Aggiunge un'uscita in finestra (in prova c'e' un solo monitor) col look scelto. */
-async function addOutput(station: Page, name: string, look: string): Promise<void> {
-  const bar = station.getByRole("group", { name: "Uscite" }).first();
-  await bar.getByRole("button", { name: /Aggiungi uscita|Uscite…/ }).click();
-  const dialog = station.getByRole("dialog", { name: "Uscite" });
-  await dialog.getByRole("button", { name: "+ Aggiungi uscita" }).click();
-  const form = dialog.getByRole("form", { name: "Aggiungi uscita" });
-  await form.getByLabel("Nome").fill(name);
-  await form.getByLabel("Finestra").check();
-  await form.getByLabel("Look").selectOption({ label: look });
-  await form.getByRole("button", { name: "Salva" }).click();
-  await expect(dialog.getByRole("listitem").filter({ hasText: name })).toBeVisible();
-  await dialog.getByRole("button", { name: "Chiudi" }).click();
-  await expect(dialog).toBeHidden();
-}
-
-/** La finestra di un'uscita, trovata dall'id che la postazione mostra nella barra. */
-async function outputWindow(running: RunningApp, name: string): Promise<Page> {
-  const id = await running.station
-    .getByRole("group", { name, exact: true })
-    .getAttribute("data-output");
-  if (id === null) throw new Error(`uscita ${name} non trovata`);
-  await expect
-    .poll(() => running.app.windows().some((w) => w.url().includes(`output=${id}`)))
-    .toBe(true);
-  const window = running.app.windows().find((w) => w.url().includes(`output=${id}`));
-  if (window === undefined) throw new Error(`finestra di ${name} non trovata`);
-  await expect(window.locator("body")).toHaveAttribute("data-state", "ready");
-  return window;
-}
+import { addOutput, createText, outputWindow, screenshotsDir, test } from "./app.js";
 
 // Criterio del cap. 28: due uscite con look diversi; blackout e freeze per uscita.
 test("due uscite con look Sala e Palco, blackout e freeze per singola uscita", async ({

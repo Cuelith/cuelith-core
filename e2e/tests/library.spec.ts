@@ -225,8 +225,17 @@ test("tante librerie: categorie, preferite, ricerca della libreria, sigla e nume
   await editor.getByRole("button", { name: "Salva" }).click();
   await expect(editor).toBeHidden();
   const row = libraryRows(station).first();
-  await row.hover();
-  await row.getByRole("button", { name: "Altre azioni per «Luce del mattino»" }).click();
+  // Il pulsante compare al passaggio del mouse; se la lista si aggiorna (riga
+  // ricreata) il passaggio va rifatto, come farebbe la mano dell'operatore.
+  await expect(async () => {
+    await row.hover();
+    await row
+      .getByRole("button", { name: "Altre azioni per «Luce del mattino»" })
+      .click({ timeout: 2000 });
+    await expect(station.getByRole("menuitem", { name: "Numero…" })).toBeVisible({
+      timeout: 1000,
+    });
+  }).toPass({ timeout: 15_000 });
   await station.getByRole("menuitem", { name: "Numero…" }).click();
   const numberDialog = station.getByRole("dialog", { name: "Numero…" });
   await numberDialog.getByLabel("Numero").fill("245");
