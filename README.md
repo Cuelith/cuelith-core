@@ -4,7 +4,16 @@ Software di proiezione live, gratuito e open source: culti, conferenze, concerti
 
 Questo repository contiene il nucleo: il motore, l'applicazione desktop e la postazione dell'operatore. I moduli vivono ognuno nel suo repository dell'organizzazione [Cuelith](https://github.com/Cuelith).
 
-> Stato: in sviluppo (Fase 0). Non ancora pronto per un evento dal vivo.
+> Stato: anteprima. Le fondamenta sono complete e provate in automatico; camera, scene e diretta arrivano con la prossima fase.
+
+## Scaricare Cuelith
+
+Dalla pagina delle [versioni](https://github.com/Cuelith/cuelith-core/releases/latest):
+
+- **Windows**: `Cuelith-Setup-<versione>.exe`. Non serve l'amministratore. L'installatore non è firmato, quindi al primo avvio Windows può chiedere conferma: **Ulteriori informazioni → Esegui comunque**.
+- **Linux**: `Cuelith-<versione>-x86_64.AppImage`.
+
+Gli aggiornamenti si scaricano da soli e si installano solo quando lo decidi tu, mai mentre sei in onda.
 
 ## Provarlo dal codice
 
