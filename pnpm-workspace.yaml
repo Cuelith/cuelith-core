@@ -9,3 +9,8 @@ packages:
 minimumReleaseAgeExclude:
   - "@types/ws@8.18.2"
   - electron@44.5.0
+
+# electron-winstaller arriva con electron-builder ma serve solo per un formato
+# di installatore che non usiamo (Squirrel): il suo script resta spento.
+allowBuilds:
+  electron-winstaller: false
