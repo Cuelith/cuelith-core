@@ -140,6 +140,32 @@ export class OutputWindows {
     this.#placed.set(id, { window, target });
   }
 
+  /** Processo di ogni finestra di uscita (contatore delle risorse). */
+  processes(): { outputId: string; pid: number }[] {
+    return [...this.#placed]
+      .filter(([, placed]) => !placed.window.isDestroyed())
+      .map(([outputId, placed]) => ({
+        outputId,
+        pid: placed.window.webContents.getOSProcessId(),
+      }));
+  }
+
+  /** Fotogrammi disegnati e in ritardo da ogni finestra di uscita (contatori cumulativi). */
+  async frameCounters(): Promise<{ outputId: string; frames: number; lateFrames: number }[]> {
+    const read = async ([outputId, placed]: [string, Placed]) => {
+      if (placed.window.isDestroyed()) return undefined;
+      const stats = (await Promise.race([
+        placed.window.webContents.executeJavaScript(
+          "window.cuelithOutput ? { frames: window.cuelithOutput.stats.frames, lateFrames: window.cuelithOutput.stats.lateFrames } : null",
+        ),
+        new Promise((resolve) => setTimeout(resolve, 1000, null)),
+      ]).catch(() => null)) as { frames: number; lateFrames: number } | null;
+      return stats === null ? undefined : { outputId, ...stats };
+    };
+    const all = await Promise.all([...this.#placed].map(read));
+    return all.filter((s) => s !== undefined);
+  }
+
   #close(id: string): void {
     const placed = this.#placed.get(id);
     if (placed === undefined) return;

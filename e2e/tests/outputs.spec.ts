@@ -72,3 +72,32 @@ test("eliminare un'uscita ne chiude la finestra", async ({ running }) => {
   await expect.poll(() => projector.isClosed()).toBe(true);
   expect(problems).toEqual([]);
 });
+
+// Contatore delle risorse (protocollo 1.9): indicatore nella barra in alto,
+// dettaglio nelle Impostazioni, fotogrammi delle uscite misurati davvero.
+test("risorse: semaforo nella barra, memoria e processore, fotogrammi delle uscite", async ({
+  running,
+}) => {
+  const { station, problems } = running;
+  await createText(station, "Luce del mattino", ["Vieni su di noi"]);
+  await addOutput(station, "Proiettore", "Sala");
+  await outputWindow(running, "Proiettore");
+  await station.keyboard.press("Enter");
+
+  const indicator = station.getByRole("button", { name: /^Risorse del computer:/ });
+  await expect(indicator).toBeVisible({ timeout: 20_000 });
+  await indicator.click();
+  const settings = station.getByRole("dialog", { name: "Impostazioni" });
+  await expect(settings.getByRole("meter", { name: "Memoria" })).toBeVisible();
+  await expect(settings.getByRole("meter", { name: "Processore" })).toBeVisible();
+  const outputs = settings.getByRole("list", { name: "Uscite" });
+  // Dopo due misure l'uscita ha i suoi fotogrammi al secondo.
+  await expect(outputs).toContainText("Proiettore", { timeout: 20_000 });
+  await expect(outputs).toContainText(/[1-9]\d* fotogrammi\/s/, { timeout: 20_000 });
+  const table = settings.getByRole("table", { name: "Consumo per parte" });
+  await expect(table).toContainText("Motore e app");
+  await expect(table).toContainText("Postazione");
+  await expect(table).toContainText("Uscita «Proiettore»");
+  await station.screenshot({ path: path.join(screenshotsDir, "impostazioni-risorse.png") });
+  expect(problems).toEqual([]);
+});

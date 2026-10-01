@@ -1,3 +1,4 @@
+import { ResourcesIndicator } from "./Resources.js";
 import { useEngine, useT } from "../engine/react.js";
 import type { Mode } from "../modes/core.js";
 import type { ShowFiles } from "../station/files.js";
@@ -23,6 +24,7 @@ export function TopBar({
   onSelect,
   onManageOutputs,
   onOpenSettings,
+  onOpenResources,
   updateReady,
   files,
 }: {
@@ -31,6 +33,8 @@ export function TopBar({
   onSelect: (mode: Mode) => void;
   onManageOutputs: () => void;
   onOpenSettings: () => void;
+  /** Apre le Impostazioni sulla sezione Risorse (indicatore nella barra). */
+  onOpenResources: () => void;
   /** Versione di Cuelith pronta da installare (puntino sull'ingranaggio). */
   updateReady?: string | undefined;
   files: ShowFiles;
@@ -72,6 +76,7 @@ export function TopBar({
       <div className="flex-1" />
 
       <OutputsBar onManage={onManageOutputs} />
+      <ResourcesIndicator onOpen={onOpenResources} />
       <button
         type="button"
         onClick={onOpenSettings}

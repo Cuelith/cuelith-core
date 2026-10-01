@@ -11,6 +11,7 @@ import {
   rpcNotification,
   type Lang,
   type PluginState,
+  type ResourceUsage,
   type RpcRequest,
   type RpcResponse,
 } from "@cuelith/protocol";
@@ -78,6 +79,8 @@ interface Running {
   stopping: Promise<void> | undefined;
   restartTimer: NodeJS.Timeout | undefined;
   pingTimer: NodeJS.Timeout | undefined;
+  /** Ultimo consumo riportato dal modulo col controllo periodico (protocollo 1.9). */
+  usage: ResourceUsage | undefined;
 }
 
 const MAX_LOG = 4000;
@@ -149,6 +152,13 @@ export class ModuleSupervisor {
   /** Pid del processo (per le prove "le uscite non cadono"). */
   pid(id: string): number | undefined {
     return this.#running.get(id)?.proc?.pid;
+  }
+
+  /** Moduli in funzione col loro ultimo consumo riportato (contatore delle risorse). */
+  usages(): { id: string; usage: ResourceUsage | undefined }[] {
+    return [...this.#running]
+      .filter(([, running]) => running.state === "active")
+      .map(([id, running]) => ({ id, usage: running.usage }));
   }
 
   storage(pluginId: string): ModuleStorage {
@@ -241,6 +251,7 @@ export class ModuleSupervisor {
       stopping: undefined,
       restartTimer: undefined,
       pingTimer: undefined,
+      usage: undefined,
     };
     this.#running.set(id, running);
     this.#statusChanged();
@@ -354,7 +365,12 @@ export class ModuleSupervisor {
       running.pingTimer = undefined;
       if (proc.exited || running.state !== "active") return;
       proc.request("plugin.ping", {}, this.#timings.responseMs).then(
-        () => {
+        (result) => {
+          const reported = result as { memoryMB?: unknown; cpuPercent?: unknown } | undefined;
+          running.usage =
+            typeof reported?.memoryMB === "number" && typeof reported.cpuPercent === "number"
+              ? { memoryMB: reported.memoryMB, cpuPercent: reported.cpuPercent }
+              : undefined;
           this.#schedulePing(id, running, proc);
         },
         (error: unknown) => {

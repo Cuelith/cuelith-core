@@ -22,7 +22,12 @@ export async function loadFonts(): Promise<void> {
 export interface PaintStats {
   frames: number;
   maxGapMs: number;
+  /** Fotogrammi arrivati con una pausa oltre 50 ms (contatore delle risorse). */
+  lateFrames: number;
 }
+
+/** Pausa oltre la quale un fotogramma conta come in ritardo (3 fotogrammi a 60 al secondo). */
+const LATE_FRAME_MS = 50;
 
 /** Colori del tempo, come sui timer da palco: verde, ambra, rosso. */
 const TIMER_COLOR = { ok: "#37D1BF", warning: "#F2B441", danger: "#FF5B3A" } as const;
@@ -40,7 +45,7 @@ function clockText(): string {
  * ferma finche' non si sblocca). Nessun messaggio d'errore arriva mai al pubblico.
  */
 export class Painter {
-  readonly stats: PaintStats = { frames: 0, maxGapMs: 0 };
+  readonly stats: PaintStats = { frames: 0, maxGapMs: 0, lateFrames: 0 };
   readonly #app = new Application();
   readonly #stage = new Container();
   readonly #cover = new Graphics();
@@ -105,7 +110,10 @@ export class Painter {
 
   #tick(ticker: Ticker): void {
     this.stats.frames++;
-    if (this.stats.frames > 1) this.stats.maxGapMs = Math.max(this.stats.maxGapMs, ticker.deltaMS);
+    if (this.stats.frames > 1) {
+      this.stats.maxGapMs = Math.max(this.stats.maxGapMs, ticker.deltaMS);
+      if (ticker.deltaMS > LATE_FRAME_MS) this.stats.lateFrames++;
+    }
     if (this.#leaving === undefined || this.#current === undefined) return;
     this.#fade.elapsed += ticker.deltaMS;
     const t = Math.min(1, this.#fade.elapsed / this.#fade.duration);

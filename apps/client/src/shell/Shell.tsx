@@ -11,7 +11,7 @@ import { ModulesWindow } from "./modules/ModulesWindow.js";
 import { Notices } from "./Notices.js";
 import { OutputsDialog } from "./OutputsDialog.js";
 import { RecoveryBanner } from "./RecoveryBanner.js";
-import { SettingsDialog } from "./SettingsDialog.js";
+import { SettingsDialog, type Section } from "./SettingsDialog.js";
 import { useUpdateReady } from "../station/appInfo.js";
 import { UnsavedDialog } from "./UnsavedDialog.js";
 import { ItemEditorDialog } from "./ItemEditorDialog.js";
@@ -75,7 +75,7 @@ function ShellBody() {
   const [mode, setMode] = useState<Mode>(() => readSavedMode(modes));
   const [modulesOpen, setModulesOpen] = useState(false);
   const [outputsOpen, setOutputsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState<Section | undefined>();
 
   const selectMode = useCallback((next: Mode) => {
     setMode(next);
@@ -96,7 +96,7 @@ function ShellBody() {
       const comma = event.key === "," || event.code === "Comma";
       if ((event.ctrlKey || event.metaKey) && comma && !event.altKey) {
         event.preventDefault();
-        setSettingsOpen(true);
+        setSettingsOpen("general");
         return;
       }
       if (match === undefined) return;
@@ -122,8 +122,11 @@ function ShellBody() {
               setOutputsOpen(true);
             }}
             updateReady={updateReady}
+            onOpenResources={() => {
+              setSettingsOpen("resources");
+            }}
             onOpenSettings={() => {
-              setSettingsOpen(true);
+              setSettingsOpen("general");
             }}
             files={files}
           />
@@ -148,10 +151,11 @@ function ShellBody() {
             request={editor}
           />
         )}
-        {settingsOpen && (
+        {settingsOpen !== undefined && (
           <SettingsDialog
+            initialSection={settingsOpen}
             onClose={() => {
-              setSettingsOpen(false);
+              setSettingsOpen(undefined);
             }}
             onManageOutputs={() => {
               setOutputsOpen(true);

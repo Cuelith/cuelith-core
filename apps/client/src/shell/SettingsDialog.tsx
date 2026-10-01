@@ -1,12 +1,20 @@
 import { isOnAir, PROTOCOL_VERSION, type Lang } from "@cuelith/protocol";
 import { useAppInfo, type AppInfo } from "../station/appInfo.js";
+import { ResourcesSection } from "./Resources.js";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
 import { Button } from "../ui/Button.js";
 import { ModalDialog } from "../ui/Dialogs.js";
 
-type Section = "general" | "shortcuts" | "outputs" | "modules" | "about";
-const SECTIONS: readonly Section[] = ["general", "shortcuts", "outputs", "modules", "about"];
+export type Section = "general" | "shortcuts" | "outputs" | "modules" | "resources" | "about";
+const SECTIONS: readonly Section[] = [
+  "general",
+  "shortcuts",
+  "outputs",
+  "modules",
+  "resources",
+  "about",
+];
 
 /** Nomi fissi delle sezioni dei canti (decisione 0005): non si traducono. */
 const SECTION_NAMES: readonly (readonly [string, string])[] = [
@@ -31,21 +39,24 @@ export function SettingsDialog({
   onClose,
   onManageOutputs,
   onManageModules,
+  initialSection = "general",
 }: {
+  /** Sezione aperta all'inizio (es. Risorse dall'indicatore nella barra in alto). */
+  initialSection?: Section;
   onClose: () => void;
   onManageOutputs: () => void;
   onManageModules: () => void;
 }) {
   const t = useT();
   const baseId = useId();
-  const [section, setSection] = useState<Section>("general");
+  const [section, setSection] = useState<Section>(initialSection);
   return (
     <ModalDialog title={t("core.settings.title")} onClose={onClose} wide>
       {(close) => (
         <div className="flex min-h-[420px] flex-col sm:flex-row">
           <nav
             aria-label={t("core.settings.sections")}
-            className="flex shrink-0 gap-1 border-b border-line p-2 sm:w-48 sm:flex-col sm:border-r sm:border-b-0"
+            className="flex shrink-0 flex-wrap gap-1 border-b border-line p-2 sm:w-48 sm:flex-col sm:flex-nowrap sm:border-r sm:border-b-0"
           >
             {SECTIONS.map((id) => (
               <button
@@ -94,6 +105,7 @@ export function SettingsDialog({
                 </Button>
               </Row>
             )}
+            {section === "resources" && <ResourcesSection />}
             {section === "about" && <About />}
             <div className="mt-auto flex justify-end">
               <Button onClick={close}>{t("core.action.close")}</Button>

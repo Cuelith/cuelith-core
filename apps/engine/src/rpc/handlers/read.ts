@@ -11,6 +11,8 @@ export const readHandlers: HandlerMap = {
 
   "display.list": (ctx) => ({ displays: ctx.displays.list() }),
 
+  "system.resources": (ctx) => ctx.resources.report(),
+
   "locale.list": (ctx) => ({ langs: ctx.locales.available(), active: ctx.locales.active }),
 
   "locale.catalog": (ctx, _session, params) => {

@@ -393,3 +393,28 @@ describe("eventi", { timeout: 30_000 }, () => {
     ]);
   });
 });
+
+describe("risorse (protocollo 1.9)", { timeout: 30_000 }, () => {
+  it("system.resources: motore, moduli attivi col consumo dichiarato, computer e semaforo", async () => {
+    const { install, active, ok } = await start();
+    await install(
+      fixture({
+        extra: {
+          resources: { memoryMB: { idle: 40, peak: 200 }, cpuPercent: { idle: 1, peak: 50 } },
+        },
+      }),
+    );
+    await active();
+    const report = await ok("system.resources", {});
+    expect(report.system.cpuCores).toBeGreaterThan(0);
+    expect(report.system.memoryTotalMB).toBeGreaterThan(0);
+    expect(report.parts.find((p) => p.id === "core.engine")?.current?.memoryMB).toBeGreaterThan(0);
+    expect(report.parts.find((p) => p.id === ID)).toMatchObject({
+      kind: "module",
+      name: "Modulo di prova",
+      declared: { memoryMB: { idle: 40, peak: 200 } },
+    });
+    expect(report.totals.max.memoryMB).toBeGreaterThanOrEqual(report.totals.current.memoryMB);
+    expect(["ok", "warning", "danger"]).toContain(report.level);
+  });
+});

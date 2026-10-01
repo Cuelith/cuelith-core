@@ -21,6 +21,7 @@ import {
   type Installation,
   type Preferences,
 } from "./installation.js";
+import { electronMetrics } from "./metrics.js";
 import { OutputWindows } from "./outputs.js";
 import { resolveAppPaths, type AppPaths } from "./paths.js";
 import { folderFetch } from "./test-registry.js";
@@ -72,6 +73,14 @@ async function launchEngine(): Promise<Engine> {
     ...(autosaveOverride === undefined ? {} : { autosaveIntervalMs: Number(autosaveOverride) }),
     ...(testRegistryDir === undefined ? {} : { fetch: folderFetch(testRegistryDir) }),
     displays: electronDisplays,
+    metrics: electronMetrics({
+      stationPid: () =>
+        station === undefined || station.isDestroyed()
+          ? undefined
+          : station.webContents.getOSProcessId(),
+      outputs: () => outputs?.processes() ?? [],
+      frameCounters: () => outputs?.frameCounters() ?? Promise.resolve([]),
+    }),
     logger: consoleLogger,
   };
   const wanted = portOverride === undefined ? DEFAULT_ENGINE_PORT : Number(portOverride);

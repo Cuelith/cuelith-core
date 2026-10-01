@@ -12,6 +12,7 @@ import { ModuleRegistry } from "./modules/registry.js";
 import type { NodeRuntime } from "./modules/sandbox.js";
 import { ModuleSupervisor, type SupervisorTimings } from "./modules/supervisor.js";
 import { pluginSelfHandlers } from "./rpc/handlers/pluginSelf.js";
+import { processMetrics, ResourceMonitor, type MetricsProvider } from "./resources.js";
 import { pluginHandlers } from "./rpc/handlers/plugins.js";
 import { dispatch, type HandlerMap } from "./rpc/dispatch.js";
 import { cueHandlers } from "./rpc/handlers/cue.js";
@@ -51,6 +52,8 @@ export interface EngineOptions {
   readonly fetch?: Fetch;
   /** Eseguibile Node per i moduli (predefinito: quello del motore, vedi sandbox.ts). */
   readonly nodeRuntime?: NodeRuntime;
+  /** Misure dei processi (il desktop usa quelle di Electron); predefinito: solo il motore. */
+  readonly metrics?: MetricsProvider;
   /** Solo per le prove: tempi dei processi dei moduli. */
   readonly moduleTimings?: Partial<SupervisorTimings>;
 }
@@ -145,12 +148,22 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   });
   modules.setRuntimeStatus((id) => supervisor.status(id));
 
+  const resources = new ResourceMonitor({
+    provider: options.metrics ?? processMetrics(),
+    registry: modules,
+    supervisor,
+    store,
+    peaksFile: join(options.paths.data, "resources.json"),
+    logger,
+  });
+
   const context: EngineContext = {
     version: options.version,
     store,
     locales,
     modules,
     supervisor,
+    resources,
     marketplace,
     library,
     shows,
@@ -185,6 +198,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   const port = (http.address() as AddressInfo).port;
   await shows.start();
   await supervisor.start();
+  await resources.start();
   logger.info(`motore in ascolto su http://${host}:${port}`);
 
   return {
@@ -202,6 +216,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
       });
     },
     stop: async () => {
+      await resources.stop();
       await supervisor.stop();
       await shows.stop();
       await rpc.close();
