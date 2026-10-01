@@ -79,6 +79,8 @@ createInterface({ input: process.stdin }).on("line", async (line) => {
 `;
 
 const ID = "cuelith.fixture";
+// Processi veri da avviare e fermare: sotto carico (prove in parallelo) servono
+// piu' dei 5 s predefiniti per prova.
 
 function fixture(
   options: { permissions?: string[]; mode?: string; id?: string; extra?: object } = {},
@@ -179,7 +181,7 @@ const alive = (pid: number) => {
   }
 };
 
-describe("processo del modulo", () => {
+describe("processo del modulo", { timeout: 30_000 }, () => {
   it("parte nel suo processo, esegue i comandi e si ferma quando lo si spegne", async () => {
     const { install, active, result, ok, status, until, engine, data } = await start();
     await install(fixture());
@@ -214,7 +216,7 @@ describe("processo del modulo", () => {
   });
 });
 
-describe("permessi (cap. 27)", () => {
+describe("permessi (cap. 27)", { timeout: 30_000 }, () => {
   it("senza permessi: niente file fuori dalla sua cartella, niente programmi, niente rete", async () => {
     const { install, active, result, data } = await start();
     const secret = join(tmpdir(), `cuelith-segreto-${String(Date.now())}.txt`);
@@ -298,7 +300,7 @@ describe("permessi (cap. 27)", () => {
   });
 });
 
-describe("crash e blocchi (cap. 24)", () => {
+describe("crash e blocchi (cap. 24)", { timeout: 30_000 }, () => {
   it("riavvia fino a 3 volte in 60 secondi, poi resta spento finche' non lo si riaccende", async () => {
     const { install, active, command, status, until, ok, engine } = await start();
     await install(fixture());
@@ -368,7 +370,7 @@ describe("crash e blocchi (cap. 24)", () => {
   });
 });
 
-describe("eventi", () => {
+describe("eventi", { timeout: 30_000 }, () => {
   it("il modulo riceve gli eventi del nucleo e i propri, solo quelli a cui si iscrive", async () => {
     const { install, active, result, ok } = await start();
     await install(fixture());

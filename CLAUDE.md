@@ -35,4 +35,13 @@ pnpm build            # motore, postazione, app desktop
 pnpm start            # apre Cuelith
 pnpm check            # typecheck, lint, test
 pnpm e2e              # build + prove con l'app vera
+pnpm -C apps/desktop run dist:dir   # app impacchettata in apps/desktop/pack/release (senza installatore)
+pnpm -C apps/desktop run dist       # installatore (Windows: NSIS; Linux: AppImage)
 ```
+
+## Installatori e aggiornamenti (decisione 0004)
+
+- L'app installata non ha `node_modules`: `vite.pack.config.ts` mette processo principale, motore e dipendenze in `pack/app/main.mjs`; `scripts/stage.mjs` aggiunge preload, postazione, uscite, stili e font; la lingua italiana va in `resources/plugins`. Per questo le dipendenze di `apps/desktop` sono tutte `devDependencies` (electron-builder impacchetterebbe le `dependencies`).
+- Prove sull'app impacchettata: `CUELITH_E2E_EXECUTABLE=<eseguibile> pnpm -C e2e exec playwright test` (la CI lo fa su Linux a ogni push).
+- Release: tag `vX.Y.Z` su `main` (uguale a `apps/desktop/package.json`) → `release.yml` pubblica gli installatori su GitHub Releases; l'app li trova con electron-updater (`src/updates.ts`): scarica da sola, installa solo su richiesta dell'operatore e mai in onda (`isOnAir`).
+- ID di installazione e preferenze in `src/installation.ts` (cartella dati): l'ID non viene inviato a nessuno.

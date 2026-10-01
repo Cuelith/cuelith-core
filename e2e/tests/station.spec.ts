@@ -79,6 +79,18 @@ test("impostazioni: ingranaggio e Ctrl+, ; la legenda dei tasti sta in Scorciato
   await station.screenshot({ path: path.join(screenshotsDir, "impostazioni-scorciatoie.png") });
   await settings.getByRole("button", { name: "Informazioni e licenza" }).click();
   await expect(settings).toContainText("Community, gratuita");
+  // Decisione 0004: ID di installazione locale, rigenerabile; informativa; aggiornamenti
+  // (nelle prove: versione di sviluppo, oppure app impacchettata senza controlli).
+  const id = settings.locator(".select-all");
+  await expect(id).toHaveText(/^[0-9a-f-]{36}$/);
+  const before = await id.textContent();
+  await settings.getByRole("button", { name: "Rigenera" }).click();
+  await expect(id).not.toHaveText(before ?? "");
+  await expect(settings).toContainText("Non invia dati personali");
+  await expect(settings.getByRole("status")).toHaveText(
+    "Versione di sviluppo: gli aggiornamenti arrivano con l'app installata.",
+  );
+  await station.screenshot({ path: path.join(screenshotsDir, "impostazioni-informazioni.png") });
   await settings.getByRole("button", { name: "Chiudi" }).last().click();
   await expect(settings).toBeHidden();
 

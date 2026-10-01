@@ -22,6 +22,8 @@ export interface RunningApp {
   readonly station: Page;
   /** Messaggi di errore della console e richieste verso host esterni. */
   readonly problems: string[];
+  /** Righe scritte dal processo principale (log del motore), per capire un errore. */
+  readonly logs: string[];
   /** Cartella dati dell'app (profilo): riusabile per simulare un riavvio. */
   readonly userData: string;
   /** Chiusura normale; se ci sono modifiche non salvate risponde "Non salvare". */
@@ -44,16 +46,33 @@ export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp
   }
   let app: ElectronApplication;
   try {
+    // CUELITH_E2E_EXECUTABLE: prova l'app impacchettata (es. win-unpacked/Cuelith.exe).
+    const packaged = process.env.CUELITH_E2E_EXECUTABLE;
     app = await electron.launch({
-      executablePath: electronPath,
-      args: [desktopDir],
-      env: { ...env, ...options.env, CUELITH_USER_DATA: userData, CUELITH_PORT: "0" },
+      executablePath: packaged ?? electronPath,
+      args: packaged === undefined ? [desktopDir] : [],
+      env: {
+        ...env,
+        ...options.env,
+        CUELITH_USER_DATA: userData,
+        CUELITH_PORT: "0",
+        // L'app impacchettata nelle prove non controlla gli aggiornamenti su GitHub.
+        CUELITH_UPDATES: "off",
+      },
     });
   } catch (error) {
     await rm(userData, { recursive: true, force: true });
     throw error;
   }
   const problems: string[] = [];
+  const logs: string[] = [];
+  const collect = (chunk: Buffer) => {
+    for (const line of chunk.toString("utf8").split(/\r?\n/)) {
+      if (line.trim() !== "") logs.push(`${new Date().toISOString().slice(11, 23)} ${line}`);
+    }
+  };
+  app.process().stdout?.on("data", collect);
+  app.process().stderr?.on("data", collect);
   // Ogni finestra (postazione e uscite): errori in console e richieste verso l'esterno.
   const watched = new WeakSet<Page>();
   const watch = (page: Page) => {
@@ -85,6 +104,7 @@ export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp
     app,
     station,
     problems,
+    logs,
     userData,
     close: async () => {
       // Se l'app e' gia' uscita (es. prova di arresto) non c'e' nulla da chiedere.
@@ -98,11 +118,16 @@ export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp
 /** Ogni prova riceve la sua istanza di Cuelith, chiusa alla fine. */
 export const test = base.extend<{ running: RunningApp }>({
   // eslint-disable-next-line no-empty-pattern -- Playwright richiede la destrutturazione
-  running: async ({}, use) => {
+  running: async ({}, use, testInfo) => {
     const running = await launchApp();
     try {
       await use(running);
     } finally {
+      // Prova fallita: il log del motore va negli allegati (e nell'output con CUELITH_E2E_LOG=1).
+      if (testInfo.status !== testInfo.expectedStatus) {
+        await testInfo.attach("log-motore.txt", { body: running.logs.join("\n") });
+        if (process.env.CUELITH_E2E_LOG === "1") console.log(running.logs.slice(-80).join("\n"));
+      }
       await running.close();
     }
   },

@@ -13,18 +13,25 @@ export interface AppPaths {
 }
 
 /**
- * Dove stanno i file serviti dal motore. In sviluppo i moduli preinstallati
- * sono le cartelle dei loro repo affiancati a cuelith-core; nel pacchetto
- * installato vengono copiati sotto resources/plugins.
+ * Dove stanno i file serviti dal motore. In sviluppo sono le cartelle dist
+ * dei pacchetti e i moduli preinstallati sono i repo affiancati a
+ * cuelith-core; nell'app installata stanno dentro l'app (scripts/stage.mjs)
+ * e i moduli preinstallati sotto resources/plugins.
  */
 export function resolveAppPaths(options: {
   packaged: boolean;
   appPath: string;
   resourcesPath: string;
 }): AppPaths {
-  const bundledPlugins = options.packaged
-    ? [path.join(options.resourcesPath, "plugins", "cuelith.locale.it")]
-    : [path.resolve(options.appPath, "../../../plugin-locale-it")];
+  if (options.packaged) {
+    return {
+      client: path.join(options.appPath, "client"),
+      renderer: path.join(options.appPath, "renderer"),
+      ui: path.join(options.appPath, "ui"),
+      bundledPlugins: [path.join(options.resourcesPath, "plugins", "cuelith.locale.it")],
+    };
+  }
+  const bundledPlugins = [path.resolve(options.appPath, "../../../plugin-locale-it")];
   return {
     client: path.join(packageDir("@cuelith-core/client/package.json"), "dist"),
     renderer: path.join(packageDir("@cuelith-core/renderer/package.json"), "dist"),

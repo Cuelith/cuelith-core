@@ -2,8 +2,9 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { consoleLogger, startEngine, type Engine } from "@cuelith-core/engine";
-import { DEFAULT_ENGINE_PORT } from "@cuelith/protocol";
+import { DEFAULT_ENGINE_PORT, isOnAir } from "@cuelith/protocol";
 import { app, BrowserWindow, ipcMain, Menu, session, shell } from "electron";
+import electronUpdater from "electron-updater";
 import { electronDisplays } from "./displays.js";
 import {
   chooseMediaFiles,
@@ -12,9 +13,18 @@ import {
   confirmUnsaved,
   saveTextFile,
 } from "./files.js";
+import {
+  loadInstallation,
+  loadPreferences,
+  resetInstallation,
+  savePreferences,
+  type Installation,
+  type Preferences,
+} from "./installation.js";
 import { OutputWindows } from "./outputs.js";
 import { resolveAppPaths, type AppPaths } from "./paths.js";
 import { folderFetch } from "./test-registry.js";
+import { Updates, type Updater } from "./updates.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BACKGROUND = "#0B0C0E";
@@ -26,12 +36,15 @@ if (userDataOverride !== undefined && userDataOverride !== "")
 const portOverride = process.env["CUELITH_PORT"];
 const autosaveOverride = process.env["CUELITH_AUTOSAVE_MS"];
 const testRegistryDir = process.env["CUELITH_TEST_REGISTRY_DIR"];
+// Prove sull'app impacchettata: niente controlli verso GitHub.
+const updatesOff = process.env["CUELITH_UPDATES"] === "off";
 
 app.enableSandbox();
 
 let engine: Engine | undefined;
 let station: BrowserWindow | undefined;
 let outputs: OutputWindows | undefined;
+let updates: Updates | undefined;
 /**
  * Finestre locali a cui si consegnano le credenziali: la postazione riceve
  * quelle di regia, le uscite quelle di sola lettura.
@@ -107,7 +120,9 @@ function lockDown(window: BrowserWindow, role: "station" | "output"): void {
 }
 
 /** Icona della finestra e della barra delle applicazioni (originale 1024 px). */
-const ICON = path.join(here, "..", "build", "icon.png");
+const ICON = app.isPackaged
+  ? path.join(app.getAppPath(), "build", "icon.png")
+  : path.join(here, "..", "build", "icon.png");
 
 /** Dimensioni della finestra di avvio (proporzioni del logo con un po' d'aria). */
 const SPLASH = { width: 600, height: 340 };
@@ -394,6 +409,8 @@ async function main(): Promise<void> {
     await shell.openExternal(parsed.href);
   });
 
+  registerAppInfo(engine);
+
   // Finestra di avvio chiusa a mano mentre partiva il motore: Cuelith sta uscendo.
   if (startupCancelled()) return;
   station = openStation();
@@ -404,6 +421,93 @@ async function main(): Promise<void> {
     createWindow: (options) => createWindow("output", options),
   });
   outputs.start();
+}
+
+/**
+ * Versione, licenza, ID di installazione e aggiornamenti (decisione 0004).
+ * Gli aggiornamenti si scaricano da soli ma si installano solo su richiesta
+ * dell'operatore, mai in onda, dopo aver chiesto se salvare.
+ */
+function registerAppInfo(running: Engine): void {
+  const dir = app.getPath("userData");
+  let installation: Installation | undefined;
+  let preferences: Preferences | undefined;
+  const ready = Promise.all([loadInstallation(dir), loadPreferences(dir)]).then(([i, p]) => {
+    installation = i;
+    preferences = p;
+    const updater =
+      app.isPackaged && !updatesOff
+        ? (electronUpdater.autoUpdater as unknown as Updater)
+        : undefined;
+    updates = new Updates({
+      updater,
+      autoCheck: p.autoCheckUpdates,
+      onChange: (state) => {
+        station?.webContents.send("cuelith:update-state", state);
+      },
+      log: (message, error) => {
+        consoleLogger.warn(message, error);
+      },
+    });
+    updates.start();
+  });
+  const fromStation = (event: Electron.IpcMainInvokeEvent) => {
+    if (trusted.get(event.sender.id) !== "station") throw new Error("richiesta non autorizzata");
+  };
+
+  ipcMain.handle("cuelith:app-info", async (event) => {
+    fromStation(event);
+    await ready;
+    return {
+      version: app.getVersion(),
+      installationId: installation?.id,
+      autoCheckUpdates: preferences?.autoCheckUpdates ?? true,
+      update: updates?.state ?? { status: "unsupported" },
+    };
+  });
+
+  ipcMain.handle("cuelith:set-auto-check", async (event, on: unknown) => {
+    fromStation(event);
+    await ready;
+    preferences = { autoCheckUpdates: on === true };
+    await savePreferences(dir, preferences);
+    updates?.setAutoCheck(preferences.autoCheckUpdates);
+  });
+
+  ipcMain.handle("cuelith:reset-installation-id", async (event) => {
+    fromStation(event);
+    await ready;
+    installation = await resetInstallation(dir);
+    return installation.id;
+  });
+
+  ipcMain.handle("cuelith:update-check", async (event) => {
+    fromStation(event);
+    await ready;
+    await updates?.check();
+  });
+
+  ipcMain.handle("cuelith:update-install", async (event) => {
+    fromStation(event);
+    await ready;
+    if (updates?.state.status !== "ready") return "notReady";
+    if (running.context.store.read(isOnAir)) return "onAir";
+    if (station !== undefined && !(await confirmUnsaved(station, running))) return "cancelled";
+    // Come una chiusura normale, poi l'installatore e il riavvio.
+    quitAllowed = true;
+    outputs?.stop();
+    outputs = undefined;
+    updates.stop();
+    if (engine !== undefined) {
+      const stopping = engine;
+      engine = undefined;
+      await stopping.stop().catch((error: unknown) => {
+        consoleLogger.error("arresto del motore non riuscito", error);
+      });
+    }
+    updates.install();
+    return "installing";
+  });
 }
 
 /** Vero quando la chiusura e' confermata: da li' nessuna finestra la blocca. */

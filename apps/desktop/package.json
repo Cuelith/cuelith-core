@@ -10,20 +10,26 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src scripts",
-    "start": "node scripts/start.js"
+    "lint": "eslint src scripts test",
+    "start": "node scripts/start.js",
+    "pack:app": "vite build --config vite.pack.config.ts && node scripts/stage.mjs",
+    "dist": "pnpm run pack:app && electron-builder --publish never",
+    "dist:dir": "pnpm run pack:app && electron-builder --dir --publish never",
+    "test": "vitest run"
   },
-  "dependencies": {
+  "devDependencies": {
     "@cuelith-core/client": "workspace:*",
     "@cuelith-core/engine": "workspace:*",
     "@cuelith-core/renderer": "workspace:*",
     "@cuelith/protocol": "link:../../../cuelith-sdk/packages/protocol",
-    "@cuelith/ui": "link:../../../cuelith-sdk/packages/ui"
-  },
-  "devDependencies": {
+    "@cuelith/ui": "link:../../../cuelith-sdk/packages/ui",
     "@types/node": "24.19.0",
     "electron": "44.5.0",
+    "electron-builder": "26.15.3",
+    "electron-updater": "6.8.9",
     "eslint": "10.11.0",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
   }
 }

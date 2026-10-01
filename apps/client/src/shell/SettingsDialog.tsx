@@ -1,4 +1,5 @@
-import { PROTOCOL_VERSION, type Lang } from "@cuelith/protocol";
+import { isOnAir, PROTOCOL_VERSION, type Lang } from "@cuelith/protocol";
+import { useAppInfo, type AppInfo } from "../station/appInfo.js";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
 import { Button } from "../ui/Button.js";
@@ -245,6 +246,7 @@ function Shortcuts() {
 function About() {
   const t = useT();
   const { engineVersion } = useEngine();
+  const { info, reload } = useAppInfo();
   return (
     <div className="flex flex-col gap-3">
       <img src="/brand/cuelith-logo.png" alt="Cuelith" className="h-10 w-auto self-start" />
@@ -260,6 +262,113 @@ function About() {
       <Row label={t("core.settings.about.license")}>
         <span className="text-sm text-muted">Apache 2.0</span>
       </Row>
+      {info !== undefined && <Updates info={info} reload={reload} />}
+      {info?.installationId !== undefined && (
+        <Row label={t("core.settings.about.installationId")}>
+          <span className="flex items-center gap-2">
+            <span className="font-mono text-xs text-muted select-all">{info.installationId}</span>
+            <Button
+              size="sm"
+              onClick={() => {
+                void window.cuelithDesktop?.resetInstallationId().then(reload);
+              }}
+            >
+              {t("core.settings.about.regenerate")}
+            </Button>
+          </span>
+        </Row>
+      )}
+      <p className="max-w-prose text-xs leading-relaxed text-muted">
+        {t("core.settings.about.privacy")}
+      </p>
     </div>
+  );
+}
+
+/**
+ * Aggiornamenti (decisione 0004): si scaricano da soli, si installano solo
+ * quando lo decide l'operatore e mai in onda.
+ */
+function Updates({ info, reload }: { info: AppInfo; reload: () => void }) {
+  const t = useT();
+  const { state } = useEngine();
+  const app = window.cuelithDesktop;
+  const [refusal, setRefusal] = useState<string | undefined>();
+  const update = info.update;
+  const onAir = state !== undefined && isOnAir(state);
+  const status = (() => {
+    switch (update.status) {
+      case "unsupported":
+        return t("core.updates.unsupported");
+      case "idle":
+        return t("core.updates.idle");
+      case "checking":
+        return t("core.updates.checking");
+      case "upToDate":
+        return t("core.updates.upToDate");
+      case "downloading":
+        return t("core.updates.downloading", {
+          version: update.version,
+          percent: String(update.percent),
+        });
+      case "ready":
+        return t("core.updates.ready", { version: update.version });
+      case "error":
+        return t("core.updates.error");
+    }
+  })();
+  const install = async () => {
+    if (app === undefined) return;
+    setRefusal(undefined);
+    const result = await app.installUpdate();
+    if (result === "onAir") setRefusal(t("core.updates.onAir"));
+  };
+  return (
+    <>
+      <Row label={t("core.updates.title")}>
+        <span className="text-sm text-muted" role="status">
+          {status}
+        </span>
+      </Row>
+      {update.status !== "unsupported" && app !== undefined && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <label className="mr-auto flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={info.autoCheckUpdates}
+              onChange={(event) => {
+                void app.setAutoCheckUpdates(event.target.checked).then(reload);
+              }}
+              className="h-4 w-4 accent-[var(--cl-cue)]"
+            />
+            {t("core.updates.autoCheck")}
+          </label>
+          {update.status === "ready" ? (
+            <Button
+              size="sm"
+              tone="primary"
+              disabled={onAir}
+              title={onAir ? t("core.updates.onAir") : undefined}
+              onClick={() => void install()}
+            >
+              {t("core.updates.install")}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled={update.status === "checking" || update.status === "downloading"}
+              onClick={() => {
+                void app.checkUpdates();
+              }}
+            >
+              {t("core.updates.checkNow")}
+            </Button>
+          )}
+        </div>
+      )}
+      {update.status === "ready" && (onAir || refusal !== undefined) && (
+        <p className="text-xs text-stage">{refusal ?? t("core.updates.onAir")}</p>
+      )}
+    </>
   );
 }

@@ -6,6 +6,7 @@ import {
   SaveFileParamsSchema,
   KeyParamsSchema,
   PANEL_CONNECT,
+  PANEL_READY,
   PANEL_HOST_METHODS,
   PanelToHostSchema,
   panelAllows,
@@ -194,6 +195,23 @@ export function ModulePanelFrame({
       port.current = undefined;
     };
   }, [connection, panel.pluginId, panel.panelId, panel.src]);
+
+  // Il pannello annuncia di essere pronto (PANEL_READY, @cuelith/panel dal
+  // protocollo 1.8): vale come il caricamento. Serve se la sua pagina finisce
+  // di caricarsi solo dopo essersi collegata (es. `await` in cima allo script).
+  useEffect(() => {
+    const onReady = (event: MessageEvent) => {
+      const element = frame.current;
+      if (element === null || event.source !== element.contentWindow) return;
+      if ((event.data as { type?: unknown } | null)?.type !== PANEL_READY) return;
+      loaded.current = true;
+      if (latest.current.connect) connectOnLoad.current?.();
+    };
+    window.addEventListener("message", onReady);
+    return () => {
+      window.removeEventListener("message", onReady);
+    };
+  }, []);
 
   // Richiesta arrivata a pannello gia' caricato: ci si collega subito.
   useEffect(() => {

@@ -21,6 +21,24 @@ electron.contextBridge.exposeInMainWorld("cuelithDesktop", {
     electron.ipcRenderer.invoke("cuelith:open-external", typeof url === "string" ? url : ""),
   chooseMediaFiles: (kind: unknown): Promise<unknown> =>
     electron.ipcRenderer.invoke("cuelith:choose-media-files", kind === "image" ? "image" : "audio"),
+  /** Versione, ID di installazione, preferenze e stato degli aggiornamenti (decisione 0004). */
+  appInfo: (): Promise<unknown> => electron.ipcRenderer.invoke("cuelith:app-info"),
+  setAutoCheckUpdates: (on: unknown): Promise<unknown> =>
+    electron.ipcRenderer.invoke("cuelith:set-auto-check", on === true),
+  resetInstallationId: (): Promise<unknown> =>
+    electron.ipcRenderer.invoke("cuelith:reset-installation-id"),
+  checkUpdates: (): Promise<unknown> => electron.ipcRenderer.invoke("cuelith:update-check"),
+  /** Installa e riavvia: il motore rifiuta se si e' in onda o se l'operatore annulla. */
+  installUpdate: (): Promise<unknown> => electron.ipcRenderer.invoke("cuelith:update-install"),
+  onUpdateState: (listener: (state: unknown) => void): (() => void) => {
+    const handler = (_event: unknown, state: unknown) => {
+      listener(state);
+    };
+    electron.ipcRenderer.on("cuelith:update-state", handler);
+    return () => {
+      electron.ipcRenderer.off("cuelith:update-state", handler);
+    };
+  },
   /** L'interfaccia e' pronta: la finestra di avvio lascia il posto alla postazione. */
   stationReady: (): void => {
     electron.ipcRenderer.send("cuelith:station-ready");

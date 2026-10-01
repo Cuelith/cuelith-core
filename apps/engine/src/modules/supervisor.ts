@@ -436,6 +436,8 @@ export class ModuleSupervisor {
       }
       if (this.#running.get(id) === running) this.#running.delete(id);
       this.#statusChanged();
+      // Riacceso (o aggiornato) mentre si chiudeva: ora riparte.
+      this.sync();
     })();
     return running.stopping;
   }

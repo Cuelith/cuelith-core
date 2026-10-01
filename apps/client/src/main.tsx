@@ -4,12 +4,13 @@ import { App } from "./App.js";
 import { EngineConnection, type Credentials } from "@cuelith-core/engine-client";
 import { ConnectionProvider } from "./engine/react.js";
 import { PanelWindow, panelWindowRequest } from "./shell/PanelWindow.js";
+import type { DesktopApp } from "./station/appInfo.js";
 import "./styles.css";
 
 declare global {
   interface Window {
     /** Esposto dal preload di Electron solo nelle finestre locali del motore. */
-    readonly cuelithDesktop?: {
+    readonly cuelithDesktop?: DesktopApp & {
       readonly getLocalSession: () => Promise<{ name: string; token: string }>;
       /** Finestra nativa Apri/Salva: percorso scelto o undefined se annullato. */
       readonly chooseShowFile: (kind: "open" | "save") => Promise<string | undefined>;

@@ -1,0 +1,41 @@
+# Installatori di Cuelith (cap. 20, decisione 0004). L'app e' la cartella
+# pack/app preparata da scripts/stage.mjs: niente node_modules, niente
+# dipendenze da installare.
+appId: io.github.cuelith.app
+productName: Cuelith
+copyright: Copyright © Cuelith contributors
+electronVersion: 44.5.0
+npmRebuild: false
+asar: true
+directories:
+  app: pack/app
+  output: pack/release
+  buildResources: build
+extraResources:
+  - from: pack/plugins
+    to: plugins
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+nsis:
+  # Installazione per l'utente (niente amministratore), cartella a scelta.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: Cuelith-Setup-${version}.${ext}
+  shortcutName: Cuelith
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: AudioVideo
+  icon: build/icon.png
+  artifactName: Cuelith-${version}-${arch}.${ext}
+# Le release e gli aggiornamenti arrivano da GitHub Releases del nucleo.
+publish:
+  provider: github
+  owner: Cuelith
+  repo: cuelith-core
+  releaseType: release

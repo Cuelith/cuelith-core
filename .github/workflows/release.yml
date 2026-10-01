@@ -1,0 +1,60 @@
+name: Release
+
+# Un tag vX.Y.Z (solo su main) crea gli installatori e li pubblica nella
+# release di GitHub del nucleo: da li' l'app installata scarica gli
+# aggiornamenti (decisione 0004). Windows senza firma (avviso SmartScreen),
+# macOS rimandato.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  installers:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: cuelith-core
+      # Le release si costruiscono con SDK e lingua pubblicati (main).
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/cuelith-sdk
+          ref: main
+          path: cuelith-sdk
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/plugin-locale-it
+          ref: main
+          path: plugin-locale-it
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: cuelith-core/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: SDK
+        working-directory: cuelith-sdk
+        run: pnpm install --frozen-lockfile && pnpm build
+      - name: Versione uguale al tag
+        working-directory: cuelith-core
+        shell: bash
+        run: test "v$(node -p "require('./apps/desktop/package.json').version")" = "$GITHUB_REF_NAME"
+      - name: Build e controlli
+        working-directory: cuelith-core
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm check
+      - name: Installatori
+        working-directory: cuelith-core
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pnpm -C apps/desktop run pack:app
+          pnpm -C apps/desktop exec electron-builder --publish always

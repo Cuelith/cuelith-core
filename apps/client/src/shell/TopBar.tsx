@@ -23,6 +23,7 @@ export function TopBar({
   onSelect,
   onManageOutputs,
   onOpenSettings,
+  updateReady,
   files,
 }: {
   modes: readonly Mode[];
@@ -30,6 +31,8 @@ export function TopBar({
   onSelect: (mode: Mode) => void;
   onManageOutputs: () => void;
   onOpenSettings: () => void;
+  /** Versione di Cuelith pronta da installare (puntino sull'ingranaggio). */
+  updateReady?: string | undefined;
   files: ShowFiles;
 }) {
   const t = useT();
@@ -72,10 +75,21 @@ export function TopBar({
       <button
         type="button"
         onClick={onOpenSettings}
-        aria-label={t("core.settings.title")}
-        title={t("core.settings.title")}
-        className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-bg-3 hover:text-fg"
+        aria-label={
+          updateReady === undefined
+            ? t("core.settings.title")
+            : t("core.updates.settingsReady", { version: updateReady })
+        }
+        title={
+          updateReady === undefined
+            ? t("core.settings.title")
+            : t("core.updates.settingsReady", { version: updateReady })
+        }
+        className="relative grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-bg-3 hover:text-fg"
       >
+        {updateReady !== undefined && (
+          <span aria-hidden="true" className="absolute top-1 right-1 h-2 w-2 rounded-full bg-cue" />
+        )}
         <svg
           viewBox="0 0 24 24"
           aria-hidden="true"

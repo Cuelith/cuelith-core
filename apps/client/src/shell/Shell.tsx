@@ -12,6 +12,7 @@ import { Notices } from "./Notices.js";
 import { OutputsDialog } from "./OutputsDialog.js";
 import { RecoveryBanner } from "./RecoveryBanner.js";
 import { SettingsDialog } from "./SettingsDialog.js";
+import { useUpdateReady } from "../station/appInfo.js";
 import { UnsavedDialog } from "./UnsavedDialog.js";
 import { ItemEditorDialog } from "./ItemEditorDialog.js";
 import { TopBar } from "./TopBar.js";
@@ -52,7 +53,11 @@ export function Shell() {
 function ShellBody() {
   const t = useT();
   const { status } = useEngine();
-  const { editor, unsavedQuestion } = useStation();
+  const { editor, unsavedQuestion, notify } = useStation();
+  // Aggiornamento scaricato: un avviso una volta e il puntino sull'ingranaggio.
+  const updateReady = useUpdateReady((version) => {
+    notify("core.updates.readyNotice", { version }, "info");
+  });
   const files = useShowFiles();
   const { panels: modulePanels, editors } = useModuleUi();
   useCueShortcuts();
@@ -116,6 +121,7 @@ function ShellBody() {
             onManageOutputs={() => {
               setOutputsOpen(true);
             }}
+            updateReady={updateReady}
             onOpenSettings={() => {
               setSettingsOpen(true);
             }}

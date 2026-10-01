@@ -42,7 +42,7 @@ export default tseslint.config(
     rules: { "@typescript-eslint/no-require-imports": ["error", { allowAsImport: true }] },
   },
   {
-    files: ["**/*.js"],
+    files: ["**/*.js", "**/*.mjs"],
     ...tseslint.configs.disableTypeChecked,
   },
 );
