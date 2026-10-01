@@ -126,7 +126,19 @@ export function createHttpServer(paths: StaticPaths, logger: Logger): Server {
     if (!served) send(res, 404);
   };
 
+  // Diagnosi: CUELITH_HTTP_LOG=1 registra ogni richiesta, all'arrivo e alla fine.
+  const trace = process.env["CUELITH_HTTP_LOG"] === "1";
   return createServer((req, res) => {
+    if (trace) {
+      const started = Date.now();
+      const label = `${req.method ?? ""} ${req.url ?? ""}`;
+      logger.info(`http > ${label}`);
+      res.once("close", () => {
+        logger.info(
+          `http < ${label} ${String(res.statusCode)} ${String(Date.now() - started)}ms ${res.writableFinished ? "completa" : "interrotta"}`,
+        );
+      });
+    }
     handle(req, res).catch((error: unknown) => {
       logger.error("errore servendo una risorsa", error);
       if (!res.headersSent) send(res, 500);

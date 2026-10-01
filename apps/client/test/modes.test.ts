@@ -22,14 +22,16 @@ describe("modalita' del nucleo", () => {
     }
   });
 
-  it("Presenta: scaletta e librerie a schede | slide | programma sopra l'anteprima (cap. 04)", () => {
+  it("Presenta: scaletta e librerie a schede | slide | programma, anteprima e sfondi (cap. 04)", () => {
     expect(PRESENT_MODE.layout.panels["playlist"]).toEqual(["core.playlist", "core.library"]);
     expect(PRESENT_MODE.shortcut).toBe("Mod+1");
     expect(PRESENT_MODE.layout.columns).toEqual(["25fr", "40fr", "33fr"]);
     expect(PRESENT_MODE.layout.areas).toEqual([
       ["playlist", "slides", "program"],
       ["playlist", "slides", "preview"],
+      ["playlist", "slides", "backgrounds"],
     ]);
+    expect(PRESENT_MODE.layout.panels["backgrounds"]).toBe("core.backgrounds");
   });
 });
 

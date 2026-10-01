@@ -88,6 +88,16 @@ test("hello-panel: processo separato, comando, riavvio dopo un crash, le uscite 
   const body = projector.locator("body");
   await expect(body).toHaveAttribute("data-text", "Vieni su di noi");
 
+  // Rete accesa: lo stato ha un campo in piu' (live.network). I pannelli dei
+  // moduli devono partire lo stesso, anche se costruiti con un protocollo piu'
+  // vecchio: non controllano lo stato in modo rigido (compatibilita' in avanti).
+  await station.getByRole("button", { name: /^Impostazioni/ }).click();
+  const settings = station.getByRole("dialog", { name: "Impostazioni" });
+  await settings.getByRole("button", { name: "Rete e postazioni" }).click();
+  await settings.getByRole("switch", { name: "Consenti altre postazioni in rete locale" }).click();
+  await expect(settings.getByTestId("network-url")).toBeVisible();
+  await settings.getByRole("button", { name: "Chiudi" }).last().click();
+
   // Installazione dalla cartella del modulo.
   await chooseFiles(app, templateDir);
   await station.getByRole("button", { name: "Aggiungi moduli" }).click();

@@ -95,7 +95,7 @@ export function PreviewPanel() {
   const style = useMemo(() => (state === undefined ? undefined : roomStyle(state)), [state]);
 
   return (
-    <Panel label={t("core.panel.preview")} labelHidden>
+    <Panel label={t("core.panel.preview")} labelHidden tight>
       <div className="flex flex-wrap items-end gap-3">
         {/* In Regia anteprima e programma sono grandi uguali, come in un mixer video. */}
         <div className={mode === "core.director" ? "w-full" : "w-[55%] min-w-40"}>

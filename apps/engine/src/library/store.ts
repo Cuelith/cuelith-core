@@ -9,6 +9,7 @@ import {
   type Library,
   type LibraryItemSummary,
   type MediaInfo,
+  type MediaKind,
 } from "@cuelith/protocol";
 import { ftsQuery, searchableBody } from "./search.js";
 
@@ -554,6 +555,20 @@ export class LibraryStore {
       info.size,
       new Date().toISOString(),
     );
+  }
+
+  /** File dell'archivio di un tipo, dal piu' recente. */
+  listMedia(kind: MediaKind): MediaInfo[] {
+    return this.#all(
+      "SELECT id, name, kind, mime, size FROM media WHERE kind = ? ORDER BY created_at DESC, id",
+      kind,
+    ).map((row) => ({
+      id: String(row["id"]),
+      name: String(row["name"]),
+      kind,
+      mime: String(row["mime"]),
+      size: Number(row["size"]),
+    }));
   }
 
   hasMedia(id: string): boolean {

@@ -113,6 +113,8 @@ export const libraryHandlers: HandlerMap = {
     return { rev: ctx.store.rev };
   },
 
+  "media.list": (ctx, _session, params) => ({ media: ctx.library.db.listMedia(params.kind) }),
+
   "media.import": async (ctx, session, params) => {
     requireLocal(session);
     return { media: await ctx.library.importMedia(params.path) };

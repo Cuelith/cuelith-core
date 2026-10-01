@@ -78,6 +78,16 @@ describe("sfondi", () => {
     expect(response.headers.get("content-type")).toBe("image/png");
     expect(Buffer.from(await response.arrayBuffer()).equals(PNG)).toBe(true);
 
+    // L'elenco delle immagini dell'archivio, per sceglierle di nuovo (protocollo 1.12).
+    const second = await importFile("mare.png", Buffer.concat([PNG, Buffer.from([0])]));
+    const listed = (await ok("media.list", { kind: "image" })).media;
+    expect(listed.map((m) => m.name).sort()).toEqual(["cielo.png", "mare.png"]);
+    expect(listed.find((m) => m.id === second.id)).toMatchObject({
+      kind: "image",
+      mime: "image/png",
+    });
+    expect((await ok("media.list", { kind: "audio" })).media).toEqual([]);
+
     // Solo immagini dell'archivio.
     const missing = { uri: mediaUri(`${"0".repeat(64)}.png`), kind: "image" as const };
     expect(await expectError(client, "item.update", { id, background: missing })).toEqual([

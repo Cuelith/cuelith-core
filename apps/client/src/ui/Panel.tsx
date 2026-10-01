@@ -13,7 +13,10 @@ export function Panel({
   children,
   actions,
   labelHidden = false,
+  tight = false,
 }: {
+  /** Meno spazio sopra: per i pannelli impilati sotto un altro (anteprima sotto il programma). */
+  tight?: boolean;
   label: string;
   children: ReactNode;
   actions?: ReactNode;
@@ -24,7 +27,10 @@ export function Panel({
   const hidden = labelHidden || chrome.labelHidden;
   const onlyActions = hidden && actions !== undefined;
   return (
-    <section aria-labelledby={id} className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 p-3">
+    <section
+      aria-labelledby={id}
+      className={`flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 p-3 ${tight ? "pt-0" : ""}`}
+    >
       <header
         className={
           hidden && !onlyActions ? "sr-only" : "flex min-h-6 items-center justify-between gap-2"

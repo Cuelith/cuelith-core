@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { addOutput, chooseFiles, createText, outputWindow, screenshotsDir, test } from "./app.js";
 
 /** Un'immagine di prova (SVG, uno dei formati ammessi) di un colore pieno con un cerchio. */
@@ -16,15 +16,19 @@ function image(name: string, color: string): string {
   return file;
 }
 
-/** Voce del menu «Sfondo» nel pannello delle slide. */
-async function backgroundMenu(station: Page, item: string | RegExp): Promise<void> {
-  await station.getByRole("button", { name: "Sfondo dei testi" }).click();
-  await station.getByRole("menuitem", { name: item }).click();
+/** Il pannello Sfondi, sotto l'anteprima. */
+const panel = (station: Page): Locator => station.getByRole("region", { name: "Sfondi" });
+
+/** Dove mettere lo sfondo: «Slide N», «Tutto l'elemento» o il predefinito del look. */
+async function target(station: Page, name: string | RegExp): Promise<void> {
+  const radio = panel(station).getByRole("radio", { name });
+  await radio.click();
+  await expect(radio).toBeChecked();
 }
 
 // Passo 6c, decisione 0003: sfondi immagine per slide, per elemento e
 // predefinito del look, con il velo; le uscite li caricano prima di mostrarli.
-test("sfondi: elemento, singola slide e look Sala; l'uscita li mostra, il velo scurisce", async ({
+test("sfondi: pannello con le miniature; elemento, singola slide e look Sala; velo", async ({
   running,
 }) => {
   const { app, station, problems } = running;
@@ -36,53 +40,66 @@ test("sfondi: elemento, singola slide e look Sala; l'uscita li mostra, il velo s
   await expect(output).toHaveAttribute("data-text", "Vieni su di noi");
   await expect(output).toHaveAttribute("data-background", "");
 
-  // Sfondo per tutto l'elemento: ogni slide lo prende, l'uscita lo mostra.
+  const backgrounds = panel(station);
+  const images = backgrounds.getByRole("list", { name: "Immagini" });
+  const none = images.getByRole("button", { name: "Nessuno" });
+  const add = images.getByRole("button", { name: "Aggiungi un'immagine dal computer" });
+  await expect(none).toHaveAttribute("aria-pressed", "true");
+
+  // Un'immagine dal computer, per tutto l'elemento: ogni slide la prende, l'uscita la mostra.
+  await target(station, "Tutto l'elemento");
   await chooseFiles(app, image("cielo", "#1F4E8C"));
-  await backgroundMenu(station, "Immagine per tutto l'elemento…");
+  await add.click();
+  const sky = images.getByRole("button", { name: "cielo.svg" });
+  await expect(sky).toHaveAttribute("aria-pressed", "true");
   const tiles = station.getByRole("list", { name: "Slide" }).getByTestId("slide-background");
   await expect(tiles).toHaveCount(2);
-  const sky = (await tiles.first().getAttribute("data-background")) ?? "";
-  expect(sky).toMatch(/^\/media\/[a-f0-9]{64}\.svg$/);
-  await expect(output).toHaveAttribute("data-background", sky);
-  await expect(
-    station.locator('[data-screen="live"]').getByTestId("slide-background"),
-  ).toHaveAttribute("data-background", sky);
+  const skyUrl = (await tiles.first().getAttribute("data-background")) ?? "";
+  expect(skyUrl).toMatch(/^\/media\/[a-f0-9]{64}\.svg$/);
+  await expect(output).toHaveAttribute("data-background", skyUrl);
 
-  // Sfondo solo per la slide 2 (quella in anteprima): vince su quello dell'elemento.
+  // Un'altra immagine solo per la slide 2 (quella in anteprima): vince su quella dell'elemento.
   await station.getByRole("button", { name: "Slide 2" }).click();
+  await target(station, "Slide 2");
+  await expect(none).toHaveAttribute("aria-pressed", "true");
   await chooseFiles(app, image("tramonto", "#8C2F1F"));
-  await backgroundMenu(station, "Immagine per la slide 2…");
-  await expect(tiles.nth(1)).not.toHaveAttribute("data-background", sky);
-  const sunset = (await tiles.nth(1).getAttribute("data-background")) ?? "";
+  await add.click();
+  await expect(images.getByRole("button", { name: "tramonto.svg" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(tiles.nth(1)).not.toHaveAttribute("data-background", skyUrl);
+  const sunsetUrl = (await tiles.nth(1).getAttribute("data-background")) ?? "";
   // L'uscita mostra ancora la slide 1, col suo sfondo.
-  await expect(output).toHaveAttribute("data-background", sky);
+  await expect(output).toHaveAttribute("data-background", skyUrl);
   await station.locator("body").click({ position: { x: 700, y: 600 } });
   await station.keyboard.press("ArrowRight");
   await expect(output).toHaveAttribute("data-text", "Resta con noi");
-  await expect(output).toHaveAttribute("data-background", sunset);
-  await projector.waitForTimeout(400); // fine della dissolvenza
-  await projector.screenshot({ path: path.join(screenshotsDir, "sfondo-uscita.png") });
+  await expect(output).toHaveAttribute("data-background", sunsetUrl);
 
-  // Velo: il testo resta leggibile; la scelta si vede nel menu.
-  await backgroundMenu(station, "Velo: medio");
-  await station.getByRole("button", { name: "Sfondo dei testi" }).click();
-  await expect(station.getByRole("menuitem", { name: "Velo: medio ✓" })).toBeVisible();
-  await station.keyboard.press("Escape");
-  await projector.waitForTimeout(400);
+  // Velo: il testo resta leggibile sopra l'immagine.
+  await backgrounds.getByRole("combobox", { name: "Velo" }).selectOption({ label: "medio" });
+  await expect(backgrounds.getByRole("combobox", { name: "Velo" })).toHaveValue("0.45");
+  await projector.waitForTimeout(400); // fine della dissolvenza
   await projector.screenshot({ path: path.join(screenshotsDir, "sfondo-uscita-velo.png") });
   await station.screenshot({ path: path.join(screenshotsDir, "sfondo-postazione.png") });
 
-  // Tolto lo sfondo della slide, torna quello dell'elemento; tolto anche quello, niente.
-  await backgroundMenu(station, "Togli lo sfondo dalla slide 2");
-  await expect(output).toHaveAttribute("data-background", sky);
-  await backgroundMenu(station, "Togli lo sfondo dell'elemento");
+  // Un'immagine gia' caricata si riusa con un clic: la slide 2 passa al cielo.
+  await target(station, "Slide 2");
+  await sky.click();
+  await expect(output).toHaveAttribute("data-background", skyUrl);
+  // «Nessuno» toglie: prima dalla slide (resta quello dell'elemento), poi dall'elemento.
+  await none.click();
+  await expect(output).toHaveAttribute("data-background", skyUrl);
+  await target(station, "Tutto l'elemento");
+  await none.click();
   await expect(output).toHaveAttribute("data-background", "");
   await expect(tiles).toHaveCount(0);
 
   // Sfondo predefinito del look Sala: vale per ogni testo senza sfondo proprio.
-  await chooseFiles(app, image("sala", "#1F6B4A"));
-  await backgroundMenu(station, /^Immagine predefinita del look Sala/);
-  await expect(output).toHaveAttribute("data-background", /^\/media\/[a-f0-9]{64}\.svg$/);
+  await target(station, /^Predefinito \(Sala\)/);
+  await images.getByRole("button", { name: "tramonto.svg" }).click();
+  await expect(output).toHaveAttribute("data-background", sunsetUrl);
   await expect(tiles).toHaveCount(2);
   expect(problems).toEqual([]);
 });

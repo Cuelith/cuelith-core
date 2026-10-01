@@ -117,6 +117,22 @@ test("dopo un arresto improvviso propone la copia automatica e la riapre", async
   await createText(first.station, "Luce del mattino", ["Vieni su di noi"]);
   const autosave = path.join(first.userData, "autosave");
   await expect.poll(() => (existsSync(autosave) ? readdirSync(autosave).length : 0)).toBe(1);
+  // La copia deve contenere gia' la voce in scaletta: «crea testo» sono due
+  // comandi (elemento, poi scaletta) e una copia puo' cadere in mezzo.
+  await expect
+    .poll(() => {
+      const [file] = readdirSync(autosave);
+      if (file === undefined) return 0;
+      try {
+        const show = JSON.parse(readFileSync(path.join(autosave, file), "utf8")) as {
+          playlist?: unknown[];
+        };
+        return show.playlist?.length ?? 0;
+      } catch {
+        return 0; // copia in corso di scrittura
+      }
+    })
+    .toBe(1);
   // Arresto brusco di tutto il programma: niente chiusura corretta, la copia resta.
   await crash(first.app);
 

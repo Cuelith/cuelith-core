@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { BackgroundsPanel } from "./BackgroundsPanel.js";
 import { LibraryPanel } from "./LibraryPanel.js";
 import { NotesPanel, OrderPanel, SectionsPanel, TransitionsPanel } from "./LivePanels.js";
 import { PlaylistPanel } from "./PlaylistPanel.js";
@@ -19,4 +20,5 @@ export const CORE_PANEL_COMPONENTS: Readonly<Record<string, ComponentType>> = {
   "core.stage": StagePanel,
   "core.notes": NotesPanel,
   "core.transitions": TransitionsPanel,
+  "core.backgrounds": BackgroundsPanel,
 };
