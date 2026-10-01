@@ -1,4 +1,5 @@
 import { areaPanelIds, providerOf } from "@cuelith/protocol";
+import { CurrentModeContext } from "../station/currentMode.js";
 import {
   useContext,
   useEffect,
@@ -185,30 +186,32 @@ export function ModeView({
       style={style}
       data-mode={mode.qualifiedId}
     >
-      <ModulePanelsContext.Provider value={modules}>
-        {entries.map(([area, coreIds]) => {
-          const ids = area === sideArea ? [...coreIds, ...side] : coreIds;
-          const single = ids.length === 1 ? ids[0] : undefined;
-          return (
-            <div
-              key={area}
-              data-area={area}
-              data-panel={single}
-              className={`flex min-h-0 min-w-0 flex-col ${single === undefined ? "" : "overflow-auto"} ${lastColumn.has(area) ? "" : "border-r border-line"}`}
-              style={{ gridArea: area }}
-            >
-              {single !== undefined ? (
-                <PanelView panelId={single} />
-              ) : (
-                <TabbedArea
-                  storageKey={`cuelith.tabs.${mode.qualifiedId}.${area}`}
-                  panelIds={ids}
-                />
-              )}
-            </div>
-          );
-        })}
-      </ModulePanelsContext.Provider>
+      <CurrentModeContext.Provider value={mode.qualifiedId}>
+        <ModulePanelsContext.Provider value={modules}>
+          {entries.map(([area, coreIds]) => {
+            const ids = area === sideArea ? [...coreIds, ...side] : coreIds;
+            const single = ids.length === 1 ? ids[0] : undefined;
+            return (
+              <div
+                key={area}
+                data-area={area}
+                data-panel={single}
+                className={`flex min-h-0 min-w-0 flex-col ${single === undefined ? "" : "overflow-auto"} ${lastColumn.has(area) ? "" : "border-r border-line"}`}
+                style={{ gridArea: area }}
+              >
+                {single !== undefined ? (
+                  <PanelView panelId={single} />
+                ) : (
+                  <TabbedArea
+                    storageKey={`cuelith.tabs.${mode.qualifiedId}.${area}`}
+                    panelIds={ids}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </ModulePanelsContext.Provider>
+      </CurrentModeContext.Provider>
     </main>
   );
 }

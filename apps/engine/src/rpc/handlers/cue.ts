@@ -1,4 +1,4 @@
-import { ErrorCode, RpcError, type StateDocument } from "@cuelith/protocol";
+import { ErrorCode, RpcError, timerRemaining, type StateDocument } from "@cuelith/protocol";
 import {
   goLive,
   previewPosition,
@@ -84,6 +84,42 @@ export const cueHandlers: HandlerMap = {
     rev: ctx.store.update((draft) => {
       draft.live.layers[params.layer] = { visible: false };
       pruneDirect(draft);
+    }),
+  }),
+
+  // ---- Timer della regia (protocollo 1.7): conto alla rovescia condiviso ----
+  "timer.set": (ctx, _session, params) => ({
+    rev: ctx.store.update((draft) => {
+      draft.live.timer = { durationMs: params.durationMs, remainingMs: params.durationMs };
+    }),
+  }),
+  "timer.start": (ctx) => ({
+    rev: ctx.store.update((draft) => {
+      const timer = draft.live.timer;
+      if (timer === undefined || timer.startedAt !== undefined) return;
+      timer.startedAt = new Date().toISOString();
+    }),
+  }),
+  "timer.pause": (ctx) => ({
+    rev: ctx.store.update((draft) => {
+      const timer = draft.live.timer;
+      if (timer?.startedAt === undefined) return;
+      draft.live.timer = {
+        durationMs: timer.durationMs,
+        remainingMs: Math.round(timerRemaining(timer)),
+      };
+    }),
+  }),
+  "timer.reset": (ctx) => ({
+    rev: ctx.store.update((draft) => {
+      const timer = draft.live.timer;
+      if (timer === undefined) return;
+      draft.live.timer = { durationMs: timer.durationMs, remainingMs: timer.durationMs };
+    }),
+  }),
+  "timer.clear": (ctx) => ({
+    rev: ctx.store.update((draft) => {
+      delete draft.live.timer;
     }),
   }),
 

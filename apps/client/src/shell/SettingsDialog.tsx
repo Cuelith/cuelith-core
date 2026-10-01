@@ -206,6 +206,10 @@ function Shortcuts() {
       title: t("core.shortcuts.group.station"),
       rows: [
         [[`${MOD}+1`], t("core.shortcuts.modePresent")],
+        [[`${MOD}+2`], t("core.shortcuts.modeBand")],
+        [[`${MOD}+3`], t("core.shortcuts.modeConference")],
+        [[`${MOD}+4`], t("core.shortcuts.modeDirector")],
+        [[`${MOD}+5`], t("core.shortcuts.modeCompact")],
         [[`${MOD}+,`], t("core.shortcuts.settings")],
       ],
     },

@@ -139,6 +139,18 @@ export const outputHandlers: HandlerMap = {
     }),
   }),
 
+  /** Messaggio su un'uscita (es. al relatore sul palco); testo vuoto lo toglie. */
+  "message.send": (ctx, _session, params) => ({
+    rev: ctx.store.update((draft) => {
+      outputOf(draft, params.outputId);
+      const live = draft.live.outputs[params.outputId];
+      if (live === undefined) return;
+      const text = params.text.trim();
+      if (text === "") delete live.message;
+      else live.message = text;
+    }),
+  }),
+
   "output.freeze": (ctx, session, params) => ({
     rev: ctx.store.update((draft) => {
       checkOwner(outputOf(draft, params.outputId), session);

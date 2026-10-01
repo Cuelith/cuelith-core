@@ -148,3 +148,39 @@ describe("uscite", () => {
     expect(state().live.outputs[id]).toEqual({ blackout: false, freeze: false, status: "ok" });
   });
 });
+
+describe("palco e timer (protocollo 1.7)", () => {
+  it("un messaggio va solo all'uscita scelta; il testo vuoto lo toglie", async () => {
+    const { room, stage } = presentation();
+    const { id: projector } = await ok("output.create", displayOutput("Proiettore", "2", room.id));
+    const { id: monitor } = await ok("output.create", displayOutput("Palco", "3", stage.id));
+    await ok("message.send", { outputId: monitor, text: "  5 minuti " });
+    expect(state().live.outputs[monitor]?.message).toBe("5 minuti");
+    expect(state().live.outputs[projector]?.message).toBeUndefined();
+    expect(state().live.dirty).toBe(true); // per la creazione delle uscite, non per il messaggio
+    await ok("message.send", { outputId: monitor, text: "" });
+    expect(state().live.outputs[monitor]?.message).toBeUndefined();
+    expect(
+      await fails("message.send", { outputId: "01ARZ3NDEKTSV4RRFFQ69G5FAV", text: "x" }),
+    ).toEqual([4040, "core.error.outputNotFound"]);
+  });
+
+  it("timer: durata, partenza, pausa che tiene il rimanente, azzera, togli", async () => {
+    await ok("timer.set", { durationMs: 600_000 });
+    expect(state().live.timer).toEqual({ durationMs: 600_000, remainingMs: 600_000 });
+    await ok("timer.start", {});
+    const started = state().live.timer;
+    expect(started?.startedAt).toBeDefined();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    await ok("timer.pause", {});
+    const paused = state().live.timer;
+    expect(paused?.startedAt).toBeUndefined();
+    expect(paused?.remainingMs).toBeLessThan(600_000);
+    expect(paused?.remainingMs).toBeGreaterThan(590_000);
+    await ok("timer.reset", {});
+    expect(state().live.timer).toEqual({ durationMs: 600_000, remainingMs: 600_000 });
+    await ok("timer.clear", {});
+    expect(state().live.timer).toBeUndefined();
+    expect(state().live.dirty).toBe(false);
+  });
+});

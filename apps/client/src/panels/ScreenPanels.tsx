@@ -1,5 +1,6 @@
 import type { FullscreenStyle } from "@cuelith-core/core-looks";
-import { useMemo } from "react";
+import { useContext, useMemo } from "react";
+import { CurrentModeContext } from "../station/currentMode.js";
 import { useEngine, useT } from "../engine/react.js";
 import {
   previewSlide,
@@ -81,6 +82,7 @@ export function ProgramPanel() {
 /** Anteprima: la prossima slide, piu' piccola; Invio la manda in onda. */
 export function PreviewPanel() {
   const t = useT();
+  const mode = useContext(CurrentModeContext);
   const { state } = useEngine();
   const run = useRun();
   const slide = useMemo(() => (state === undefined ? undefined : previewSlide(state)), [state]);
@@ -89,7 +91,8 @@ export function PreviewPanel() {
   return (
     <Panel label={t("core.panel.preview")} labelHidden>
       <div className="flex flex-wrap items-end gap-3">
-        <div className="w-[55%] min-w-40">
+        {/* In Regia anteprima e programma sono grandi uguali, come in un mixer video. */}
+        <div className={mode === "core.director" ? "w-full" : "w-[55%] min-w-40"}>
           <Screen tone="cue" label={t("core.panel.preview")}>
             {slide === undefined ? (
               <ScreenEmpty text={t("core.preview.empty")} />

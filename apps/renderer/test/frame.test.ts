@@ -139,6 +139,25 @@ describe("describeOutput", () => {
     expect(describeOutput(doc, stage)?.frame).toMatchObject({ message: "Cinque minuti" });
   });
 
+  it("un messaggio per un'uscita sola (es. al relatore) non compare sulle altre", () => {
+    const { doc, room, stage } = makeDoc();
+    const stageLive = doc.live.outputs[stage];
+    if (stageLive === undefined) throw new Error("stato mancante");
+    stageLive.message = "5 minuti";
+    expect(describeOutput(doc, stage)?.frame).toMatchObject({ message: "5 minuti" });
+    expect(describeOutput(doc, room)?.frame).toMatchObject({ message: undefined });
+  });
+
+  it("Palco: il timer della regia arriva al relatore", () => {
+    const { doc, room, stage } = makeDoc();
+    doc.live.timer = { durationMs: 600_000, remainingMs: 600_000 };
+    expect(describeOutput(doc, stage)?.frame).toMatchObject({
+      kind: "stage",
+      timer: { durationMs: 600_000, remainingMs: 600_000 },
+    });
+    expect(describeOutput(doc, room)?.frame).not.toHaveProperty("timer");
+  });
+
   it("Sala: i crediti compaiono sull'ultima slide se l'elemento lo prevede", () => {
     const { doc, room, stage } = makeDoc();
     const item = Object.values(doc.show.items)[0];

@@ -3,6 +3,7 @@ import { useEngine } from "../engine/react.js";
 import { slideSequence } from "@cuelith/protocol";
 import { itemOfEntry } from "./show.js";
 import { useRun, useStation } from "./station.js";
+import { showTab } from "./tabs.js";
 
 /**
  * Sceglie una voce della scaletta: ne mostra le slide e mette la prima in
@@ -16,6 +17,8 @@ export function useChooseEntry(): (entryId: string) => void {
   return useCallback(
     (entryId: string) => {
       select(entryId);
+      // Dove le slide sono una scheda (Compatta), la si mostra.
+      showTab("core.slides");
       if (state === undefined) return;
       const live = state.live;
       const onAir = live.layers.content.visible && live.cursor.entryId === entryId;

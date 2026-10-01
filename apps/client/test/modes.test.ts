@@ -32,3 +32,31 @@ describe("modalita' del nucleo", () => {
     ]);
   });
 });
+
+describe("disposizioni fisse (decisione 0006)", () => {
+  it("sono cinque, con scorciatoie Ctrl+1..5 diverse", () => {
+    expect(CORE_MODES.map((m) => m.id)).toEqual([
+      "present",
+      "band",
+      "conference",
+      "director",
+      "compact",
+    ]);
+    expect(CORE_MODES.map((m) => m.shortcut)).toEqual([
+      "Mod+1",
+      "Mod+2",
+      "Mod+3",
+      "Mod+4",
+      "Mod+5",
+    ]);
+  });
+
+  it("in ognuna il programma (cio' che e' in onda) resta sempre visibile, mai in una scheda", () => {
+    for (const mode of CORE_MODES) {
+      const areas = Object.values(mode.layout.panels);
+      expect(areas.some((panels) => panels === "core.program")).toBe(true);
+      // La scaletta c'e' sempre: anche le schede dei moduli (es. Canti) hanno un posto.
+      expect(areas.some((panels) => areaPanelIds(panels).includes("core.playlist"))).toBe(true);
+    }
+  });
+});

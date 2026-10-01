@@ -47,6 +47,9 @@ export function ModulePanelFrame({
   const { notify } = useStation();
   const frame = useRef<HTMLIFrameElement>(null);
   const port = useRef<MessagePort | undefined>(undefined);
+  // Caricamento dell'iframe e collegamento da fare (vedi l'effetto sotto).
+  const loaded = useRef(false);
+  const connectOnLoad = useRef<(() => void) | undefined>(undefined);
   const t = useT();
   const panels = useContext(ModulePanelsContext);
   const latest = useRef({
@@ -175,9 +178,13 @@ export function ModulePanelFrame({
       });
     };
 
-    element.addEventListener("load", onLoad);
+    // L'iframe puo' finire di caricarsi prima di questo effetto (file gia' in
+    // memoria): il caricamento lo registra `onLoad` sull'elemento e il
+    // collegamento si fa subito, invece di restare scollegati.
+    connectOnLoad.current = onLoad;
+    if (loaded.current) onLoad();
     return () => {
-      element.removeEventListener("load", onLoad);
+      connectOnLoad.current = undefined;
       port.current?.close();
       port.current = undefined;
     };
@@ -204,6 +211,10 @@ export function ModulePanelFrame({
       sandbox="allow-scripts"
       className="h-full min-h-0 w-full flex-1 border-0 bg-bg"
       data-module-panel={panel.id}
+      onLoad={() => {
+        loaded.current = true;
+        connectOnLoad.current?.();
+      }}
     />
   );
 }

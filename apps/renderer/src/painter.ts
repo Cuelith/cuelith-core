@@ -1,5 +1,6 @@
 import "pixi.js/unsafe-eval";
 import { Application, Container, Graphics, Text, type Ticker } from "pixi.js";
+import { formatTimer, timerPhase, timerRemaining } from "@cuelith/protocol";
 import type { Frame, OutputView, TextStyle } from "./frame.js";
 
 const FONT: Record<TextStyle["font"], string> = {
@@ -22,6 +23,9 @@ export interface PaintStats {
   frames: number;
   maxGapMs: number;
 }
+
+/** Colori del tempo, come sui timer da palco: verde, ambra, rosso. */
+const TIMER_COLOR = { ok: "#37D1BF", warning: "#F2B441", danger: "#FF5B3A" } as const;
 
 function clockText(): string {
   return new Date().toLocaleTimeString(document.documentElement.lang || undefined, {
@@ -47,6 +51,8 @@ export class Painter {
   #latest: OutputView | undefined;
   #clock: Text | undefined;
   #clockTimer: ReturnType<typeof setInterval> | undefined;
+  #countdown: Text | undefined;
+  #countdownTimer: ReturnType<typeof setInterval> | undefined;
 
   async init(host: HTMLElement): Promise<void> {
     await this.#app.init({
@@ -140,6 +146,9 @@ export class Painter {
     this.#clock = undefined;
     if (this.#clockTimer !== undefined) clearInterval(this.#clockTimer);
     this.#clockTimer = undefined;
+    this.#countdown = undefined;
+    if (this.#countdownTimer !== undefined) clearInterval(this.#countdownTimer);
+    this.#countdownTimer = undefined;
     if (frame.kind === "black") return layer;
 
     layer.addChild(new Graphics().rect(0, 0, w, h).fill(frame.background));
@@ -200,6 +209,30 @@ export class Painter {
         this.#clockTimer = setInterval(() => {
           if (this.#clock !== undefined) this.#clock.text = clockText();
         }, 1000);
+      }
+      const timer = frame.timer;
+      if (timer !== undefined) {
+        // Timer del relatore: grande, in alto a destra (sotto l'orologio), coi colori del tempo.
+        const remaining = timerRemaining(timer);
+        const countdown = new Text({
+          text: formatTimer(remaining),
+          style: {
+            fontFamily: FONT.mono,
+            fontSize: 110 * scale,
+            fontWeight: "700",
+            fill: TIMER_COLOR[timerPhase(remaining)],
+          },
+        });
+        countdown.anchor.set(1, 0);
+        countdown.position.set(w - margin, margin * 0.5 + (frame.clock ? 60 * scale : 0));
+        layer.addChild(countdown);
+        this.#countdown = countdown;
+        this.#countdownTimer = setInterval(() => {
+          if (this.#countdown === undefined) return;
+          const left = timerRemaining(timer);
+          this.#countdown.text = formatTimer(left);
+          this.#countdown.style.fill = TIMER_COLOR[timerPhase(left)];
+        }, 250);
       }
     }
 

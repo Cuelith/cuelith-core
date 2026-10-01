@@ -14,6 +14,7 @@ import {
   type OutputConfig,
   type Slide,
   type StateDocument,
+  type Timer,
 } from "@cuelith/protocol";
 
 export type TextStyle = FullscreenStyle["text"];
@@ -39,6 +40,8 @@ export type Frame =
       readonly next: string | undefined;
       readonly clock: boolean;
       readonly message: string | undefined;
+      /** Timer della regia (protocollo 1.7), per il relatore. */
+      readonly timer: Timer | undefined;
     };
 
 export interface OutputView {
@@ -97,14 +100,13 @@ function presentation(doc: StateDocument) {
   return { onAir, next, key, credits };
 }
 
-function messageOf(doc: StateDocument, look: Look): string | undefined {
+/** Messaggio dell'uscita (protocollo 1.7), altrimenti quello generale, se il look lo mostra. */
+function messageOf(doc: StateDocument, look: Look, outputId: string): string | undefined {
+  if (!look.layers.includes("message")) return undefined;
+  const own = doc.live.outputs[outputId]?.message;
+  if (own !== undefined && own !== "") return own;
   const layer = doc.live.layers.message;
-  return look.layers.includes("message") &&
-    layer.visible &&
-    layer.text !== undefined &&
-    layer.text !== ""
-    ? layer.text
-    : undefined;
+  return layer.visible && layer.text !== undefined && layer.text !== "" ? layer.text : undefined;
 }
 
 /**
@@ -129,7 +131,7 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
   const { onAir, next, key, credits } = presentation(doc);
   const showContent = look.layers.includes("content");
   const text = showContent && look.fields.includes("text") ? textOf(onAir) : undefined;
-  const message = messageOf(doc, look);
+  const message = messageOf(doc, look, outputId);
 
   if (look.template === "core.fullscreen") {
     const style = FullscreenStyleSchema.safeParse(look.style);
@@ -165,6 +167,7 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
         next: style.data.showNext ? textOf(next) : undefined,
         clock: style.data.showClock,
         message,
+        timer: doc.live.timer,
       },
     };
   }
