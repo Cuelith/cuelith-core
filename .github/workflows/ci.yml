@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # I repo vanno affiancati come in locale: cuelith-core usa cuelith-sdk
-      # con link:../../../cuelith-sdk e legge la lingua da ../plugin-locale-it.
+      # con link:../../../cuelith-sdk e legge le lingue da ../plugin-locale-it e ../plugin-locale-en.
       - uses: actions/checkout@v7
         with:
           path: cuelith-core
@@ -25,6 +25,11 @@ jobs:
           repository: Cuelith/plugin-locale-it
           ref: ${{ github.base_ref || github.ref_name }}
           path: plugin-locale-it
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/plugin-locale-en
+          ref: ${{ github.base_ref || github.ref_name }}
+          path: plugin-locale-en
       # Il modulo Canti vero, per la prova con l'app (e2e/tests/songs.spec.ts).
       # Ramo dev finche' il modulo non ha la prima release su main.
       - uses: actions/checkout@v7

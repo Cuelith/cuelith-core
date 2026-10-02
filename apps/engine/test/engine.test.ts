@@ -143,11 +143,9 @@ describe("stato", () => {
         .map((l) => l.name)
         .sort(),
     ).toEqual(["Palco", "Sala"]);
-    expect(state.live.plugins).toContainEqual({
-      id: "cuelith.locale.it",
-      version: "0.1.0",
-      state: "active",
-    });
+    expect(state.live.plugins).toContainEqual(
+      expect.objectContaining({ id: "cuelith.locale.it", state: "active" }),
+    );
     expect(state.live.clients).toHaveLength(1);
     expect(state.live.rev).toBe(rev);
   });

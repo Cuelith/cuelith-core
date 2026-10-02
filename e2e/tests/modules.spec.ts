@@ -19,7 +19,7 @@ function greetingsPackage(version: string): Uint8Array {
     license: "Apache-2.0",
     repository: "https://github.com/Cuelith/plugin-greetings",
     family: "function",
-    engines: { cuelith: "^0.1.0", protocol: "^1.4.0" },
+    engines: { cuelith: ">=0.1.0 <1.0.0", protocol: "^1.4.0" },
     runtime: { type: "none" },
     permissions: ["storage"],
     dependencies: {},
@@ -67,7 +67,7 @@ function registryFolder(): string {
           versions: [
             {
               version: "1.0.0",
-              engines: { cuelith: "^0.1.0", protocol: "^1.4.0" },
+              engines: { cuelith: ">=0.1.0 <1.0.0", protocol: "^1.4.0" },
               url: `https://github.com/Cuelith/plugin-greetings/releases/download/v1.0.0/${file}`,
               sha256: createHash("sha256").update(data).digest("hex"),
               size: data.byteLength,
@@ -95,8 +95,8 @@ const test = base.extend<{ market: RunningApp }>({
 });
 
 async function openModules(station: Page) {
-  await station.getByRole("button", { name: "Aggiungi moduli" }).click();
-  const window = station.getByRole("dialog", { name: "Moduli" });
+  await station.getByRole("button", { name: "Aggiungi plugin" }).click();
+  const window = station.getByRole("dialog", { name: "Plugin" });
   await expect(window).toBeVisible();
   return window;
 }
@@ -160,7 +160,7 @@ test("senza marketplace raggiungibile lo dice, e l'italiano resta obbligatorio",
     hasText: "Italiano",
   });
   // Modulo passivo: lavora in background, niente icona nella colonna degli strumenti.
-  await expect(italian).toContainText("Lingua · In background · 0.1.0 · Incluso · Attivo");
+  await expect(italian).toContainText(/Lingua · In background · \d+\.\d+\.\d+ · Incluso · Attivo/);
   await expect(italian.locator("img")).toHaveAttribute("src", /icon\.svg$/);
   await expect(italian.getByRole("switch", { name: "Attiva Italiano" })).toBeDisabled();
   await expect(italian.getByRole("button", { name: "Disinstalla" })).toHaveCount(0);

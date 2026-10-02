@@ -263,8 +263,8 @@ async function setLanguage(station: Page, lang: string): Promise<void> {
 async function installSongs(running: RunningApp, file: string): Promise<FrameLocator> {
   const { app, station } = running;
   await chooseFiles(app, file);
-  await station.getByRole("button", { name: "Aggiungi moduli" }).click();
-  const modules = station.getByRole("dialog", { name: "Moduli" });
+  await station.getByRole("button", { name: "Aggiungi plugin" }).click();
+  const modules = station.getByRole("dialog", { name: "Plugin" });
   await modules.getByRole("tab", { name: "Installati" }).click();
   await modules.getByRole("button", { name: "Installa da file…" }).click();
   const guide = station.getByRole("dialog", { name: "Primi passi con «Canti»" });
@@ -273,7 +273,7 @@ async function installSongs(running: RunningApp, file: string): Promise<FrameLoc
   await guide.getByRole("button", { name: "Ho capito" }).click();
   await modules.getByRole("button", { name: "Chiudi" }).click();
   await station
-    .getByRole("navigation", { name: "Moduli" })
+    .getByRole("navigation", { name: "Plugin" })
     .getByRole("button", { name: "Canti", exact: true })
     .click();
   const side = station.frameLocator('[data-module-panel="cuelith.songs.songs"]');
@@ -382,8 +382,8 @@ async function shoot(running: RunningApp, demo: Demo): Promise<void> {
   await station.getByRole("button", { name: "Presenta", exact: true }).click();
 
   // Moduli e risorse.
-  await station.getByRole("button", { name: "Aggiungi moduli" }).click();
-  const modules = station.getByRole("dialog", { name: "Moduli" });
+  await station.getByRole("button", { name: "Aggiungi plugin" }).click();
+  const modules = station.getByRole("dialog", { name: "Plugin" });
   await modules.getByRole("tab", { name: "Installati" }).click();
   await expect(modules.getByRole("list", { name: "Installati" })).toContainText("Canti");
   await shot(station, "moduli");

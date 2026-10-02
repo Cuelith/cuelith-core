@@ -50,10 +50,9 @@ writeFileSync(
   )}\n`,
 );
 
-// Le lingue preinstallate (extraResources): solo i file del modulo. L'italiano
-// e' obbligatorio; l'inglese entra se il suo repo e' affiancato.
-const locale = path.resolve(root, "../../../plugin-locale-it");
-const plugins = path.join(root, "pack", "plugins", "cuelith.locale.it");
+// Le lingue preinstallate (extraResources): solo i file del modulo. Italiano
+// e inglese stanno nell'installatore (decisione 0010): senza uno dei due repo
+// affiancati il pacchetto non si fa.
 rmSync(path.join(root, "pack", "plugins"), { recursive: true, force: true });
 for (const lang of ["it", "en"]) {
   const from = path.resolve(root, `../../../plugin-locale-${lang}`);
@@ -63,9 +62,9 @@ for (const lang of ["it", "en"]) {
       cpSync(path.join(from, name), path.join(to, name), { recursive: true });
     }
   }
-}
-if (!existsSync(path.join(plugins, "cuelith-plugin.json"))) {
-  console.error(`Manca la lingua italiana in ${locale} (repo affiancato plugin-locale-it).`);
-  process.exit(1);
+  if (!existsSync(path.join(to, "cuelith-plugin.json"))) {
+    console.error(`Manca la lingua "${lang}" in ${from} (repo affiancato plugin-locale-${lang}).`);
+    process.exit(1);
+  }
 }
 console.log("pack/app pronta");

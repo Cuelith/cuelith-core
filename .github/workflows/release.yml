@@ -32,6 +32,11 @@ jobs:
           repository: Cuelith/plugin-locale-it
           ref: main
           path: plugin-locale-it
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/plugin-locale-en
+          ref: main
+          path: plugin-locale-en
       - uses: pnpm/action-setup@v6
         with:
           package_json_file: cuelith-core/package.json

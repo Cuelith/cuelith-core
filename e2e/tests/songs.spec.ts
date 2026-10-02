@@ -56,8 +56,8 @@ async function clickUntil(
 
 async function install(station: Page, app: ElectronApplication, file: string) {
   await chooseFiles(app, file);
-  await station.getByRole("button", { name: "Aggiungi moduli" }).click();
-  const window = station.getByRole("dialog", { name: "Moduli" });
+  await station.getByRole("button", { name: "Aggiungi plugin" }).click();
+  const window = station.getByRole("dialog", { name: "Plugin" });
   await window.getByRole("tab", { name: "Installati" }).click();
   await window.getByRole("button", { name: "Installa da file…" }).click();
 
@@ -81,7 +81,7 @@ async function install(station: Page, app: ElectronApplication, file: string) {
 
 /** Apre la scheda Canti dalla colonna degli strumenti (icona del modulo). */
 async function openSongs(station: Page): Promise<FrameLocator> {
-  const tool = station.getByRole("navigation", { name: "Moduli" }).getByRole("button", {
+  const tool = station.getByRole("navigation", { name: "Plugin" }).getByRole("button", {
     name: "Canti",
     exact: true,
   });

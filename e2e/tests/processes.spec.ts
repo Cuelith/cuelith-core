@@ -100,8 +100,8 @@ test("hello-panel: processo separato, comando, riavvio dopo un crash, le uscite 
 
   // Installazione dalla cartella del modulo.
   await chooseFiles(app, templateDir);
-  await station.getByRole("button", { name: "Aggiungi moduli" }).click();
-  const modules = station.getByRole("dialog", { name: "Moduli" });
+  await station.getByRole("button", { name: "Aggiungi plugin" }).click();
+  const modules = station.getByRole("dialog", { name: "Plugin" });
   await modules.getByRole("tab", { name: "Installati" }).click();
   await modules.getByRole("button", { name: "Installa da cartella…" }).click();
   const row = modules
@@ -112,7 +112,7 @@ test("hello-panel: processo separato, comando, riavvio dopo un crash, le uscite 
   await modules.getByRole("button", { name: "Chiudi" }).click();
 
   // Il pannello chiama il comando, eseguito nel processo del modulo.
-  const dock = station.getByRole("navigation", { name: "Moduli" });
+  const dock = station.getByRole("navigation", { name: "Plugin" });
   await dock.getByRole("button", { name: "Ciao", exact: true }).click();
   const panel = station.frameLocator('[data-module-panel="cuelith.hello.hello"]');
   const status = panel.getByRole("status");
@@ -156,7 +156,7 @@ test("hello-panel: processo separato, comando, riavvio dopo un crash, le uscite 
 
   // Spento e riacceso a caldo: le uscite non si fermano.
   await startFrameWatch(projector);
-  await station.getByRole("button", { name: "Aggiungi moduli" }).click();
+  await station.getByRole("button", { name: "Aggiungi plugin" }).click();
   await modules.getByRole("tab", { name: "Installati" }).click();
   const toggle = row.getByRole("switch", { name: "Attiva Ciao" });
   // L'interruttore cambia quando il motore conferma: si clicca e si attende.

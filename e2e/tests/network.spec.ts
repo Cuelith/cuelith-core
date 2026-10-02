@@ -69,7 +69,7 @@ test("postazioni in rete: abbinamento con codice, regia sincronizzata, telecoman
     await expect(stations).toContainText("Tablet del palco");
     await expect(stations).toContainText("Operatore · collegata");
     // L'operatore non vede quello che non puo' usare.
-    await expect(tablet.page.getByRole("button", { name: "Aggiungi moduli" })).toHaveCount(0);
+    await expect(tablet.page.getByRole("button", { name: "Aggiungi plugin" })).toHaveCount(0);
 
     // Regia dal tablet: Invio manda in onda, e la postazione del motore lo vede.
     await settings.getByRole("button", { name: "Chiudi" }).last().click();

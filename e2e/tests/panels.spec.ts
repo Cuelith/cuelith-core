@@ -86,7 +86,7 @@ function panelsPackage(): string {
     license: "Apache-2.0",
     repository: "https://github.com/Cuelith/plugin-greetings",
     family: "function",
-    engines: { cuelith: "^0.1.0", protocol: "^1.4.0" },
+    engines: { cuelith: ">=0.1.0 <1.0.0", protocol: "^1.4.0" },
     runtime: { type: "none" },
     ui: { entry: "ui/index.html" },
     permissions: [],
@@ -125,8 +125,8 @@ async function installFromFile(
   app: Parameters<typeof chooseFiles>[0],
 ): Promise<void> {
   await chooseFiles(app, panelsPackage());
-  await station.getByRole("button", { name: "Aggiungi moduli" }).click();
-  const window = station.getByRole("dialog", { name: "Moduli" });
+  await station.getByRole("button", { name: "Aggiungi plugin" }).click();
+  const window = station.getByRole("dialog", { name: "Plugin" });
   await window.getByRole("tab", { name: "Installati" }).click();
   await window.getByRole("button", { name: "Installa da file…" }).click();
   await expect(window.getByRole("list", { name: "Installati" })).toContainText("Saluti");
@@ -143,7 +143,7 @@ test("pannelli dei moduli: scheda laterale e pannello centrale isolati, con i so
   await installFromFile(station, app);
 
   // Il dock mostra i pannelli del modulo; quello laterale e' una scheda della colonna sinistra.
-  const dock = station.getByRole("navigation", { name: "Moduli" });
+  const dock = station.getByRole("navigation", { name: "Plugin" });
   await expect(dock.getByRole("button", { name: "Saluti", exact: true })).toBeVisible();
   await dock.getByRole("button", { name: "Saluti", exact: true }).click();
   await expect(station.getByRole("tab", { name: "Saluti", exact: true })).toHaveAttribute(
