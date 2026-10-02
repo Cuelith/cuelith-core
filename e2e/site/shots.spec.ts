@@ -370,6 +370,9 @@ async function shoot(running: RunningApp, demo: Demo): Promise<void> {
   await expect(projector.locator("body")).toHaveAttribute("data-text", new RegExp(first));
   await expect(projector.locator("body")).toHaveAttribute("data-background", /^\/media\//);
   await station.locator("header").first().hover();
+  // Gli avvisi a comparsa («messo in scaletta») non devono restare nella foto.
+  const notices = station.getByRole("button", { name: "Chiudi l’avviso" });
+  while ((await notices.count()) > 0) await notices.first().click();
   await station.waitForTimeout(600);
   await shot(station, "regia");
   await projector.screenshot({ path: path.join(demo.dir, "uscita-sala.png") });
