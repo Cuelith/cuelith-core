@@ -342,15 +342,23 @@ describe("crash e blocchi (cap. 24)", { timeout: 30_000 }, () => {
   });
 
   it("un modulo che smette di rispondere ai controlli viene terminato e riavviato", async () => {
-    const { install, active, until, engine } = await start({
+    const { install, status, until, engine } = await start({
       ...FAST,
       responseMs: 300,
       pingMs: 100,
     });
     await install(fixture({ mode: "hang-ping" }));
-    await active();
-    const pid = engine.context.supervisor.pid(ID) ?? 0;
-    await until(() => Promise.resolve(!alive(pid)));
+    // Coi tempi accorciati il modulo viene terminato e riavviato in meno di un
+    // secondo, piu' volte: su un computer lento non si fa in tempo a cogliere
+    // un processo preciso. Si guarda l'esito: ogni processo visto e' stato
+    // terminato e, dopo i riavvii consentiti, il modulo resta fermo con errore.
+    const seen = new Set<number>();
+    await until(async () => {
+      const pid = engine.context.supervisor.pid(ID);
+      if (pid !== undefined) seen.add(pid);
+      return (await status())?.error === "core.module.crashedTooOften";
+    }, 25_000);
+    await until(() => Promise.resolve([...seen].every((pid) => !alive(pid))));
   });
 
   it("un'attivazione che non risponde finisce in errore senza bloccare il motore", async () => {

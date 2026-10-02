@@ -1,35 +1,62 @@
 # Cuelith
 
-Software di proiezione live, gratuito e open source: culti, conferenze, concerti, dirette, teatro e schermi informativi. Un nucleo leggero; tutto il resto si aggiunge come modulo.
+Live projection software, free and open source: texts, lyrics and announcements on the projector, the stage monitor and every other screen. A small core; everything else is added as a plugin.
 
-Questo repository contiene il nucleo: il motore, l'applicazione desktop e la postazione dell'operatore. I moduli vivono ognuno nel suo repository dell'organizzazione [Cuelith](https://github.com/Cuelith).
+**Website and downloads: [cuelith.lzrhive.it](https://cuelith.lzrhive.it/en/)** · _[in italiano](https://cuelith.lzrhive.it/)_
 
-> Stato: anteprima. Le fondamenta sono complete e provate in automatico; camera, scene e diretta arrivano con la prossima fase.
+This repository contains the core: the engine, the desktop app and the operator's control view. Plugins live in their own repositories of the [Cuelith](https://github.com/Cuelith) organisation.
 
-## Scaricare Cuelith
+> Status: preview. The foundations are complete and tested automatically; camera, scenes and live streaming come with the next phase.
 
-Dalla pagina delle [versioni](https://github.com/Cuelith/cuelith-core/releases/latest):
+## Download
 
-- **Windows**: `Cuelith-Setup-<versione>.exe`. Non serve l'amministratore. L'installatore non è firmato, quindi al primo avvio Windows può chiedere conferma: **Ulteriori informazioni → Esegui comunque**.
-- **Linux**: `Cuelith-<versione>-x86_64.AppImage`.
+From the [website](https://cuelith.lzrhive.it/en/#download) or from the [latest release](https://github.com/Cuelith/cuelith-core/releases/latest):
 
-Gli aggiornamenti si scaricano da soli e si installano solo quando lo decidi tu, mai mentre sei in onda.
+- **Windows**: `Cuelith-Setup-<version>.exe`. No administrator rights needed. The installer is not signed yet, so on first launch Windows may ask for confirmation: **More info → Run anyway**.
+- **Linux**: `Cuelith-<version>-x86_64.AppImage`.
 
-## Provarlo dal codice
+The interface is available in English and Italian. Updates download by themselves and install only when you decide, never while you are on air. To remove Cuelith on Windows use **Settings → Apps → Installed apps → Cuelith → Uninstall**; on Linux delete the AppImage file.
 
-Servono [Node.js](https://nodejs.org) 24 e [pnpm](https://pnpm.io) 12. I repository vanno clonati affiancati nella stessa cartella:
+## Run it from source
+
+You need [Node.js](https://nodejs.org) 24 and [pnpm](https://pnpm.io) 12. Clone the repositories side by side in one folder:
 
 ```bash
-git clone -b dev https://github.com/Cuelith/cuelith-sdk.git
-git clone -b dev https://github.com/Cuelith/plugin-locale-it.git
-git clone -b dev https://github.com/Cuelith/cuelith-core.git
+git clone https://github.com/Cuelith/cuelith-sdk.git
+git clone https://github.com/Cuelith/plugin-locale-it.git
+git clone https://github.com/Cuelith/plugin-locale-en.git
+git clone https://github.com/Cuelith/cuelith-core.git
 
 cd cuelith-sdk && pnpm install && pnpm build && cd ..
 cd cuelith-core && pnpm install && pnpm build && pnpm start
 ```
 
-Al primo avvio viene scaricato l'eseguibile di Electron.
+The Electron executable is downloaded on first launch.
 
-## Licenza
+## Contributing
 
-[Apache 2.0](LICENSE)
+- [How to propose a change](https://github.com/Cuelith/.github/blob/main/CONTRIBUTING.md) ([italiano](https://github.com/Cuelith/.github/blob/main/CONTRIBUTING.it.md))
+- [Developer guide: writing a plugin that stays compatible](https://github.com/Cuelith/.github/blob/main/DEVELOPERS.md) ([italiano](https://github.com/Cuelith/.github/blob/main/DEVELOPERS.it.md))
+- [Reporting a security problem](https://github.com/Cuelith/.github/blob/main/SECURITY.md)
+- [Name and logo](https://github.com/Cuelith/.github/blob/main/TRADEMARK.md)
+
+## Privacy
+
+Cuelith has no accounts and collects no data. It connects to the internet for two things only: to check for updates of the app, and to read the public list of plugins when you open the marketplace. Neither request carries personal data or anything from your shows. The automatic update check can be turned off in Settings → About and licence. The installation ID shown there is created on your computer and is never sent to anyone. Shows, songs, images and settings stay on your computer.
+
+A plugin can reach the network only if it declares that permission, which is shown before you install it.
+
+## Code signing policy
+
+Windows releases are built by the [release workflow](.github/workflows/release.yml) of this repository from the tagged source code, and nothing else is signed.
+
+- Committers and reviewers: [@MattiaLazzari](https://github.com/MattiaLazzari)
+- Approvers: [@MattiaLazzari](https://github.com/MattiaLazzari)
+
+Every change from outside contributors is reviewed and approved by a reviewer before it is merged, and every release is approved manually before it is signed.
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it, with the two exceptions described under [Privacy](#privacy): the update check and the public list of plugins.
+
+## Licence
+
+[Apache 2.0](LICENSE). The name and the logo are not part of the licence: see [Name and logo](https://github.com/Cuelith/.github/blob/main/TRADEMARK.md).
