@@ -20,25 +20,33 @@ test("la lingua si sceglie nelle impostazioni e resta dopo un riavvio", async ()
   const userData = await mkdtemp(path.join(os.tmpdir(), "cuelith-e2e-lingua-"));
   try {
     const first = await launchApp({ userData, env });
-    const { station, problems } = first;
-    await expect(station.getByRole("button", { name: "Presenta", exact: true })).toBeVisible();
-    await station.getByRole("button", { name: "Impostazioni" }).click();
-    const settings = station.getByRole("dialog", { name: "Impostazioni" });
-    const language = settings.getByTestId("settings-language");
-    await expect(language).toHaveValue("it");
-    await language.selectOption({ label: "English" });
+    try {
+      const { station, problems } = first;
+      await expect(station.getByRole("button", { name: "Presenta", exact: true })).toBeVisible();
+      await station.getByRole("button", { name: "Impostazioni" }).click();
+      const settings = station.getByRole("dialog", { name: "Impostazioni" });
+      // L'elenco delle lingue arriva un attimo dopo l'apertura: col solo
+      // italiano c'e' il nome, con due lingue la scelta.
+      const language = settings.locator('select[data-testid="settings-language"]');
+      await expect(language.locator("option")).toHaveText(["Italiano", "English"]);
+      await expect(language).toHaveValue("it");
+      await language.selectOption({ label: "English" });
 
-    // Tutto cambia sotto gli occhi: finestra aperta, barra, pannelli.
-    const english = station.getByRole("dialog", { name: "Settings" });
-    await expect(english.getByTestId("settings-language")).toHaveValue("en");
-    await expect(station.locator("html")).toHaveAttribute("lang", "en");
-    await english.getByRole("button", { name: "Close" }).click();
-    await expect(station.getByRole("button", { name: "Present", exact: true })).toBeVisible();
-    await expect(station.getByRole("tab", { name: "Playlist", exact: true })).toBeVisible();
-    await expect(station.getByRole("region", { name: "Program" })).toContainText("Nothing on air");
-    expect(problems).toEqual([]);
-    // Un riavvio vero: la cartella dati resta, la lingua pure.
-    await first.app.close();
+      // Tutto cambia sotto gli occhi: finestra aperta, barra, pannelli.
+      const english = station.getByRole("dialog", { name: "Settings" });
+      await expect(english.locator('select[data-testid="settings-language"]')).toHaveValue("en");
+      await expect(station.locator("html")).toHaveAttribute("lang", "en");
+      await english.getByRole("button", { name: "Close" }).click();
+      await expect(station.getByRole("button", { name: "Present", exact: true })).toBeVisible();
+      await expect(station.getByRole("tab", { name: "Playlist", exact: true })).toBeVisible();
+      await expect(station.getByRole("region", { name: "Program" })).toContainText(
+        "Nothing on air",
+      );
+      expect(problems).toEqual([]);
+    } finally {
+      // Un riavvio vero: la cartella dati resta, la lingua pure.
+      await first.app.close();
+    }
 
     const second = await launchApp({ userData, env });
     try {
