@@ -13,6 +13,7 @@ import { Marketplace, type Fetch } from "./modules/marketplace.js";
 import { ModuleRegistry } from "./modules/registry.js";
 import type { NodeRuntime } from "./modules/sandbox.js";
 import { ModuleSupervisor, type SupervisorTimings } from "./modules/supervisor.js";
+import { PanelWarmer } from "./modules/warm.js";
 import { pluginSelfHandlers } from "./rpc/handlers/pluginSelf.js";
 import { NetworkService } from "./network.js";
 import { processMetrics, ResourceMonitor, type MetricsProvider } from "./resources.js";
@@ -155,6 +156,8 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   const library = new LibraryService({ store, modules, dataDir: options.paths.data });
   await library.start();
 
+  const warmer = new PanelWarmer();
+  void warmer.warm(modules.active());
   const publishLang = () => {
     store.update((draft) => {
       draft.live.lang = locales.active;
@@ -236,6 +239,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   modules.onChange(() => {
     if (locales.refresh()) publishLang();
     refreshPlugins();
+    void warmer.warm(modules.active());
     supervisor.sync();
   });
 
