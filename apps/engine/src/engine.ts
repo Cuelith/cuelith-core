@@ -1,7 +1,8 @@
+import { readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_ENGINE_PORT, REGISTRY_INDEX_URL, type Lang } from "@cuelith/protocol";
+import { DEFAULT_ENGINE_PORT, LangSchema, REGISTRY_INDEX_URL, type Lang } from "@cuelith/protocol";
 import { Tokens } from "./auth.js";
 import type { EngineContext } from "./context.js";
 import type { DisplayProvider } from "./displays.js";
@@ -24,6 +25,7 @@ import { readHandlers } from "./rpc/handlers/read.js";
 import { sessionHandlers } from "./rpc/handlers/session.js";
 import { showHandlers } from "./rpc/handlers/show.js";
 import { attachRpcServer } from "./rpc/server.js";
+import { writeFileAtomic } from "./show/files.js";
 import { ShowService } from "./show/service.js";
 import { LibraryService } from "./library/service.js";
 import { libraryHandlers } from "./rpc/handlers/library.js";
@@ -90,6 +92,21 @@ const handlers: HandlerMap = {
   ...pluginSelfHandlers,
 };
 
+/** Scelte dell'utente che valgono per tutta l'installazione (settings.json). */
+interface Settings {
+  lang?: Lang;
+}
+
+async function readSettings(file: string): Promise<Settings> {
+  try {
+    const raw = JSON.parse(await readFile(file, "utf8")) as { lang?: unknown };
+    const lang = LangSchema.safeParse(raw.lang);
+    return lang.success ? { lang: lang.data } : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function startEngine(options: EngineOptions): Promise<Engine> {
   const logger = options.logger ?? consoleLogger;
   const host = options.host ?? "127.0.0.1";
@@ -104,7 +121,11 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     logger,
     ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
   });
-  const locales = new Locales(() => modules.active(), options.lang ?? "it");
+  // La lingua scelta dall'utente vale piu' di quella proposta all'avvio
+  // (options.lang: quella del sistema, se il desktop la passa).
+  const settingsFile = join(options.paths.data, "settings.json");
+  const settings = await readSettings(settingsFile);
+  const locales = new Locales(() => modules.active(), settings.lang ?? options.lang ?? "it");
   if (locales.available().length === 0)
     logger.error("nessuna lingua installata: l'interfaccia mostrerà le chiavi");
 
@@ -115,7 +136,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
         roomLook: locales.t("core.look.room"),
         stageLook: locales.t("core.look.stage"),
       }),
-      live: { ...createLiveState(), plugins: modules.statuses() },
+      live: { ...createLiveState(), plugins: modules.statuses(), lang: locales.active },
     },
     logger,
   );
@@ -134,7 +155,11 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   const library = new LibraryService({ store, modules, dataDir: options.paths.data });
   await library.start();
 
-  const preferredLang = options.lang ?? "it";
+  const publishLang = () => {
+    store.update((draft) => {
+      draft.live.lang = locales.active;
+    });
+  };
   const refreshPlugins = () => {
     store.update((draft) => {
       draft.live.plugins = modules.statuses();
@@ -188,6 +213,13 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     version: options.version,
     store,
     locales,
+    setLanguage: async (lang) => {
+      if (!locales.choose(lang)) return false;
+      await writeFileAtomic(settingsFile, `${JSON.stringify({ ...settings, lang }, null, 2)}\n`);
+      settings.lang = lang;
+      publishLang();
+      return true;
+    },
     modules,
     supervisor,
     resources,
@@ -202,7 +234,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   };
 
   modules.onChange(() => {
-    locales.refresh(preferredLang);
+    if (locales.refresh()) publishLang();
     refreshPlugins();
     supervisor.sync();
   });

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -33,5 +33,18 @@ describe("testi del motore", () => {
       }
     }
     expect([...missing]).toEqual([]);
+  });
+
+  // L'inglese e' nel repo affiancato plugin-locale-en: dove c'e', deve avere
+  // le stesse chiavi e gli stessi segnaposto dell'italiano.
+  const english = resolve(here, "../../../../plugin-locale-en/locales/en.json");
+  it.skipIf(!existsSync(english))("l'inglese traduce tutto cio' che traduce l'italiano", () => {
+    const en = JSON.parse(readFileSync(english, "utf8")) as Record<string, string>;
+    expect(Object.keys(en).sort()).toEqual(Object.keys(catalog).sort());
+    const marks = (text: string) => (text.match(/\{\w+\}/g) ?? []).sort().join();
+    const different = Object.keys(catalog).filter(
+      (key) => marks(catalog[key] ?? "") !== marks(en[key] ?? ""),
+    );
+    expect(different).toEqual([]);
   });
 });

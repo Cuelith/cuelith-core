@@ -65,6 +65,10 @@ function appPaths(): AppPaths {
     packaged: app.isPackaged,
     appPath: app.getAppPath(),
     resourcesPath: process.resourcesPath,
+    // CUELITH_LANGS (es. "it"): le prove scelgono quali lingue incluse caricare.
+    ...(process.env.CUELITH_LANGS === undefined
+      ? {}
+      : { langs: process.env.CUELITH_LANGS.split(",") }),
   });
 }
 
@@ -76,6 +80,9 @@ async function launchEngine(): Promise<Engine> {
     ...(autosaveOverride === undefined ? {} : { autosaveIntervalMs: Number(autosaveOverride) }),
     ...(testRegistryDir === undefined ? {} : { fetch: folderFetch(testRegistryDir) }),
     displays: electronDisplays,
+    // Al primo avvio la lingua del sistema, se installata; poi vale la scelta
+    // dell'utente (Impostazioni). CUELITH_LANG la fissa, per le prove.
+    lang: process.env.CUELITH_LANG ?? app.getLocale().split("-")[0] ?? "it",
     ...(lanPortOverride === undefined ? {} : { lanPort: Number(lanPortOverride) }),
     ...(announceOff ? { announce: false } : {}),
     metrics: electronMetrics({

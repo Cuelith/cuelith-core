@@ -39,6 +39,9 @@ function freshLive(current: LiveState, show: Show): LiveState {
     clients: current.clients,
     plugins: current.plugins,
     ...(current.recovery === undefined ? {} : { recovery: current.recovery }),
+    // Rete e lingua sono dell'installazione, non dello show: restano come sono.
+    ...(current.network === undefined ? {} : { network: current.network }),
+    ...(current.lang === undefined ? {} : { lang: current.lang }),
     outputs: Object.fromEntries(
       Object.keys(show.outputs).map((id) => [
         id,

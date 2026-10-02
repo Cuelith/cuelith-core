@@ -1,3 +1,4 @@
+import type { Lang } from "@cuelith/protocol";
 import type { Tokens } from "./auth.js";
 import type { DisplayProvider } from "./displays.js";
 import type { Logger } from "./log.js";
@@ -17,6 +18,8 @@ export interface EngineContext {
   readonly version: string;
   readonly store: StateStore;
   readonly locales: Locales;
+  /** Cambia la lingua dell'interfaccia e la ricorda; false se non e' installata. */
+  setLanguage(lang: Lang): Promise<boolean>;
   readonly modules: ModuleRegistry;
   /** Processi dei moduli con codice (passo 9b). */
   readonly supervisor: ModuleSupervisor;

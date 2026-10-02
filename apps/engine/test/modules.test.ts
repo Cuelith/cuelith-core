@@ -337,6 +337,43 @@ describe("attiva, disattiva, disinstalla", () => {
     expect(engine.context.locales.t("core.mode.present")).toBe("Present");
   });
 
+  it("la lingua si sceglie, arriva nello stato e resta dopo un riavvio", async () => {
+    const net = new FakeNet();
+    net.publish(
+      "cuelith.locale.en",
+      "0.1.0",
+      cpkg({
+        "cuelith-plugin.json": manifest("cuelith.locale.en", "0.1.0", {
+          family: "locale",
+          contributes: { locales: [{ lang: "en", file: "locales/en.json", name: "English" }] },
+        }),
+        "locales/en.json": { "core.mode.present": "Present" },
+      }),
+    );
+    net.publish("cuelith.greetings", "1.0.0", greetings("1.0.0"));
+    const data = folder();
+    const first = await start(net, { data });
+    await first.ok("plugin.installFromRegistry", { id: "cuelith.locale.en" });
+    await first.ok("plugin.installFromRegistry", { id: "cuelith.greetings" });
+    const lang = () => first.engine.context.store.snapshot().live.lang;
+    expect(lang()).toBe("it");
+    expect(await first.ok("locale.set", { lang: "en" })).toEqual({ active: "en" });
+    expect(lang()).toBe("en");
+    // Un modulo senza testi in questa lingua mostra quelli che ha, non le chiavi.
+    const { catalog } = await first.ok("locale.catalog", { lang: "en" });
+    expect(catalog["core.mode.present"]).toBe("Present");
+    expect(catalog["cuelith.greetings.hello"]).toBe("Ciao");
+    expect(await first.fails("locale.set", { lang: "fr" })).toEqual([4040, "core.error.notFound"]);
+    // Un nuovo show non riporta la lingua a quella di partenza.
+    await first.ok("show.new", { name: "Altro show" });
+    expect(lang()).toBe("en");
+    await stop();
+
+    const second = await start(net, { data });
+    expect((await second.ok("locale.list", {})).active).toBe("en");
+    expect(second.engine.context.store.snapshot().live.lang).toBe("en");
+  });
+
   it("installazioni e scelte restano dopo un riavvio", async () => {
     const net = new FakeNet();
     net.publish("cuelith.greetings", "1.0.0", greetings("1.0.0"));

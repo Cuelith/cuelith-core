@@ -22,5 +22,12 @@ export const readHandlers: HandlerMap = {
     return { catalog: ctx.locales.catalog(params.lang) };
   },
 
+  "locale.set": async (ctx, _session, params) => {
+    if (!(await ctx.setLanguage(params.lang))) {
+      throw new RpcError(ErrorCode.NotFound, "core.error.notFound");
+    }
+    return { active: ctx.locales.active };
+  },
+
   "plugin.list": (ctx) => ({ plugins: ctx.modules.installed() }),
 };

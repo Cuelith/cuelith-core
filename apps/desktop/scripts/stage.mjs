@@ -50,13 +50,18 @@ writeFileSync(
   )}\n`,
 );
 
-// La lingua italiana preinstallata (extraResources): solo i file del modulo.
+// Le lingue preinstallate (extraResources): solo i file del modulo. L'italiano
+// e' obbligatorio; l'inglese entra se il suo repo e' affiancato.
 const locale = path.resolve(root, "../../../plugin-locale-it");
 const plugins = path.join(root, "pack", "plugins", "cuelith.locale.it");
 rmSync(path.join(root, "pack", "plugins"), { recursive: true, force: true });
-for (const name of ["cuelith-plugin.json", "LICENSE", "icon.svg", "locales"]) {
-  if (existsSync(path.join(locale, name))) {
-    cpSync(path.join(locale, name), path.join(plugins, name), { recursive: true });
+for (const lang of ["it", "en"]) {
+  const from = path.resolve(root, `../../../plugin-locale-${lang}`);
+  const to = path.join(root, "pack", "plugins", `cuelith.locale.${lang}`);
+  for (const name of ["cuelith-plugin.json", "LICENSE", "icon.svg", "locales"]) {
+    if (existsSync(path.join(from, name))) {
+      cpSync(path.join(from, name), path.join(to, name), { recursive: true });
+    }
   }
 }
 if (!existsSync(path.join(plugins, "cuelith-plugin.json"))) {

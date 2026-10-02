@@ -123,6 +123,9 @@ test("hello-panel: processo separato, comando, riavvio dopo un crash, le uscite 
       await expect(status).toHaveText(`Saluti inviati: ${String(count)}`, { timeout: 2000 });
     }).toPass({ timeout: 20_000 });
   };
+  // Il pannello riceve i suoi testi quando la postazione lo collega: su un
+  // computer carico puo' volerci qualche secondo.
+  await expect(panel.getByRole("button", { name: "Saluta" })).toBeVisible({ timeout: 30_000 });
   await greet("Anna", 1);
   await station.getByRole("tab", { name: "Scaletta", exact: true }).click();
   await expect(station.getByRole("list", { name: "Voci della scaletta" })).toContainText(

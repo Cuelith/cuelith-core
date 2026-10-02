@@ -53,6 +53,10 @@ export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp
       args: packaged === undefined ? [desktopDir] : [],
       env: {
         ...env,
+        // Le prove leggono l'interfaccia in italiano, qualunque sia la lingua del
+        // sistema, e con il solo italiano incluso: chi prova le lingue lo cambia.
+        CUELITH_LANG: "it",
+        CUELITH_LANGS: "it",
         ...options.env,
         CUELITH_USER_DATA: userData,
         CUELITH_PORT: "0",

@@ -298,7 +298,12 @@ export class EngineConnection {
       this.#rev = patch.data.rev;
       this.#set({ state: next });
       // Un modulo acceso, spento o aggiornato puo' portare o togliere testi e lingue.
-      if (patch.data.ops.some((op) => op.path.startsWith("/live/plugins"))) {
+      // Lo stesso se l'utente sceglie un'altra lingua (live.lang, dal protocollo 1.13).
+      if (
+        patch.data.ops.some(
+          (op) => op.path.startsWith("/live/plugins") || op.path.startsWith("/live/lang"),
+        )
+      ) {
         this.#loadCatalog().catch(() => undefined);
       }
     } catch {

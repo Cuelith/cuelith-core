@@ -6,7 +6,8 @@ import { ResourcesSection } from "./Resources.js";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
 import { Button } from "../ui/Button.js";
-import { ModalDialog } from "../ui/Dialogs.js";
+import { INPUT, ModalDialog } from "../ui/Dialogs.js";
+import { useRun } from "../station/station.js";
 
 export type Section =
   "general" | "shortcuts" | "outputs" | "modules" | "network" | "resources" | "about";
@@ -142,8 +143,12 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function General() {
   const t = useT();
   const connection = useConnection();
-  const { lang } = useEngine();
+  const run = useRun();
+  const canChoose = useCan("admin");
+  const { lang, state } = useEngine();
+  const plugins = state?.live.plugins;
   const [languages, setLanguages] = useState<readonly { lang: Lang; name: string }[]>([]);
+  // Le lingue sono moduli: l'elenco si rilegge quando i moduli cambiano.
   useEffect(() => {
     let cancelled = false;
     connection
@@ -155,12 +160,30 @@ function General() {
     return () => {
       cancelled = true;
     };
-  }, [connection]);
+  }, [connection, plugins]);
   return (
     <Row label={t("core.settings.general.language")}>
-      <span className="text-sm text-muted" data-testid="settings-language">
-        {languages.find((l) => l.lang === lang)?.name ?? lang}
-      </span>
+      {canChoose && languages.length > 1 ? (
+        <select
+          aria-label={t("core.settings.general.language")}
+          className={INPUT}
+          data-testid="settings-language"
+          value={lang}
+          onChange={(event) => {
+            void run("locale.set", { lang: event.target.value });
+          }}
+        >
+          {languages.map((l) => (
+            <option key={l.lang} value={l.lang}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <span className="text-sm text-muted" data-testid="settings-language">
+          {languages.find((l) => l.lang === lang)?.name ?? lang}
+        </span>
+      )}
     </Row>
   );
 }
