@@ -1,0 +1,9 @@
+# Licenza di ogni file del repo (specifica REUSE, https://reuse.software).
+# Il testo e' in LICENSE; il permesso aggiuntivo per i plugin in PLUGIN-EXCEPTION.md.
+version = 1
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 The Cuelith project and its contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"

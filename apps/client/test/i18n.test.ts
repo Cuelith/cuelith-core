@@ -30,7 +30,7 @@ const TEXT_ATTRIBUTES = new Set(["aria-label", "title", "placeholder", "alt", "l
  * Testi ammessi nel codice: il nome del prodotto e nomi propri che non si
  * traducono (la licenza). Tutto il resto passa dalle chiavi.
  */
-const ALLOWED = new Set(["Cuelith", "Apache 2.0"]);
+const ALLOWED = new Set(["Cuelith", "GPL 3.0"]);
 
 /** Un testo "vero" contiene almeno una lettera: simboli e frecce non contano. */
 const hasWords = (text: string) => /\p{L}{2,}/u.test(text);

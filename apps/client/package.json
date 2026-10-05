@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0-or-later",
   "description": "Postazione di Cuelith: interfaccia di regia servita dal motore, anche da browser in rete locale.",
   "scripts": {
     "build": "vite build",

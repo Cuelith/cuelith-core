@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0-or-later",
   "description": "Collegamento al motore per postazioni e finestre di uscita: presentazione, accesso, stato con patch in ordine, ricollegamento.",
   "exports": {
     ".": {

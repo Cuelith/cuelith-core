@@ -14,6 +14,13 @@ directories:
 extraResources:
   - from: pack/plugins
     to: plugins
+  # La GPL vuole il testo della licenza insieme al programma.
+  - from: ../../LICENSE
+    to: legal/LICENSE
+  - from: ../../NOTICE
+    to: legal/NOTICE
+  - from: ../../PLUGIN-EXCEPTION.md
+    to: legal/PLUGIN-EXCEPTION.md
 win:
   target:
     - target: nsis

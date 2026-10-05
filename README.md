@@ -59,4 +59,10 @@ This program will not transfer any information to other networked systems unless
 
 ## Licence
 
-[Apache 2.0](LICENSE). The name and the logo are not part of the licence: see [Name and logo](https://github.com/Cuelith/.github/blob/main/TRADEMARK.md).
+Cuelith is free software under the [GNU General Public License, version 3 or later](LICENSE). Anyone who distributes Cuelith, modified or not, must do so under the same licence and give the recipients the source code.
+
+**Plugins are not affected.** A plugin that works with Cuelith only through its public interface (the plugin protocol, the [SDK](https://github.com/Cuelith/cuelith-sdk), its panels and its data files) is an independent work: its author can license it as they wish, including as a paid, closed-source plugin. This is stated in the [Plugin Exception](PLUGIN-EXCEPTION.md), an additional permission under section 7 of the GPL. The SDK is a separate work under the Apache License 2.0.
+
+**The name Cuelith.** The licence covers the code, not the identity. The name "Cuelith" and its logo are trademarks of the project owner (registration pending) and identify the official software. If you distribute a modified version, you must give it a different name and a different logo, replace the files in `brand/`, and point updates and the plugin marketplace to your own addresses. You may say it is "based on Cuelith", and you may say a plugin is "for Cuelith". Details: [Name and logo](https://github.com/Cuelith/.github/blob/main/TRADEMARK.md).
+
+Versions published up to 0.2.0 were released under the Apache License 2.0 and stay available under it; the GPL applies to every version from the next one on.

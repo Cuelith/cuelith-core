@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0-or-later",
   "description": "Motore di Cuelith: unica fonte di verità dello show, comandi, moduli, server HTTP e WebSocket.",
   "exports": {
     ".": {

@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0-or-later",
   "description": "Finestre di uscita di Cuelith: disegnano con PixiJS (WebGL) il feed assegnato, col look, blackout e freeze.",
   "scripts": {
     "build": "vite build",

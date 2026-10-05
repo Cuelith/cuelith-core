@@ -307,7 +307,7 @@ function About() {
         <span className="text-sm text-muted">{t("core.settings.about.community")}</span>
       </Row>
       <Row label={t("core.settings.about.license")}>
-        <span className="text-sm text-muted">Apache 2.0</span>
+        <span className="text-sm text-muted">GPL 3.0</span>
       </Row>
       {info !== undefined && <Updates info={info} reload={reload} />}
       {info?.installationId !== undefined && (
