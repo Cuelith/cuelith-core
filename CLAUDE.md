@@ -27,6 +27,7 @@ Il contenitore di Cuelith: motore live, applicazione desktop (Electron), postazi
 - Le decisioni prese durante il lavoro stanno in `cuelith-docs/decisioni/` e valgono come il documento.
 - Prima di ogni commit: `pnpm check` e `pnpm exec prettier --check .` verdi, e `pnpm e2e` se è cambiata l'interfaccia o l'app desktop.
 - Lavoro su `dev`; `main` riceve solo release taggate (SemVer).
+- **Marketplace a pagamento** (decisione 0013): oggi il nucleo legge ancora `index.json` (schema 1, solo gratuiti); `RegistryIndexSchema` accetta già anche lo schema 2. Acquisto, licenza, chiavi del computer e rinnovo sono le fasi 2-4, da costruire e provare (con un fornitore simulato) prima di leggere `index-2.json`. Dopo ogni cambio all'SDK: `pnpm exec turbo run typecheck lint test --force`.
 - **Licenza** (decisione 0012): il nucleo è GPL 3.0 o successiva con l'eccezione per i plugin (`PLUGIN-EXCEPTION.md`). Una dipendenza nuova va controllata (`pnpm licenses list`): niente licenze incompatibili con la GPLv3. Il nucleo non incorpora mai codice di plugin di terzi, e i plugin non importano mai codice di `apps/*` o `packages/*` del nucleo: parlano solo con protocollo e SDK. Il codice dell'SDK è Apache 2.0 e resta nel suo repo: non si sposta codice del nucleo nell'SDK. Il nome «Cuelith» non è nella licenza (README, `TRADEMARK.md`).
 
 ## Comandi

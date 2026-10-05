@@ -98,6 +98,7 @@ class FakeNet {
         repository: `https://github.com/Cuelith/${id}`,
         family: "function",
         verified: true,
+        access: "free",
         versions: [entry],
       });
     }
