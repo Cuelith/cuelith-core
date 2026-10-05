@@ -11,6 +11,7 @@ import { useConnection, useEngine, useT, type Translate } from "../../engine/rea
 import { useRun, useStation } from "../../station/station.js";
 import { Button } from "../../ui/Button.js";
 import { INPUT, ModalDialog } from "../../ui/Dialogs.js";
+import { isLicensed, LicenseActions, LicenseLine, PaidBox, useLicenses } from "./LicensePanel.js";
 import { OnboardingDialog } from "./OnboardingDialog.js";
 
 type Tab = "market" | "installed";
@@ -42,7 +43,7 @@ function permissionLabel(t: Translate, permission: string): string {
   return t(`core.permission.${permission.replace(":", ".")}`);
 }
 
-/** Apre la documentazione nel browser del sistema (solo indirizzi https). */
+/** Apre un indirizzo https nel browser del sistema: documentazione e pagina di acquisto. */
 function openDocs(url: string): void {
   const desktop = window.cuelithDesktop;
   if (desktop !== undefined) void desktop.openExternal(url);
@@ -153,6 +154,7 @@ function Marketplace({
   const [confirm, setConfirm] = useState<{ plugin: RegistryPlugin; update: boolean } | undefined>();
   const [busy, setBusy] = useState<string | undefined>();
   const installed = useInstalledList(installedKey);
+  const licenses = useLicenses(installedKey);
 
   const load = (refresh: boolean) => {
     setRefreshing(true);
@@ -260,6 +262,10 @@ function Marketplace({
         {plugins.map((plugin) => {
           const latest = plugin.versions[0];
           const mine = installed.find((p) => p.manifest.id === plugin.id);
+          const paid = plugin.access === "paid";
+          const license = licenses.byPlugin.get(plugin.id);
+          // Un plugin a pagamento si installa e si aggiorna solo con la licenza valida.
+          const allowed = !paid || isLicensed(license);
           const canUpdate =
             mine !== undefined &&
             latest !== undefined &&
@@ -276,6 +282,14 @@ function Marketplace({
                   <p className="truncate text-xs text-muted">
                     {plugin.publisher} · {t(`core.family.${plugin.family}`)} · {latest?.version}
                   </p>
+                  {paid && (
+                    <p className="truncate text-xs text-stage">
+                      {t("core.modules.paid")}
+                      {plugin.price === undefined
+                        ? ""
+                        : ` · ${t("core.modules.price", { price: plugin.price })}`}
+                    </p>
+                  )}
                 </div>
                 <span
                   className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
@@ -289,12 +303,24 @@ function Marketplace({
                 </span>
               </div>
               <p className="text-sm text-muted">{plugin.description}</p>
+              {paid && license !== undefined && license.state !== "none" && (
+                <LicenseLine license={license} />
+              )}
+              {paid && !allowed && (
+                <PaidBox
+                  plugin={plugin}
+                  available={licenses.available}
+                  openExternal={openDocs}
+                  reload={licenses.reload}
+                />
+              )}
               <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                 {mine === undefined ? (
                   <Button
                     tone="cue"
                     size="sm"
-                    disabled={busy !== undefined}
+                    disabled={busy !== undefined || !allowed}
+                    title={allowed ? undefined : t("core.modules.needsLicenseFirst")}
                     onClick={() => {
                       setConfirm({ plugin, update: false });
                     }}
@@ -305,7 +331,7 @@ function Marketplace({
                   <Button
                     tone="cue"
                     size="sm"
-                    disabled={busy !== undefined}
+                    disabled={busy !== undefined || !allowed}
                     onClick={() => {
                       setConfirm({ plugin, update: true });
                     }}
@@ -382,6 +408,7 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
   const { notify } = useStation();
   const installedKey = JSON.stringify(useEngine().state?.live.plugins);
   const plugins = useInstalledList(installedKey);
+  const licenses = useLicenses(installedKey);
   const [removing, setRemoving] = useState<InstalledPlugin | undefined>();
   const desktop = window.cuelithDesktop;
 
@@ -404,6 +431,7 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
         {plugins.map((plugin) => {
           const { manifest, status } = plugin;
           const problem = status.error;
+          const license = licenses.byPlugin.get(manifest.id);
           return (
             <li
               key={manifest.id}
@@ -470,6 +498,17 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
                 >
                   {t("core.modules.uninstall")}
                 </Button>
+              )}
+              {license !== undefined && license.state !== "none" && (
+                // Una riga tutta sua sotto il plugin: il nome non si stringe.
+                <div className="flex basis-full flex-wrap items-center gap-x-3 gap-y-1 pl-12">
+                  <LicenseLine license={license} />
+                  <LicenseActions
+                    pluginId={manifest.id}
+                    license={license}
+                    reload={licenses.reload}
+                  />
+                </div>
               )}
             </li>
           );

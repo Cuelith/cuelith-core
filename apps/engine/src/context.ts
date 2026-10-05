@@ -3,6 +3,7 @@ import type { Tokens } from "./auth.js";
 import type { DisplayProvider } from "./displays.js";
 import type { Logger } from "./log.js";
 import type { LibraryService } from "./library/service.js";
+import type { LicenseService } from "./licenses/service.js";
 import type { Locales } from "./modules/locales.js";
 import type { Marketplace } from "./modules/marketplace.js";
 import type { ModuleRegistry } from "./modules/registry.js";
@@ -27,6 +28,8 @@ export interface EngineContext {
   readonly resources: ResourceMonitor;
   /** Indice dei moduli (GitHub Pages) e download dei pacchetti. */
   readonly marketplace: Marketplace;
+  /** Licenze dei plugin a pagamento (decisione 0013). */
+  readonly licenses: LicenseService;
   /** Librerie, archivio e media. */
   readonly library: LibraryService;
   /** File dello show e copia automatica. */

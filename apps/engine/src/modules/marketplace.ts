@@ -16,6 +16,11 @@ export type Fetch = typeof fetch;
 
 export interface MarketplaceOptions {
   readonly url: string;
+  /**
+   * Indice di ripiego se il primo non risponde o non si legge (indice 1, solo plugin
+   * gratuiti): finché l'indice 2 non è pubblicato il marketplace funziona lo stesso.
+   */
+  readonly fallbackUrl?: string;
   /** Copia dell'ultimo indice scaricato, per lavorare senza internet. */
   readonly cacheFile: string;
   readonly engineVersion: string;
@@ -62,24 +67,27 @@ export class Marketplace {
 
   async list(refresh = false): Promise<MarketplaceList> {
     if (!refresh && this.#last?.source === "network") return this.#last;
-    try {
-      const response = await this.#fetch(this.#o.url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
-      if (!response.ok) throw new Error(`HTTP ${String(response.status)}`);
-      const index = RegistryIndexSchema.parse(await response.json());
-      const fetchedAt = new Date().toISOString();
-      await writeFileAtomic(this.#o.cacheFile, `${JSON.stringify({ fetchedAt, index })}\n`).catch(
-        (error: unknown) => {
-          this.#o.logger.warn("copia dell'indice dei moduli non salvata", error);
-        },
-      );
-      this.#last = { plugins: this.#compatible(index.plugins), source: "network", fetchedAt };
-    } catch (error) {
-      this.#o.logger.warn(
-        "indice dei moduli non raggiungibile, uso la copia salvata",
-        String(error),
-      );
-      this.#last = await this.#fromCache();
+    const errors: string[] = [];
+    for (const url of [this.#o.url, this.#o.fallbackUrl]) {
+      if (url === undefined) continue;
+      try {
+        const response = await this.#fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+        if (!response.ok) throw new Error(`HTTP ${String(response.status)}`);
+        const index = RegistryIndexSchema.parse(await response.json());
+        const fetchedAt = new Date().toISOString();
+        await writeFileAtomic(this.#o.cacheFile, `${JSON.stringify({ fetchedAt, index })}\n`).catch(
+          (error: unknown) => {
+            this.#o.logger.warn("copia dell'indice dei moduli non salvata", error);
+          },
+        );
+        this.#last = { plugins: this.#compatible(index.plugins), source: "network", fetchedAt };
+        return this.#last;
+      } catch (error) {
+        errors.push(`${url}: ${String(error)}`);
+      }
     }
+    this.#o.logger.warn("indice dei moduli non raggiungibile, uso la copia salvata", errors);
+    this.#last = await this.#fromCache();
     return this.#last;
   }
 
@@ -99,6 +107,13 @@ export class Marketplace {
     } catch {
       return { plugins: [], source: "none" };
     }
+  }
+
+  /** La voce di un plugin nel marketplace (con le sole versioni compatibili), se c'è. */
+  async pluginOf(id: string): Promise<RegistryPlugin | undefined> {
+    const known = (await this.list(false)).plugins.find((p) => p.id === id);
+    if (known !== undefined) return known;
+    return (await this.list(true)).plugins.find((p) => p.id === id);
   }
 
   /** Versione richiesta (o la piu' recente compatibile) di un modulo del marketplace. */

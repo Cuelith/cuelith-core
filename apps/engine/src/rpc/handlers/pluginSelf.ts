@@ -35,6 +35,9 @@ export const pluginSelfHandlers: HandlerMap = {
     return {};
   },
 
+  /** Prova della licenza del plugin che chiama (la verifica il plugin: vedi `ctx.license` dell'SDK). */
+  "license.prove": (ctx, session, params) => ctx.licenses.prove(pluginOf(session), params.nonce),
+
   "events.subscribe": (ctx, session, params) => {
     pluginOf(session);
     ctx.supervisor.subscribeEvents(session, params.names);

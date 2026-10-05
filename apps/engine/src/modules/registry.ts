@@ -26,6 +26,11 @@ const StateSchema = z.object({
       source: z.enum(["registry", "local"]),
       /** Versione precedente, tenuta per tornare indietro se quella nuova non si carica. */
       previous: z.string().optional(),
+      /**
+       * Plugin a pagamento installato dal marketplace (decisione 0013): parte solo
+       * con una licenza valida. Una volta messo non si toglie reinstallandolo da file.
+       */
+      licensed: z.boolean().optional(),
     }),
   ),
   /** Moduli preinstallati spenti dall'utente. */
@@ -48,6 +53,13 @@ export interface InstallExpectation {
 
 const EMPTY_STATE: State = { schema: 1, installed: {}, disabled: [] };
 
+/** Chi decide se un plugin a pagamento può partire (il servizio delle licenze). */
+export interface LicenseGate {
+  allows(id: string): boolean;
+  /** Chiave di traduzione del motivo per cui non parte. */
+  reason(id: string): string;
+}
+
 /**
  * Moduli noti al motore (cap. 13 e 24). Il nucleo non conosce i moduli: li
  * trova nelle cartelle dei preinstallati e in quella dei moduli installati
@@ -67,9 +79,36 @@ export class ModuleRegistry {
   readonly #listeners = new Set<() => void>();
   #runtimeStatus: (id: string) => { state: PluginState; error?: string } | undefined = () =>
     undefined;
+  #gate: LicenseGate | undefined;
 
   constructor(logger: Logger) {
     this.#logger = logger;
+  }
+
+  /** Collega il servizio delle licenze: i plugin a pagamento partono solo se ammessi. */
+  setLicenseGate(gate: LicenseGate): void {
+    this.#gate = gate;
+  }
+
+  /** I plugin installati dal marketplace che richiedono una licenza. */
+  licensedIds(): string[] {
+    return [...this.#installed.entries()]
+      .filter(([, installed]) => installed.record.licensed === true)
+      .map(([id]) => id);
+  }
+
+  /** Il plugin richiede una licenza e non ce l'ha (adesso)? */
+  #blocked(id: string): boolean {
+    return (
+      this.#installed.get(id)?.record.licensed === true &&
+      this.#gate !== undefined &&
+      !this.#gate.allows(id)
+    );
+  }
+
+  /** Ricalcola chi è attivo (dopo un cambio di licenza): avvisa chi ascolta. */
+  refresh(): void {
+    this.#changed();
   }
 
   /** Chiamato dopo ogni cambiamento (installa, attiva, disattiva, disinstalla). */
@@ -207,7 +246,9 @@ export class ModuleRegistry {
   active(): LoadedModule[] {
     return this.#ids().flatMap((id) => {
       const { module, enabled, error } = this.#current(id);
-      return module !== undefined && enabled && error === undefined ? [module] : [];
+      return module !== undefined && enabled && error === undefined && !this.#blocked(id)
+        ? [module]
+        : [];
     });
   }
 
@@ -222,6 +263,10 @@ export class ModuleRegistry {
         ];
       }
       if (!enabled) return [{ id, version, state: "disabled" as const }];
+      // Plugin a pagamento senza licenza valida: non parte, e dice perché (decisione 0013).
+      if (this.#blocked(id) && this.#gate !== undefined) {
+        return [{ id, version, state: "disabled" as const, error: this.#gate.reason(id) }];
+      }
       if (module.manifest.runtime.type === "none")
         return [{ id, version, state: "active" as const }];
       // Modulo con codice: lo stato del suo processo (in avvio finche' non risponde).
@@ -269,6 +314,7 @@ export class ModuleRegistry {
     input: { readonly data: Uint8Array } | { readonly dir: string },
     source: "registry" | "local",
     expected?: InstallExpectation,
+    options: { readonly licensed?: boolean } = {},
   ): Promise<{ id: string; version: string }> {
     return this.#serial(async () => {
       const root = this.#requireDir();
@@ -308,6 +354,8 @@ export class ModuleRegistry {
           enabled: old?.enabled ?? true,
           source,
           ...(old !== undefined && old.version !== version ? { previous: old.version } : {}),
+          // Una volta a pagamento, a pagamento: reinstallarlo da file non toglie il vincolo.
+          ...(options.licensed === true || old?.licensed === true ? { licensed: true } : {}),
         };
         this.#state = { ...this.#state, installed: { ...this.#state.installed, [id]: record } };
         await this.#saveState();

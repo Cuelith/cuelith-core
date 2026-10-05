@@ -14,6 +14,8 @@ import {
 } from "@cuelith/protocol";
 import WebSocket from "ws";
 import { silentLogger, startEngine, type Engine } from "../src/index.js";
+import type { SecretStore } from "../src/licenses/secrets.js";
+import type { LicenseTimings } from "../src/licenses/service.js";
 import type { SupervisorTimings } from "../src/modules/supervisor.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -28,6 +30,12 @@ export interface TestEngineOptions {
   readonly fetch?: typeof fetch;
   /** Tempi dei processi dei moduli (riavvii, risposte) accorciati per le prove. */
   readonly moduleTimings?: Partial<SupervisorTimings>;
+  /** Licenze dei plugin a pagamento (decisione 0013): custodia, Notaio e orologio di prova. */
+  readonly secrets?: SecretStore;
+  readonly licenseUrl?: string;
+  readonly notaryKeys?: Readonly<Record<string, string>>;
+  readonly now?: () => number;
+  readonly licenseTimings?: Partial<LicenseTimings>;
 }
 
 export async function startTestEngine(options: TestEngineOptions = {}): Promise<Engine> {
@@ -51,6 +59,11 @@ export async function startTestEngine(options: TestEngineOptions = {}): Promise<
     },
     ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
     ...(options.moduleTimings === undefined ? {} : { moduleTimings: options.moduleTimings }),
+    ...(options.secrets === undefined ? {} : { secrets: options.secrets }),
+    ...(options.licenseUrl === undefined ? {} : { licenseUrl: options.licenseUrl }),
+    ...(options.notaryKeys === undefined ? {} : { notaryKeys: options.notaryKeys }),
+    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.licenseTimings === undefined ? {} : { licenseTimings: options.licenseTimings }),
     // Nelle prove: porta di rete qualsiasi e nessun annuncio in rete.
     lanPort: 0,
     announce: false,

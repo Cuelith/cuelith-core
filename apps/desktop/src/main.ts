@@ -24,7 +24,8 @@ import {
 import { electronMetrics } from "./metrics.js";
 import { OutputWindows } from "./outputs.js";
 import { resolveAppPaths, type AppPaths } from "./paths.js";
-import { folderFetch } from "./test-registry.js";
+import { electronSecrets, memorySecrets } from "./secrets.js";
+import { folderFetch, parseNotaryKeys } from "./test-registry.js";
 import { Updates, type Updater } from "./updates.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -37,6 +38,10 @@ if (userDataOverride !== undefined && userDataOverride !== "")
 const portOverride = process.env["CUELITH_PORT"];
 const autosaveOverride = process.env["CUELITH_AUTOSAVE_MS"];
 const testRegistryDir = process.env["CUELITH_TEST_REGISTRY_DIR"];
+// Prove delle licenze (decisione 0013): Notaio di prova su questo computer e custodia in memoria.
+const testNotaryUrl = process.env["CUELITH_TEST_NOTARY_URL"];
+const testNotaryKeys = parseNotaryKeys(process.env["CUELITH_TEST_NOTARY_KEYS"]);
+const testSecretsInMemory = process.env["CUELITH_TEST_SECRETS"] === "memory";
 // Prove sull'app impacchettata: niente controlli verso GitHub.
 const updatesOff = process.env["CUELITH_UPDATES"] === "off";
 // Prove delle postazioni in rete: porta qualsiasi e nessun annuncio in rete.
@@ -79,6 +84,10 @@ async function launchEngine(): Promise<Engine> {
     paths: { ...paths, data: app.getPath("userData") },
     ...(autosaveOverride === undefined ? {} : { autosaveIntervalMs: Number(autosaveOverride) }),
     ...(testRegistryDir === undefined ? {} : { fetch: folderFetch(testRegistryDir) }),
+    // Licenze dei plugin a pagamento: la custodia è quella del sistema operativo.
+    secrets: testSecretsInMemory ? memorySecrets() : electronSecrets(),
+    ...(testNotaryUrl === undefined ? {} : { licenseUrl: testNotaryUrl }),
+    ...(testNotaryKeys === undefined ? {} : { notaryKeys: testNotaryKeys }),
     displays: electronDisplays,
     // Al primo avvio la lingua del sistema, se installata; poi vale la scelta
     // dell'utente (Impostazioni). CUELITH_LANG la fissa, per le prove.

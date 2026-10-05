@@ -2,12 +2,21 @@ import { readFile } from "node:fs/promises";
 import type { AddressInfo } from "node:net";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_ENGINE_PORT, LangSchema, REGISTRY_INDEX_URL, type Lang } from "@cuelith/protocol";
+import {
+  DEFAULT_ENGINE_PORT,
+  isOnAir,
+  LangSchema,
+  REGISTRY_INDEX_URL,
+  REGISTRY_INDEX_V2_URL,
+  type Lang,
+} from "@cuelith/protocol";
 import { Tokens } from "./auth.js";
 import type { EngineContext } from "./context.js";
 import type { DisplayProvider } from "./displays.js";
 import { createHttpServer, type StaticPaths } from "./http/server.js";
 import { consoleLogger, type Logger } from "./log.js";
+import { LicenseService, type LicenseTimings } from "./licenses/service.js";
+import type { SecretStore } from "./licenses/secrets.js";
 import { Locales } from "./modules/locales.js";
 import { Marketplace, type Fetch } from "./modules/marketplace.js";
 import { ModuleRegistry } from "./modules/registry.js";
@@ -17,6 +26,7 @@ import { PanelWarmer } from "./modules/warm.js";
 import { pluginSelfHandlers } from "./rpc/handlers/pluginSelf.js";
 import { NetworkService } from "./network.js";
 import { processMetrics, ResourceMonitor, type MetricsProvider } from "./resources.js";
+import { licenseHandlers } from "./rpc/handlers/licenses.js";
 import { pluginHandlers } from "./rpc/handlers/plugins.js";
 import { dispatch, type HandlerMap } from "./rpc/dispatch.js";
 import { cueHandlers } from "./rpc/handlers/cue.js";
@@ -51,8 +61,18 @@ export interface EngineOptions {
   readonly displays: DisplayProvider;
   readonly lang?: Lang;
   readonly logger?: Logger;
-  /** Indice del marketplace (predefinito: GitHub Pages di Cuelith). */
+  /** Indice del marketplace (predefinito: l'indice 2 su GitHub Pages di Cuelith, con ripiego sull'indice 1). */
   readonly registryUrl?: string;
+  /**
+   * Custodia dei segreti del sistema (nel desktop `safeStorage`): senza, i plugin a
+   * pagamento non si possono attivare (decisione 0013).
+   */
+  readonly secrets?: SecretStore;
+  /** Solo per le prove: indirizzo e chiavi del Notaio, orologio e tempi dei controlli. */
+  readonly licenseUrl?: string;
+  readonly notaryKeys?: Readonly<Record<string, string>>;
+  readonly now?: () => number;
+  readonly licenseTimings?: Partial<LicenseTimings>;
   /** Solo per le prove: rete finta per indice e pacchetti. */
   readonly fetch?: Fetch;
   /** Eseguibile Node per i moduli (predefinito: quello del motore, vedi sandbox.ts). */
@@ -90,6 +110,7 @@ const handlers: HandlerMap = {
   ...showHandlers,
   ...libraryHandlers,
   ...pluginHandlers,
+  ...licenseHandlers,
   ...pluginSelfHandlers,
 };
 
@@ -116,12 +137,32 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   await modules.loadBundled(options.paths.bundledPlugins, options.version);
   await modules.loadInstalled(join(options.paths.data, "plugins"));
   const marketplace = new Marketplace({
-    url: options.registryUrl ?? REGISTRY_INDEX_URL,
+    url: options.registryUrl ?? REGISTRY_INDEX_V2_URL,
+    ...(options.registryUrl === undefined ? { fallbackUrl: REGISTRY_INDEX_URL } : {}),
     cacheFile: join(options.paths.data, "registry-cache.json"),
     engineVersion: options.version,
     logger,
     ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
   });
+  // Licenze dei plugin a pagamento: i plugin installati dal marketplace come «a pagamento»
+  // partono solo se la licenza vale; in onda non si toglie nulla (vedi LicenseService).
+  const refs: { store: StateStore | undefined } = { store: undefined };
+  const licenses = new LicenseService({
+    dir: join(options.paths.data, "licenses"),
+    secrets: options.secrets,
+    notaryUrl: options.licenseUrl,
+    notaryKeys: options.notaryKeys,
+    fetch: options.fetch ?? fetch,
+    logger,
+    isOnAir: () => refs.store?.read(isOnAir) ?? false,
+    onChange: () => {
+      modules.refresh();
+    },
+    ...(options.now === undefined ? {} : { now: options.now }),
+    ...(options.licenseTimings === undefined ? {} : { timings: options.licenseTimings }),
+  });
+  modules.setLicenseGate(licenses);
+  await licenses.load();
   // La lingua scelta dall'utente vale piu' di quella proposta all'avvio
   // (options.lang: quella del sistema, se il desktop la passa).
   const settingsFile = join(options.paths.data, "settings.json");
@@ -141,6 +182,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     },
     logger,
   );
+  refs.store = store;
 
   const shows = new ShowService({
     store,
@@ -227,6 +269,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     supervisor,
     resources,
     marketplace,
+    licenses,
     library,
     shows,
     displays: options.displays,
@@ -255,6 +298,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   const port = (http.address() as AddressInfo).port;
   await shows.start();
   await supervisor.start();
+  licenses.start();
   await resources.start();
   await network.start();
   logger.info(`motore in ascolto su http://${host}:${port}`);
@@ -274,6 +318,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
       });
     },
     stop: async () => {
+      licenses.stop();
       await network.stop();
       await resources.stop();
       await supervisor.stop();

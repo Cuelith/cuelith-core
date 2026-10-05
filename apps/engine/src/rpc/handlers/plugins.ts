@@ -15,9 +15,19 @@ export const pluginHandlers: HandlerMap = {
   },
 
   "plugin.installFromRegistry": async (ctx, _session, params) => {
+    // Un plugin a pagamento si installa solo con una licenza valida (decisione 0013).
+    const paid = (await ctx.marketplace.pluginOf(params.id))?.access === "paid";
+    if (paid && !ctx.licenses.allows(params.id)) {
+      throw new RpcError(ErrorCode.Forbidden, "core.error.licenseRequired");
+    }
     const version = await ctx.marketplace.find(params.id, params.version);
     const data = await ctx.marketplace.download(version);
-    return ctx.modules.install({ data }, "registry", { id: params.id, version: version.version });
+    return ctx.modules.install(
+      { data },
+      "registry",
+      { id: params.id, version: version.version },
+      paid ? { licensed: true } : {},
+    );
   },
 
   /** Da un pacchetto .cpkg o da una cartella del computer del motore (sviluppo, prove). */
