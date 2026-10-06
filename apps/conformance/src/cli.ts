@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+declare const __CORE__: string | undefined;
 import { checkPlugin, formatReport } from "./index.js";
 
 const args = process.argv.slice(2);
@@ -22,7 +23,7 @@ if (target === undefined || args.includes("--help")) {
   process.exit(target === undefined ? 2 : 0);
 }
 const report = await checkPlugin(target, {
-  coreVersion: flag("--core") ?? "0.3.1",
+  coreVersion: flag("--core") ?? (typeof __CORE__ === "string" ? __CORE__ : "0.3.1"),
   staticOnly: args.includes("--static"),
   stableSeconds: Number(flag("--seconds") ?? 3),
 });

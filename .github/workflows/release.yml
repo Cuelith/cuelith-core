@@ -83,8 +83,40 @@ jobs:
           pnpm -C apps/desktop run pack:app
           pnpm -C apps/desktop exec electron-builder --publish always
 
+  # Il programma che gli autori di plugin usano per provare il proprio pacchetto.
+  conformance:
+    needs: draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: cuelith-core
+      - uses: actions/checkout@v7
+        with:
+          repository: Cuelith/cuelith-sdk
+          ref: main
+          path: cuelith-sdk
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: cuelith-core/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: SDK
+        working-directory: cuelith-sdk
+        run: pnpm install --frozen-lockfile && pnpm build
+      - name: Programma di verifica
+        working-directory: cuelith-core
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter "@cuelith-core/conformance..." build
+          pnpm -C apps/conformance bundle
+          gh release upload "$GITHUB_REF_NAME" apps/conformance/bundle/cuelith-conformance.mjs --clobber
+
   publish:
-    needs: installers
+    needs: [installers, conformance]
     runs-on: ubuntu-latest
     steps:
       - name: La release diventa pubblica

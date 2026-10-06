@@ -18,7 +18,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src test",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bundle": "vite build --config vite.bundle.config.ts"
   },
   "dependencies": {
     "@cuelith-core/engine": "workspace:*",
@@ -33,6 +34,7 @@
     "@types/ws": "8.18.2",
     "eslint": "10.11.0",
     "typescript": "6.0.3",
-    "vitest": "5.0.2"
+    "vitest": "5.0.2",
+    "vite": "8.3.1"
   }
 }
