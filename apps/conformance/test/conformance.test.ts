@@ -23,6 +23,19 @@ describe("controlli statici", () => {
     expect(report.ok).toBe(false);
   });
 
+  it("gli errori del manifest dicono quale campo e perche', in parole", async () => {
+    const report = await staticOnly(
+      makeFolder({
+        manifest: { id: "Acme.Bad", contributes: { commands: [{ id: "go", title: "altro.go" }] } },
+      }),
+    );
+    const text = report.findings[0]?.message ?? "";
+    expect(text).toContain("id: protocol.pluginId.invalid (the id must be a reverse-domain name");
+    expect(text).toContain(
+      "contributes.commands.0.title: protocol.manifest.keyOutsideNamespace (a translation key must start with the plugin id",
+    );
+  });
+
   it("un intervallo di versioni che esclude il nucleo e' un errore dedicato", async () => {
     const report = await staticOnly(
       makeFolder({ manifest: { engines: { cuelith: "^0.2.0", protocol: "^1.8.0" } } }),

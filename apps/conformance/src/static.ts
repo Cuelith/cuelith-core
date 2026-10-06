@@ -8,6 +8,7 @@ import {
   PACKAGE_LIMITS,
 } from "@cuelith-core/engine/conformance";
 import { PLUGIN_MANIFEST_FILE, type PluginManifest } from "@cuelith/protocol";
+import { explain } from "./explain.js";
 import { Collector, type CheckOptions } from "./types.js";
 
 /** File di testo in cui cercare segreti e riferimenti esterni; i binari si saltano. */
@@ -51,6 +52,21 @@ function walk(dir: string): string[] {
   });
 }
 
+/** Cosa non va, in righe leggibili: il campo e il motivo (gli errori di schema hanno un elenco di problemi). */
+function describeCause(cause: unknown): string {
+  const issues = (cause as { issues?: unknown } | null)?.issues;
+  if (Array.isArray(issues)) {
+    return issues
+      .slice(0, 8)
+      .map((issue: { path?: unknown[]; message?: string }) => {
+        const where = (issue.path ?? []).map(String).join(".");
+        return `${where === "" ? "(root)" : where}: ${explain(issue.message ?? "invalid")}`;
+      })
+      .join("; ");
+  }
+  return cause instanceof Error ? cause.message.slice(0, 300) : "";
+}
+
 const posix = (root: string, file: string): string => relative(root, file).split(sep).join("/");
 
 /**
@@ -73,14 +89,14 @@ export async function checkFolder(
     manifest = (await loadModule(dir, options.coreVersion, false)).manifest;
   } catch (error) {
     if (error instanceof ModuleLoadError) {
-      const detail = error.cause instanceof Error ? error.cause.message.slice(0, 600) : "";
+      const detail = describeCause(error.cause);
       const incompatible =
         error.key === "core.module.engineIncompatible" ||
         error.key === "core.module.protocolIncompatible";
       out.add({
         id: incompatible ? "compat-range" : "manifest",
         level: "error",
-        message: `The engine refuses to load this plugin (${error.key} ${JSON.stringify(error.params)}).${detail === "" ? "" : ` ${detail}`}`,
+        message: `The engine refuses to load this plugin (${error.key}${error.key === "core.module.manifestInvalid" || error.key === "core.module.catalogInvalid" ? "" : ` ${JSON.stringify(error.params)}`}).${detail === "" ? "" : ` Problems: ${detail}`}`,
         fix: incompatible
           ? `Widen "engines" in ${PLUGIN_MANIFEST_FILE} so it includes Cuelith ${options.coreVersion}.`
           : `Fix ${PLUGIN_MANIFEST_FILE} (or the translation files) so they match the schema.`,
