@@ -203,7 +203,8 @@ test("plugin a pagamento: acquisto, chiave, installazione, stato e disattivazion
     hasText: "Lyrics Pro",
   });
   await expect(card).toContainText("A pagamento · Prezzo: 9 €");
-  await expect(card).toContainText("Il link può contenere un riferimento di affiliazione");
+  await expect(card).toContainText("Prodotto da Acme");
+  await expect(card).toContainText("Venduto da Lemon Squeezy");
   // Senza licenza non si può installare: c'è il campo per la chiave.
   await expect(card.getByRole("button", { name: "Installa" })).toBeDisabled();
   await expect(card.getByText("Serve una licenza per usarlo.")).toHaveCount(0);

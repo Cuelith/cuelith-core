@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { cp, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import {
   ErrorCode,
@@ -11,6 +11,7 @@ import {
 import { z } from "zod";
 import type { Logger } from "../log.js";
 import { writeFileAtomic } from "../show/files.js";
+import { renameWithRetry } from "./fsretry.js";
 import { loadModule, ModuleLoadError, type LoadedModule } from "./load.js";
 import { extractPackage, stagingDir } from "./package.js";
 
@@ -346,7 +347,7 @@ export class ModuleRegistry {
         const target = join(root, id, version);
         await mkdir(join(root, id), { recursive: true });
         await rm(target, { recursive: true, force: true });
-        await rename(staging, target);
+        await renameWithRetry(staging, target);
 
         const old = this.#state.installed[id];
         const record: InstallRecord = {

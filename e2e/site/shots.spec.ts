@@ -267,17 +267,17 @@ async function installSongs(running: RunningApp, file: string): Promise<FrameLoc
   const modules = station.getByRole("dialog", { name: "Plugin" });
   await modules.getByRole("tab", { name: "Installati" }).click();
   await modules.getByRole("button", { name: "Installa da file…" }).click();
-  const guide = station.getByRole("dialog", { name: "Primi passi con «Canti»" });
+  const guide = station.getByRole("dialog", { name: "Primi passi con «Brani»" });
   await guide.getByRole("button", { name: "Avanti" }).click();
   await guide.getByRole("button", { name: "Avanti" }).click();
   await guide.getByRole("button", { name: "Ho capito" }).click();
   await modules.getByRole("button", { name: "Chiudi" }).click();
   await station
     .getByRole("navigation", { name: "Plugin" })
-    .getByRole("button", { name: "Canti", exact: true })
+    .getByRole("button", { name: "Brani", exact: true })
     .click();
   const side = station.frameLocator('[data-module-panel="cuelith.songs.songs"]');
-  await expect(side.getByRole("button", { name: "+ Nuovo canto" })).toBeVisible();
+  await expect(side.getByRole("button", { name: "+ Nuovo brano" })).toBeVisible();
   return side;
 }
 
@@ -314,10 +314,10 @@ async function shoot(running: RunningApp, demo: Demo): Promise<void> {
   );
   const row = (title: string) => side.getByRole("option").filter({ hasText: title });
   await expect(row(demo.songs[2]?.title ?? "")).toBeVisible();
-  const actions = side.getByRole("toolbar", { name: "Azioni sui canti selezionati" });
+  const actions = side.getByRole("toolbar", { name: "Azioni sui brani selezionati" });
   const entries = station.getByRole("list", { name: "Voci della scaletta" }).getByRole("listitem");
   const playlist = station.getByRole("tab", { name: "Scaletta", exact: true });
-  const songsTab = station.getByRole("tab", { name: "Canti", exact: true });
+  const songsTab = station.getByRole("tab", { name: "Brani", exact: true });
   let count = 0;
   for (const { title } of demo.songs) {
     count++;
@@ -388,7 +388,7 @@ async function shoot(running: RunningApp, demo: Demo): Promise<void> {
   await station.getByRole("button", { name: "Aggiungi plugin" }).click();
   const modules = station.getByRole("dialog", { name: "Plugin" });
   await modules.getByRole("tab", { name: "Installati" }).click();
-  await expect(modules.getByRole("list", { name: "Installati" })).toContainText("Canti");
+  await expect(modules.getByRole("list", { name: "Installati" })).toContainText("Brani");
   await shot(station, "moduli");
   await modules.getByRole("button", { name: "Chiudi" }).click();
   await station.getByRole("button", { name: /^Risorse del computer/ }).click();

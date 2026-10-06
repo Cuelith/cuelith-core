@@ -12,8 +12,8 @@ import {
 import { chooseFiles, panelWindowVisible, screenshotsDir, shownPanelWindow, test } from "./app.js";
 
 /**
- * Il modulo Canti vero (repo affiancato plugin-songs, costruito con
- * `pnpm build`): installazione, scheda Canti con selezione e barra fissa,
+ * Il modulo Brani vero (repo affiancato plugin-songs, costruito con
+ * `pnpm build`): installazione, scheda Brani con selezione e barra fissa,
  * editor in una finestra propria, scaletta, tasti delle sezioni, fuori
  * scaletta, importazione ed esportazione. Senza il pacchetto la prova si salta.
  *
@@ -62,33 +62,33 @@ async function install(station: Page, app: ElectronApplication, file: string) {
   await window.getByRole("button", { name: "Installa da file…" }).click();
 
   // La guida al primo uso, coi testi del modulo.
-  const guide = station.getByRole("dialog", { name: "Primi passi con «Canti»" });
-  await expect(guide).toContainText("I canti in Cuelith");
+  const guide = station.getByRole("dialog", { name: "Primi passi con «Brani»" });
+  await expect(guide).toContainText("I brani in Cuelith");
   await guide.getByRole("button", { name: "Avanti" }).click();
   await guide.getByRole("button", { name: "Avanti" }).click();
   await expect(guide).toContainText("V C P B I E O");
   await guide.getByRole("button", { name: "Ho capito" }).click();
   await expect(guide).toBeHidden();
   const installed = window.getByRole("list", { name: "Installati" });
-  await expect(installed).toContainText("Canti");
+  await expect(installed).toContainText("Brani");
   // Modulo attivo: e' uno strumento, con la sua icona.
-  await expect(installed.getByRole("listitem").filter({ hasText: "Canti" })).toContainText(
+  await expect(installed.getByRole("listitem").filter({ hasText: "Brani" })).toContainText(
     "Strumento",
   );
   await window.getByRole("button", { name: "Chiudi" }).click();
   await expect(window).toBeHidden();
 }
 
-/** Apre la scheda Canti dalla colonna degli strumenti (icona del modulo). */
+/** Apre la scheda Brani dalla colonna degli strumenti (icona del modulo). */
 async function openSongs(station: Page): Promise<FrameLocator> {
   const tool = station.getByRole("navigation", { name: "Plugin" }).getByRole("button", {
-    name: "Canti",
+    name: "Brani",
     exact: true,
   });
   await expect(tool.locator("img")).toHaveAttribute("src", /icon\.svg$/);
   await tool.click();
   const side = station.frameLocator('[data-module-panel="cuelith.songs.songs"]');
-  await expect(side.getByRole("button", { name: "+ Nuovo canto" })).toBeVisible();
+  await expect(side.getByRole("button", { name: "+ Nuovo brano" })).toBeVisible();
   return side;
 }
 
@@ -149,25 +149,25 @@ async function addSection(editor: FrameLocator, kind: string, id: string): Promi
 }
 
 const bar = (side: FrameLocator) =>
-  side.getByRole("toolbar", { name: "Azioni sui canti selezionati" });
+  side.getByRole("toolbar", { name: "Azioni sui brani selezionati" });
 const songRow = (side: FrameLocator, title: string) =>
   side.getByRole("option").filter({ hasText: title }).getByRole("button");
 
-test("modulo Canti: nuovo canto nell'editor, scaletta, tasti delle sezioni, importazione ed esportazione", async ({
+test("modulo Brani: nuovo brano nell'editor, scaletta, tasti delle sezioni, importazione ed esportazione", async ({
   running,
 }) => {
   test.skip(songsPackage === undefined, "pacchetto plugin-songs non costruito");
   const { app, station, problems } = running;
   await install(station, app, songsPackage ?? "");
   const side = await openSongs(station);
-  await expect(side.getByText("Nessun canto ancora.", { exact: false })).toBeVisible();
+  await expect(side.getByText("Nessun brano ancora.", { exact: false })).toBeVisible();
 
-  // Nuovo canto: l'editor si apre in una finestra sua; la postazione non cambia.
+  // Nuovo brano: l'editor si apre in una finestra sua; la postazione non cambia.
   const { page, editor } = await editorOpenedBy(
     app,
-    side.getByRole("button", { name: "+ Nuovo canto" }),
+    side.getByRole("button", { name: "+ Nuovo brano" }),
   );
-  await expect(editor.getByText("Nuovo canto", { exact: true })).toBeVisible();
+  await expect(editor.getByText("Nuovo brano", { exact: true })).toBeVisible();
   await expect(station.getByRole("region", { name: "Slide" })).toBeVisible();
 
   // Titolo, autore e testo sono obbligatori.
@@ -200,7 +200,7 @@ test("modulo Canti: nuovo canto nell'editor, scaletta, tasti delle sezioni, impo
     expect(savedAdded).toBeVisible({ timeout: 6000 }),
   );
 
-  // Esportazione di un canto in OpenLyrics (formato aperto, per gli altri programmi).
+  // Esportazione di un brano in OpenLyrics (formato aperto, per gli altri programmi).
   const exported = path.join(mkdtempSync(path.join(os.tmpdir(), "cuelith-canto-")), "Santo.xml");
   await chooseFiles(app, exported);
   await clickUntil(editor.getByRole("button", { name: "Esporta OpenLyrics" }), () =>
@@ -212,7 +212,7 @@ test("modulo Canti: nuovo canto nell'editor, scaletta, tasti delle sezioni, impo
   await closeEditor(app, editor);
   await expect(songRow(side, "Santo")).toBeVisible();
 
-  // Backup: tutti i canti in un file ChordPro, scritto dove sceglie l'operatore.
+  // Backup: tutti i brani in un file ChordPro, scritto dove sceglie l'operatore.
   const backup = path.join(mkdtempSync(path.join(os.tmpdir(), "cuelith-canti-")), "canti.cho");
   await chooseFiles(app, backup);
   await clickUntil(side.getByRole("button", { name: "Esporta tutti…" }), () =>
@@ -271,7 +271,7 @@ test("modulo Canti: nuovo canto nell'editor, scaletta, tasti delle sezioni, impo
     },
   ]);
   const report = side.getByRole("region", { name: "Importazione" });
-  await expect(report).toContainText("1 canto importato.");
+  await expect(report).toContainText("1 brano importato.");
   await expect(report).toContainText("Alleluia");
   await expect(songRow(side, "Come l'aurora")).toBeVisible();
   const completing = await editorOpenedBy(app, report.getByRole("button", { name: "Completa" }));
@@ -284,7 +284,7 @@ test("modulo Canti: nuovo canto nell'editor, scaletta, tasti delle sezioni, impo
   expect(problems).toEqual([]);
 });
 
-test("scheda Canti: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C1 B1 C1 in cerchio", async ({
+test("scheda Brani: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C1 B1 C1 in cerchio", async ({
   running,
 }) => {
   test.skip(songsPackage === undefined, "pacchetto plugin-songs non costruito");
@@ -381,8 +381,8 @@ test("scheda Canti: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C
     .click();
   await expect(station.getByText("«Glorioso giorno» messo in scaletta.")).toBeVisible();
 
-  // Piu' canti selezionati (Ctrl+clic): «In scaletta» li aggiunge tutti, nell'ordine scelto.
-  const second = await editorOpenedBy(app, side.getByRole("button", { name: "+ Nuovo canto" }));
+  // Piu' brani selezionati (Ctrl+clic): «In scaletta» li aggiunge tutti, nell'ordine scelto.
+  const second = await editorOpenedBy(app, side.getByRole("button", { name: "+ Nuovo brano" }));
   await second.editor.getByLabel("Titolo").fill("Alba");
   await clickUntil(second.editor.getByRole("button", { name: "Autore sconosciuto" }), () =>
     expect(second.editor.getByLabel("Autore 1", { exact: true })).toHaveValue(
@@ -409,7 +409,7 @@ test("scheda Canti: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C
   await clickUntil(actions.getByRole("button", { name: "In scaletta", exact: true }), async () => {
     await station.getByRole("tab", { name: "Scaletta", exact: true }).click();
     await expect(entries).toHaveCount(3, SOON);
-    await station.getByRole("tab", { name: "Canti", exact: true }).click();
+    await station.getByRole("tab", { name: "Brani", exact: true }).click();
   });
   await station.getByRole("tab", { name: "Scaletta", exact: true }).click();
   await expect(entries).toHaveText([/Glorioso giorno/, /Glorioso giorno/, /Alba/]);

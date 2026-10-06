@@ -290,6 +290,11 @@ function Marketplace({
                         : ` · ${t("core.modules.price", { price: plugin.price })}`}
                     </p>
                   )}
+                  {paid && (
+                    <p className="text-[11px] text-faint">
+                      {t("core.modules.soldBy", { publisher: plugin.publisher })}
+                    </p>
+                  )}
                 </div>
                 <span
                   className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] ${
