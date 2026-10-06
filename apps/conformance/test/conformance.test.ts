@@ -118,7 +118,6 @@ describe("controlli statici", () => {
     const report = await staticOnly(makeFolder({ files: { "main.mjs": code } }));
     expect(report.ok).toBe(true);
     expect(report.findings.filter((f) => f.id === "code-permissions").length).toBe(2);
-    expect(ids(report)).toContain("stdout-protocol");
     const declared = await staticOnly(
       makeFolder({
         manifest: { permissions: ["process", "network"] },

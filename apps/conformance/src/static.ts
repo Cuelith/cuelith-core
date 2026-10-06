@@ -255,7 +255,6 @@ export async function checkFolder(
 
   // --- euristiche sul codice del processo: avvisi, la prova vera e' a runtime ---
   out.ran("code-permissions");
-  out.ran("stdout-protocol");
   if (manifest.runtime.type === "node") {
     const entry = join(dir, manifest.runtime.entry);
     if (existsSync(entry) && statSync(entry).size < 8 * 1024 ** 2) {
@@ -285,16 +284,6 @@ export async function checkFolder(
             file: manifest.runtime.entry,
           });
         }
-      }
-      if (/\bconsole\.log\s*\(/.test(code)) {
-        out.add({
-          id: "stdout-protocol",
-          level: "warning",
-          message:
-            "The code uses console.log. Stdout carries the protocol between plugin and engine: stray lines are ignored, but a half line can corrupt a message.",
-          fix: "Log with console.error (stderr) instead.",
-          file: manifest.runtime.entry,
-        });
       }
     }
   }
