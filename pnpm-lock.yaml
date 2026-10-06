@@ -249,6 +249,43 @@ importers:
         specifier: 5.0.2
         version: 5.0.2(@types/node@24.19.0)(vite@8.3.1(@types/node@24.19.0)(jiti@2.7.0))
 
+  apps/conformance:
+    dependencies:
+      '@cuelith-core/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@cuelith/protocol':
+        specifier: link:../../../cuelith-sdk/packages/protocol
+        version: link:../../../cuelith-sdk/packages/protocol
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
+      semver:
+        specifier: 7.8.5
+        version: 7.8.5
+      ws:
+        specifier: 8.22.0
+        version: 8.22.0
+    devDependencies:
+      '@types/node':
+        specifier: 24.19.0
+        version: 24.19.0
+      '@types/semver':
+        specifier: 7.8.0
+        version: 7.8.0
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
+      eslint:
+        specifier: 10.11.0
+        version: 10.11.0(jiti@2.7.0)(supports-color@7.2.0)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 5.0.2
+        version: 5.0.2(@types/node@24.19.0)(vite@8.3.1(@types/node@24.19.0)(jiti@2.7.0))
+
   apps/desktop:
     devDependencies:
       '@cuelith-core/client':

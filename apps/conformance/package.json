@@ -1,18 +1,17 @@
 {
-  "name": "@cuelith-core/engine",
-  "version": "0.2.0",
+  "name": "@cuelith-core/conformance",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "GPL-3.0-or-later",
-  "description": "Motore di Cuelith: unica fonte di verità dello show, comandi, moduli, server HTTP e WebSocket.",
+  "description": "Suite di conformita' dei plugin: controlli sul pacchetto e prove con il motore vero.",
+  "bin": {
+    "cuelith-conformance": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./conformance": {
-      "types": "./dist/conformance.d.ts",
-      "default": "./dist/conformance.js"
     }
   },
   "scripts": {
@@ -22,13 +21,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cuelith-core/core-looks": "workspace:*",
+    "@cuelith-core/engine": "workspace:*",
     "@cuelith/protocol": "link:../../../cuelith-sdk/packages/protocol",
-    "bonjour-service": "1.4.4",
     "fflate": "0.8.3",
     "semver": "7.8.5",
-    "ws": "8.22.0",
-    "zod": "4.6.5"
+    "ws": "8.22.0"
   },
   "devDependencies": {
     "@types/node": "24.19.0",
