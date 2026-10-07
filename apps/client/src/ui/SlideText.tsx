@@ -34,11 +34,14 @@ export function SlideText({
           fontSize: `calc(${String(style.text.size)} / 1080 * 100cqh)`,
           color: style.text.color,
           textAlign: style.text.align,
+          lineHeight: style.text.lineHeight ?? 1.25,
+          fontWeight: style.text.weight === "bold" ? 700 : 400,
+          textTransform: style.text.uppercase === true ? "uppercase" : "none",
           padding: `calc(${String(style.text.margin)} * 100cqmin)`,
         };
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center leading-[1.25] whitespace-pre-line"
+      className="absolute inset-0 flex items-center justify-center whitespace-pre-line"
       style={css}
     >
       {background !== undefined && (

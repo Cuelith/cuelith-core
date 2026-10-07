@@ -239,15 +239,18 @@ export class Painter {
       fontSize,
       fill: color,
       align: frame.style.align,
+      fontWeight: frame.style.weight === "bold" ? ("700" as const) : ("400" as const),
       wordWrap: true,
       wordWrapWidth: wrap,
-      lineHeight: fontSize * 1.25,
+      lineHeight: fontSize * (frame.style.lineHeight ?? 1.25),
     });
+    const shown = (value: string): string =>
+      frame.style.uppercase === true ? value.toUpperCase() : value;
 
     if (frame.kind === "fullscreen") {
       if (frame.text !== undefined) {
         const text = new Text({
-          text: frame.text,
+          text: shown(frame.text),
           style: textStyle(size, frame.style.color, w - 2 * margin),
         });
         const ax = frame.style.align === "left" ? 0 : frame.style.align === "right" ? 1 : 0.5;
@@ -258,7 +261,7 @@ export class Painter {
     } else {
       if (frame.text !== undefined) {
         const text = new Text({
-          text: frame.text,
+          text: shown(frame.text),
           style: textStyle(size, frame.style.color, w - 2 * margin),
         });
         text.position.set(margin, margin);
