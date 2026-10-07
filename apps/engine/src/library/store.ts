@@ -13,7 +13,7 @@ import {
 } from "@cuelith/protocol";
 import { ftsQuery, searchableBody } from "./search.js";
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const MIGRATIONS: readonly string[] = [
   `
@@ -58,6 +58,15 @@ const MIGRATIONS: readonly string[] = [
   ALTER TABLE libraries ADD COLUMN code TEXT;
   ALTER TABLE libraries ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0;
   CREATE UNIQUE INDEX libraries_code ON libraries(code) WHERE code IS NOT NULL;
+  `,
+  // 3: stili globali del testo, creati dall'utente (decisione 0015).
+  `
+  CREATE TABLE text_styles (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    data TEXT NOT NULL,
+    position INTEGER NOT NULL
+  );
   `,
 ];
 
@@ -138,6 +147,55 @@ export class LibraryStore {
 
   #run(sql: string, ...params: SQLInputValue[]): number {
     return Number(this.#db.prepare(sql).run(...params).changes);
+  }
+
+  // ---------- stili globali del testo ----------
+
+  textStyles(): { id: string; name: string; style: Record<string, unknown> }[] {
+    return this.#all("SELECT id, name, data FROM text_styles ORDER BY position, rowid").map(
+      (row) => ({
+        id: str(row, "id"),
+        name: str(row, "name"),
+        style: JSON.parse(str(row, "data")) as Record<string, unknown>,
+      }),
+    );
+  }
+
+  createTextStyle(name: string, style: Record<string, unknown>): string {
+    return this.#transaction(() => {
+      const id = newId();
+      const next = Number(this.#get("SELECT COUNT(*) AS n FROM text_styles")?.["n"] ?? 0);
+      this.#run(
+        "INSERT INTO text_styles (id, name, data, position) VALUES (?, ?, ?, ?)",
+        id,
+        name,
+        JSON.stringify(style),
+        next,
+      );
+      return id;
+    });
+  }
+
+  updateTextStyle(
+    id: string,
+    patch: { name?: string | undefined; style?: Record<string, unknown> | undefined },
+  ): void {
+    this.#transaction(() => {
+      if (this.#get("SELECT id FROM text_styles WHERE id = ?", id) === undefined) {
+        throw notFound("core.error.textStyleNotFound");
+      }
+      if (patch.name !== undefined)
+        this.#run("UPDATE text_styles SET name = ? WHERE id = ?", patch.name, id);
+      if (patch.style !== undefined) {
+        this.#run("UPDATE text_styles SET data = ? WHERE id = ?", JSON.stringify(patch.style), id);
+      }
+    });
+  }
+
+  deleteTextStyle(id: string): void {
+    if (this.#run("DELETE FROM text_styles WHERE id = ?", id) === 0) {
+      throw notFound("core.error.textStyleNotFound");
+    }
   }
 
   // ---------- librerie ----------

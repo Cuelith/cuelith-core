@@ -1,7 +1,25 @@
 import "pixi.js/unsafe-eval";
 import { Application, Container, Graphics, Sprite, Text, Texture, type Ticker } from "pixi.js";
+import {
+  canvasMeasure,
+  creditsReserve,
+  fitScale,
+  type MeasureText,
+} from "@cuelith-core/core-looks";
 import { formatTimer, timerPhase, timerRemaining } from "@cuelith/protocol";
 import type { Frame, OutputView, TextStyle } from "./frame.js";
+
+/** Misura del testo con i caratteri veri, su un canvas che non si vede (creato alla prima richiesta). */
+let measureCache: MeasureText | undefined;
+function measure(): MeasureText {
+  if (measureCache === undefined) {
+    const context = document.createElement("canvas").getContext("2d");
+    measureCache = canvasMeasure(
+      context ?? { font: "", measureText: (text: string) => ({ width: text.length * 20 }) },
+    );
+  }
+  return measureCache;
+}
 
 const FONT: Record<TextStyle["font"], string> = {
   display: "Fraunces Variable",
@@ -149,6 +167,13 @@ export class Painter {
   /** Chiamata dopo ogni disegno (anche quando uno sfondo finisce di caricarsi). */
   onDrawn: (() => void) | undefined;
 
+  #textInfo = "";
+
+  /** Come e' disegnato il testo (dimensione reale in pixel, peso, maiuscolo): per le prove automatiche. */
+  get shownTextStyle(): string {
+    return this.#textInfo;
+  }
+
   /** Immagine di sfondo attualmente disegnata, se c'e' (per le prove automatiche). */
   get shownImage(): string {
     const frame = this.#shown?.frame;
@@ -233,7 +258,25 @@ export class Painter {
     }
     const scale = h / 1080;
     const margin = frame.style.margin * Math.min(w, h);
-    const size = frame.style.size * scale;
+    // Adattamento: se lo stile lo prevede e una slide non entra, tutto l'elemento si rimpicciolisce uguale.
+    const fit =
+      frame.style.fit === undefined || frame.text === undefined
+        ? 1
+        : (fitScale(
+            frame.fitTexts.includes(frame.text) ? frame.fitTexts : [...frame.fitTexts, frame.text],
+            frame.style,
+            { width: w, height: h },
+            measure(),
+            frame.kind === "fullscreen" ? creditsReserve(h, frame.credits !== undefined) : 0,
+          ) ?? frame.style.fit.min);
+    const size = frame.style.size * scale * fit;
+    this.#textInfo = JSON.stringify({
+      size: Math.round(size * 10) / 10,
+      lineHeight: frame.style.lineHeight ?? 1.25,
+      bold: frame.style.weight === "bold",
+      uppercase: frame.style.uppercase === true,
+      color: frame.style.color,
+    });
     const textStyle = (fontSize: number, color: string, wrap: number) => ({
       fontFamily: FONT[frame.style.font],
       fontSize,

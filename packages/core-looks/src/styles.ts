@@ -33,20 +33,19 @@ export const TextStyleSchema = z.strictObject({
 });
 export type TextStyle = z.infer<typeof TextStyleSchema>;
 
+export { TextOverrideSchema, type TextOverride } from "@cuelith/protocol";
+
 /**
- * Modifiche dell'editor per un solo elemento (decisione 0015): solo cio' che l'utente ha
- * toccato. La dimensione e' una scala sullo stile in uso, non un numero assoluto.
+ * Stile globale scelto per un look (decisione 0015): una copia dello stile salvato
+ * dall'utente, cosi' lo show si vede uguale anche su un computer dove quello stile non esiste.
+ * Finche' c'e', sostituisce del tutto le modifiche dell'editor.
  */
-export const TextOverrideSchema = z.strictObject({
-  scale: z.number().min(0.5).max(2).optional(),
-  font: TextStyleSchema.shape.font.optional(),
-  color: Color.optional(),
-  align: TextStyleSchema.shape.align.optional(),
-  lineHeight: z.number().min(0.8).max(2.5).optional(),
-  weight: z.enum(["normal", "bold"]).optional(),
-  uppercase: z.boolean().optional(),
+export const GlobalTextSchema = z.strictObject({
+  id: z.string().min(1),
+  name: z.string().min(1).max(60),
+  text: TextStyleSchema,
 });
-export type TextOverride = z.infer<typeof TextOverrideSchema>;
+export type GlobalText = z.infer<typeof GlobalTextSchema>;
 
 /**
  * Sfondo del look Sala (decisione 0003): colore, immagine predefinita
@@ -65,6 +64,7 @@ const Background = z.strictObject({
 export const FullscreenStyleSchema = z.strictObject({
   background: Background,
   text: TextStyleSchema,
+  globalText: GlobalTextSchema.optional(),
   transition: Transition,
 });
 export type FullscreenStyle = z.infer<typeof FullscreenStyleSchema>;
@@ -72,6 +72,7 @@ export type FullscreenStyle = z.infer<typeof FullscreenStyleSchema>;
 export const StageStyleSchema = z.strictObject({
   background: z.strictObject({ color: Color }),
   text: TextStyleSchema,
+  globalText: GlobalTextSchema.optional(),
   /** Mostra la slide successiva sotto quella in onda. */
   showNext: z.boolean(),
   /** Mostra l'orologio in un angolo. */

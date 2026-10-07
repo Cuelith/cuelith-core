@@ -1,5 +1,6 @@
 import {
   creditsFor,
+  effectiveTextStyle,
   FullscreenStyleSchema,
   PRESENTATION_SOURCE_TYPE,
   StageStyleSchema,
@@ -34,6 +35,8 @@ export type Frame =
       readonly dim: number;
       readonly text: string | undefined;
       readonly style: TextStyle;
+      /** Testi di tutte le slide dell'elemento in onda: l'adattamento e' uguale per tutte. */
+      readonly fitTexts: readonly string[];
       readonly message: string | undefined;
       /** Riga dei crediti (prima o ultima slide, se l'elemento li prevede). */
       readonly credits: string | undefined;
@@ -43,6 +46,7 @@ export type Frame =
       readonly background: string;
       readonly text: string | undefined;
       readonly style: TextStyle;
+      readonly fitTexts: readonly string[];
       readonly next: string | undefined;
       readonly clock: boolean;
       readonly message: string | undefined;
@@ -105,8 +109,14 @@ function presentation(doc: StateDocument) {
     previewItem === undefined ? undefined : slideSequence(previewItem)[preview.slideIndex];
   const key =
     onAir === undefined ? "none" : `${item?.id ?? ""}/${String(content.slideIndex)}/${onAir.id}`;
+  const fitTexts =
+    item === undefined
+      ? []
+      : sequence.map((slide) => slide.fields["text"]?.value ?? "").filter((text) => text !== "");
   return {
     onAir,
+    item,
+    fitTexts,
     next,
     key,
     credits,
@@ -144,7 +154,8 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
   const look = feed.lookId === undefined ? undefined : doc.show.looks[feed.lookId];
   if (source?.type !== PRESENTATION_SOURCE_TYPE || look === undefined) return black;
 
-  const { onAir, next, key, credits, background, nextBackground } = presentation(doc);
+  const { onAir, item, fitTexts, next, key, credits, background, nextBackground } =
+    presentation(doc);
   const showContent = look.layers.includes("content");
   const text = showContent && look.fields.includes("text") ? textOf(onAir) : undefined;
   const message = messageOf(doc, look, outputId);
@@ -172,7 +183,9 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
         image,
         dim: style.data.background.dim ?? 0,
         text,
-        style: style.data.text,
+        // Lo stile globale scelto vince; senza, lo stile del look con le modifiche dell'editor.
+        style: effectiveTextStyle(style.data.text, style.data.globalText?.text, item?.textStyle),
+        fitTexts,
         message,
         credits: showContent ? credits : undefined,
       },
@@ -192,7 +205,8 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
         kind: "stage",
         background: style.data.background.color,
         text,
-        style: style.data.text,
+        style: effectiveTextStyle(style.data.text, style.data.globalText?.text, item?.textStyle),
+        fitTexts,
         next: style.data.showNext ? textOf(next) : undefined,
         clock: style.data.showClock,
         message,

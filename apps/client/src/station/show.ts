@@ -1,4 +1,9 @@
-import { creditsFor, FullscreenStyleSchema, type FullscreenStyle } from "@cuelith-core/core-looks";
+import {
+  creditsFor,
+  effectiveTextStyle,
+  FullscreenStyleSchema,
+  type FullscreenStyle,
+} from "@cuelith-core/core-looks";
 import {
   cursorItem,
   itemById,
@@ -61,6 +66,23 @@ export function roomStyle(doc: StateDocument): FullscreenStyle | undefined {
     if (style.success) return style.data;
   }
   return undefined;
+}
+
+/**
+ * Stile del look Sala con cui si disegna il testo di un elemento: lo stile globale scelto,
+ * altrimenti le modifiche dell'editor sopra lo stile del look (decisione 0015). E' lo stesso
+ * calcolo delle uscite.
+ */
+export function roomStyleFor(
+  doc: StateDocument,
+  item: Pick<Item, "textStyle"> | undefined,
+): FullscreenStyle | undefined {
+  const base = roomStyle(doc);
+  if (base === undefined) return undefined;
+  return {
+    ...base,
+    text: effectiveTextStyle(base.text, base.globalText?.text, item?.textStyle),
+  };
 }
 
 /** Testo della slide: il campo "text", l'unico che il look Sala mostra. */

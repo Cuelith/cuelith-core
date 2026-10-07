@@ -6,6 +6,7 @@ import { PlaylistPanel } from "./PlaylistPanel.js";
 import { PreviewPanel, ProgramPanel } from "./ScreenPanels.js";
 import { SlidesPanel } from "./SlidesPanel.js";
 import { StagePanel, TimerPanel } from "./StagePanels.js";
+import { TextStylesPanel } from "./TextStylesPanel.js";
 
 /** Pannelli del nucleo, per id qualificato. */
 export const CORE_PANEL_COMPONENTS: Readonly<Record<string, ComponentType>> = {
@@ -21,4 +22,5 @@ export const CORE_PANEL_COMPONENTS: Readonly<Record<string, ComponentType>> = {
   "core.notes": NotesPanel,
   "core.transitions": TransitionsPanel,
   "core.backgrounds": BackgroundsPanel,
+  "core.textstyles": TextStylesPanel,
 };

@@ -18,11 +18,12 @@ export const PRESENT_MODE: Mode = {
   shortcut: "Mod+1",
   layout: {
     columns: ["25fr", "40fr", "33fr"],
-    rows: ["auto", "auto", "1fr"],
+    rows: ["auto", "auto", "1fr", "auto"],
     areas: [
       ["playlist", "slides", "program"],
       ["playlist", "slides", "preview"],
       ["playlist", "slides", "backgrounds"],
+      ["playlist", "slides", "textstyles"],
     ],
     panels: {
       playlist: ["core.playlist", "core.library"],
@@ -30,6 +31,7 @@ export const PRESENT_MODE: Mode = {
       program: "core.program",
       preview: "core.preview",
       backgrounds: "core.backgrounds",
+      textstyles: "core.textstyles",
     },
   },
 };

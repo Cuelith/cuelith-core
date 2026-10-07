@@ -132,6 +132,50 @@ describe("describeOutput", () => {
     expect(describeOutput(doc, mirror)?.blackout).toBe(true);
   });
 
+  it("stile del testo: l'editor si somma al look, lo stile globale lo sostituisce, e tornano se lo si toglie", () => {
+    const { doc, room, stage } = makeDoc();
+    const itemId = Object.keys(doc.show.items)[0] ?? "";
+    const item = doc.show.items[itemId];
+    const look = Object.values(doc.show.looks).find((l) => l.template === "core.fullscreen");
+    if (item === undefined || look === undefined) throw new Error("stato mancante");
+    const textOf = (id: string) =>
+      (
+        describeOutput(doc, id)?.frame as {
+          style: { size: number; color: string; weight?: string };
+        }
+      ).style;
+    const baseSize = textOf(room).size;
+
+    item.textStyle = { scale: 1.5, color: "#FFCC00", weight: "bold" };
+    expect(textOf(room)).toMatchObject({ size: baseSize * 1.5, color: "#FFCC00", weight: "bold" });
+    // Il look Palco ha il suo stile di base: la scala dell'editor vale anche li', in proporzione.
+    expect(textOf(stage).size).toBeGreaterThan(0);
+
+    const style = look.style as { text: Record<string, unknown> };
+    look.style = {
+      ...style,
+      globalText: {
+        id: "g1",
+        name: "Grande",
+        text: { ...style.text, size: 200, color: "#00FF00" },
+      },
+    };
+    expect(textOf(room)).toMatchObject({ size: 200, color: "#00FF00" });
+    expect(textOf(room).weight).toBeUndefined();
+
+    look.style = style;
+    expect(textOf(room)).toMatchObject({ size: baseSize * 1.5, color: "#FFCC00", weight: "bold" });
+  });
+
+  it("porta i testi di tutte le slide dell'elemento per l'adattamento, senza quelle vuote", () => {
+    const { doc, room } = makeDoc();
+    expect(describeOutput(doc, room)?.frame).toMatchObject({ fitTexts: ["Prima", "Seconda"] });
+    const item = Object.values(doc.show.items)[0];
+    if (item === undefined) throw new Error("stato mancante");
+    item.slides.push({ id: newId(), fields: { text: { kind: "text", value: "" } } });
+    expect(describeOutput(doc, room)?.frame).toMatchObject({ fitTexts: ["Prima", "Seconda"] });
+  });
+
   it("il messaggio compare solo sui look che hanno il layer dei messaggi", () => {
     const { doc, room, stage } = makeDoc();
     doc.live.layers.message = { visible: true, text: "Cinque minuti" };

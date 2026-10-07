@@ -1,3 +1,4 @@
+import { checkStyle, creditsReserve, effectiveTextStyle } from "@cuelith-core/core-looks";
 import {
   ATTACHMENT_ROLES,
   AUTHOR_ROLES,
@@ -5,6 +6,7 @@ import {
   type Attachment,
   type Item,
   type Slide,
+  type TextOverride,
 } from "@cuelith/protocol";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
@@ -15,18 +17,22 @@ import {
   type CreditsForm,
 } from "../station/credits.js";
 import { useLibraryTags } from "../station/library.js";
-import { joinSlides, splitSlides } from "../station/show.js";
+import { joinSlides, roomStyle, splitSlides } from "../station/show.js";
+import { measure, roomOutputs } from "../station/textStyles.js";
 import { useRun, useStation, type EditorRequest } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { FieldLabel, INPUT } from "../ui/Dialogs.js";
+import { SlideText } from "../ui/SlideText.js";
 
 const textField = (value: string) => ({ kind: "text" as const, value });
-type Tab = "text" | "credits" | "extra";
+type Tab = "text" | "style" | "credits" | "extra";
 
 interface Draft {
   readonly title: string;
   readonly text: string;
   readonly credits: CreditsForm;
+  /** Stile del testo di questo elemento (decisione 0015): solo cio' che l'utente ha toccato. */
+  readonly textStyle: TextOverride | undefined;
   readonly tags: readonly string[];
   readonly attachments: readonly Attachment[];
 }
@@ -36,6 +42,7 @@ function draftOf(item: Item | undefined): Draft {
     title: item?.title ?? "",
     text: item === undefined ? "" : joinSlides(item.slides),
     credits: creditsToForm(item?.credits),
+    textStyle: item?.textStyle,
     tags: item?.tags ?? [],
     attachments: item?.attachments ?? [],
   };
@@ -102,6 +109,20 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
   }, [connection, request]);
 
   const slides = splitSlides(draft.text);
+  // Con uno stile globale attivo il testo scritto deve ancora entrare nelle uscite: lo si dice mentre si scrive.
+  const room = state === undefined ? undefined : roomStyle(state);
+  const fitProblem = (() => {
+    const active = room?.globalText;
+    if (state === undefined || active === undefined || slides.length === 0) return undefined;
+    const boxes = roomOutputs(state);
+    const credits = draft.credits.show !== "none";
+    const reserve = Math.max(...boxes.map((box) => creditsReserve(box.height, credits)));
+    const result = checkStyle(slides, active.text, boxes, measure(), reserve);
+    const first = result.failures[0];
+    return result.ok || first === undefined
+      ? undefined
+      : { name: active.name, slide: first.slide + 1, output: first.output };
+  })();
   const problems = creditsProblems(draft.credits);
   const titleMissing = inLibrary && draft.title.trim() === "";
   const canSave =
@@ -132,6 +153,9 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
         ...(tags.length === 0 ? {} : { tags }),
         ...(attachments.length === 0 ? {} : { attachments }),
       });
+      if (created !== undefined && draft.textStyle !== undefined) {
+        await run("item.update", { id: created.id, textStyle: draft.textStyle });
+      }
       const entry = created && (await run("playlist.add", { itemId: created.id }));
       if (entry !== undefined) {
         // La prima slide va in anteprima: Invio la manda in onda.
@@ -140,7 +164,13 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
         ok = true;
       }
     } else if (request.mode === "edit" && showItem !== undefined) {
-      ok = await saveShowItem(showItem, { title, credits, tags, attachments });
+      ok = await saveShowItem(showItem, {
+        title,
+        credits,
+        tags,
+        attachments,
+        textStyle: draft.textStyle ?? null,
+      });
     } else if (inLibrary) {
       const base = existing;
       const item: Item = {
@@ -150,6 +180,7 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
         slides: slidesFrom(slides, base?.slides ?? []),
         meta: base?.meta ?? {},
         ...(credits === undefined ? {} : { credits }),
+        ...(draft.textStyle === undefined ? {} : { textStyle: draft.textStyle }),
         ...(tags.length === 0 ? {} : { tags }),
         ...(attachments.length === 0 ? {} : { attachments }),
         ...(base?.derivedFrom === undefined ? {} : { derivedFrom: base.derivedFrom }),
@@ -168,7 +199,13 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
   /** Un elemento dello show: campi dell'elemento, poi le slide una per una. */
   const saveShowItem = async (
     item: Item,
-    patch: { title: string; credits: Item["credits"]; tags: string[]; attachments: Attachment[] },
+    patch: {
+      title: string;
+      credits: Item["credits"];
+      tags: string[];
+      attachments: Attachment[];
+      textStyle: TextOverride | null;
+    },
   ): Promise<boolean> => {
     const itemId = item.id;
     let ok =
@@ -176,6 +213,7 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
         id: itemId,
         title: patch.title,
         credits: patch.credits ?? null,
+        textStyle: patch.textStyle,
         tags: patch.tags,
         attachments: patch.attachments,
       })) !== undefined;
@@ -232,7 +270,7 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
           {t(heading)}
         </h2>
         <div role="tablist" className="flex gap-4 border-b border-line px-5">
-          {(["text", "credits", "extra"] as const).map((id) => (
+          {(["text", "style", "credits", "extra"] as const).map((id) => (
             <button
               key={id}
               type="button"
@@ -285,6 +323,15 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
                     rows={12}
                     className={`${INPUT} resize-y font-display text-base leading-snug`}
                   />
+                  {fitProblem !== undefined && (
+                    <span role="alert" className="text-xs text-live-soft">
+                      {t("core.editor.fitWarning", {
+                        name: fitProblem.name,
+                        slide: String(fitProblem.slide),
+                        output: fitProblem.output,
+                      })}
+                    </span>
+                  )}
                   <span className="flex justify-between gap-3 text-xs text-faint">
                     <span>{t("core.editor.textHint")}</span>
                     <span className="shrink-0 font-mono" data-testid="slide-count">
@@ -292,6 +339,15 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
                     </span>
                   </span>
                 </label>
+              )}
+              {tab === "style" && (
+                <TextStyleEditor
+                  value={draft.textStyle}
+                  sample={slides[0] ?? ""}
+                  onChange={(textStyle) => {
+                    set({ textStyle });
+                  }}
+                />
               )}
               {tab === "credits" && (
                 <CreditsEditor
@@ -657,6 +713,196 @@ function ExtrasEditor({
             {t(desktop === undefined ? "core.attachments.localOnly" : "core.attachments.hint")}
           </span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const SELECT = "rounded-md border border-line-2 bg-bg px-2 py-1 text-sm text-fg";
+
+/** Un valore facoltativo: "" = come la sala, altrimenti il valore scelto. */
+function optional(value: string): string | undefined {
+  return value === "" ? undefined : value;
+}
+
+/**
+ * Stile del testo di questo elemento, come in un editor di testi: si tocca solo cio' che serve e
+ * il resto resta come la sala. Se la regia ha scelto uno stile globale, queste modifiche restano
+ * salvate ma sospese (decisione 0015).
+ */
+function TextStyleEditor({
+  value,
+  sample,
+  onChange,
+}: {
+  value: TextOverride | undefined;
+  sample: string;
+  onChange: (value: TextOverride | undefined) => void;
+}) {
+  const t = useT();
+  const { state } = useEngine();
+  const base = state === undefined ? undefined : roomStyle(state);
+  const override = value ?? {};
+  const update = (patch: Partial<Record<keyof TextOverride, unknown>>) => {
+    const merged = Object.fromEntries(
+      Object.entries({ ...override, ...patch }).filter(([, entry]) => entry !== undefined),
+    ) as TextOverride;
+    onChange(Object.keys(merged).length === 0 ? undefined : merged);
+  };
+  const suspended = base?.globalText;
+  const previewStyle =
+    base === undefined
+      ? undefined
+      : { ...base, text: effectiveTextStyle(base.text, undefined, value) };
+  const number = (raw: string): number | undefined => {
+    const parsed = Number(raw);
+    return raw.trim() === "" || !Number.isFinite(parsed) ? undefined : parsed;
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-faint">{t("core.editor.style.intro")}</p>
+      {suspended !== undefined && (
+        <p role="status" className="text-xs text-live-soft">
+          {t("core.editor.style.suspended", { name: suspended.name })}
+        </p>
+      )}
+      <div className="grid grid-cols-3 gap-3">
+        <Field label={t("core.editor.style.scale")}>
+          <input
+            type="number"
+            min={50}
+            max={200}
+            step={5}
+            placeholder="100"
+            value={override.scale === undefined ? "" : Math.round(override.scale * 100)}
+            onChange={(event) => {
+              const percent = number(event.target.value);
+              update({
+                scale:
+                  percent === undefined ? undefined : Math.min(200, Math.max(50, percent)) / 100,
+              });
+            }}
+            className={INPUT}
+          />
+        </Field>
+        <Field label={t("core.textstyles.font")}>
+          <select
+            value={override.font ?? ""}
+            onChange={(event) => {
+              update({ font: optional(event.target.value) });
+            }}
+            className={SELECT}
+          >
+            <option value="">{t("core.editor.style.default")}</option>
+            {(["display", "body", "mono"] as const).map((font) => (
+              <option key={font} value={font}>
+                {t(`core.textstyles.font.${font}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("core.textstyles.align")}>
+          <select
+            value={override.align ?? ""}
+            onChange={(event) => {
+              update({ align: optional(event.target.value) });
+            }}
+            className={SELECT}
+          >
+            <option value="">{t("core.editor.style.default")}</option>
+            {(["left", "center", "right"] as const).map((align) => (
+              <option key={align} value={align}>
+                {t(`core.textstyles.align.${align}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("core.textstyles.lineHeight")}>
+          <input
+            type="number"
+            min={0.8}
+            max={2.5}
+            step={0.05}
+            placeholder="1.25"
+            value={override.lineHeight ?? ""}
+            onChange={(event) => {
+              const n = number(event.target.value);
+              update({ lineHeight: n === undefined ? undefined : Math.min(2.5, Math.max(0.8, n)) });
+            }}
+            className={INPUT}
+          />
+        </Field>
+        <Field label={t("core.textstyles.bold")}>
+          <select
+            value={override.weight ?? ""}
+            onChange={(event) => {
+              update({ weight: optional(event.target.value) });
+            }}
+            className={SELECT}
+          >
+            <option value="">{t("core.editor.style.default")}</option>
+            <option value="bold">{t("core.textstyles.bold")}</option>
+            <option value="normal">—</option>
+          </select>
+        </Field>
+        <Field label={t("core.textstyles.uppercase")}>
+          <select
+            value={override.uppercase === undefined ? "" : String(override.uppercase)}
+            onChange={(event) => {
+              update({
+                uppercase: event.target.value === "" ? undefined : event.target.value === "true",
+              });
+            }}
+            className={SELECT}
+          >
+            <option value="">{t("core.editor.style.default")}</option>
+            <option value="true">{t("core.textstyles.uppercase")}</option>
+            <option value="false">—</option>
+          </select>
+        </Field>
+        <Field label={t("core.textstyles.color")}>
+          <span className="flex items-center gap-2">
+            <input
+              type="color"
+              value={override.color ?? base?.text.color ?? "#FFFFFF"}
+              onChange={(event) => {
+                update({ color: event.target.value.toUpperCase() });
+              }}
+              className="h-8 w-14 rounded-md border border-line-2 bg-bg"
+            />
+            {override.color !== undefined && (
+              <button
+                type="button"
+                onClick={() => {
+                  update({ color: undefined });
+                }}
+                className="text-xs text-muted hover:text-fg"
+              >
+                {t("core.editor.style.default")}
+              </button>
+            )}
+          </span>
+        </Field>
+      </div>
+      <div className="flex items-start gap-3">
+        <div className="flex w-56 flex-col gap-1.5">
+          <FieldLabel>{t("core.editor.style.preview")}</FieldLabel>
+          <div
+            className="relative aspect-video overflow-hidden rounded-md border border-line bg-screen"
+            style={{ containerType: "size" }}
+          >
+            <SlideText text={sample === "" ? "Aa" : sample} style={previewStyle} />
+          </div>
+        </div>
+        <Button
+          disabled={value === undefined}
+          onClick={() => {
+            onChange(undefined);
+          }}
+        >
+          {t("core.editor.style.reset")}
+        </Button>
       </div>
     </div>
   );

@@ -189,3 +189,32 @@ export function checkStyle(
   });
   return { ok: failures.length === 0, scale, failures };
 }
+
+/** I caratteri inclusi nel programma, per nome: gli stessi nelle uscite e nell'anteprima. */
+export const FONT_FAMILIES: Readonly<Record<TextStyle["font"], string>> = {
+  display: "Fraunces Variable",
+  body: "Schibsted Grotesk Variable",
+  mono: "JetBrains Mono Variable",
+};
+
+/** Quel che serve a misurare del contesto 2D di un canvas (cosi' il pacchetto non dipende dal DOM). */
+export interface MeasuringContext {
+  font: string;
+  measureText(text: string): { width: number };
+}
+
+/** Misura reale delle righe con i caratteri veri, su un canvas fornito da chi disegna. */
+export function canvasMeasure(context: MeasuringContext): MeasureText {
+  return (text, fontSizePx, weight, font) => {
+    context.font = `${weight === "bold" ? "700" : "400"} ${String(fontSizePx)}px "${FONT_FAMILIES[font]}"`;
+    return context.measureText(text).width;
+  };
+}
+
+/**
+ * Spazio da lasciare libero in basso quando la slide ha i crediti: il testo e' centrato, quindi
+ * la fascia dei crediti va tolta da entrambi i lati.
+ */
+export function creditsReserve(boxHeight: number, hasCredits: boolean): number {
+  return hasCredits ? 2 * (0.03 * boxHeight + 30 * (boxHeight / REFERENCE_HEIGHT)) : 0;
+}

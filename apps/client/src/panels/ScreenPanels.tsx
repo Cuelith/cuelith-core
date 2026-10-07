@@ -5,11 +5,12 @@ import { useEngine, useT } from "../engine/react.js";
 import {
   previewSlide,
   programSlide,
-  roomStyle,
+  roomStyleFor,
   slideText,
   type ShownSlide,
 } from "../station/show.js";
 import { useRun } from "../station/station.js";
+import { itemFit } from "../station/textStyles.js";
 import { Button } from "../ui/Button.js";
 import { Crossfade } from "../ui/Crossfade.js";
 import { Panel } from "../ui/Panel.js";
@@ -43,7 +44,11 @@ export function ProgramPanel() {
   const { state } = useEngine();
   const run = useRun();
   const slide = useMemo(() => (state === undefined ? undefined : programSlide(state)), [state]);
-  const style = useMemo(() => (state === undefined ? undefined : roomStyle(state)), [state]);
+  const style = useMemo(
+    () => (state === undefined ? undefined : roomStyleFor(state, slide?.item)),
+    [state, slide],
+  );
+  const fit = state === undefined ? 1 : itemFit(state, style, slide?.item);
   const program = state?.live.cursor.entryId;
 
   return (
@@ -60,6 +65,7 @@ export function ProgramPanel() {
               <SlideText
                 text={slideText(shown.slide)}
                 style={style}
+                fit={fit}
                 credits={shown.credits}
                 background={backgroundUrl(style, shown.item, shown.slide)}
               />
@@ -92,7 +98,11 @@ export function PreviewPanel() {
   const { state } = useEngine();
   const run = useRun();
   const slide = useMemo(() => (state === undefined ? undefined : previewSlide(state)), [state]);
-  const style = useMemo(() => (state === undefined ? undefined : roomStyle(state)), [state]);
+  const style = useMemo(
+    () => (state === undefined ? undefined : roomStyleFor(state, slide?.item)),
+    [state, slide],
+  );
+  const fit = state === undefined ? 1 : itemFit(state, style, slide?.item);
 
   return (
     <Panel label={t("core.panel.preview")} labelHidden tight>
@@ -106,6 +116,7 @@ export function PreviewPanel() {
               <SlideText
                 text={slideText(slide.slide)}
                 style={style}
+                fit={fit}
                 credits={slide.credits}
                 background={backgroundUrl(style, slide.item, slide.slide)}
               />

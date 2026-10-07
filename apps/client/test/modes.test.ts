@@ -30,8 +30,11 @@ describe("modalita' del nucleo", () => {
       ["playlist", "slides", "program"],
       ["playlist", "slides", "preview"],
       ["playlist", "slides", "backgrounds"],
+      ["playlist", "slides", "textstyles"],
     ]);
     expect(PRESENT_MODE.layout.panels["backgrounds"]).toBe("core.backgrounds");
+    // Gli stili del testo stanno subito sotto gli sfondi (decisione 0015).
+    expect(PRESENT_MODE.layout.panels["textstyles"]).toBe("core.textstyles");
   });
 });
 

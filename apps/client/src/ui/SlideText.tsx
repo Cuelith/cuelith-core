@@ -18,8 +18,11 @@ export function SlideText({
   style,
   credits,
   background,
+  fit = 1,
 }: {
   text: string;
+  /** Fattore di adattamento (decisione 0015): 1 = nessuno. */
+  fit?: number | undefined;
   style: FullscreenStyle | undefined;
   /** Immagine di sfondo (indirizzo sul motore), col velo del look sopra. */
   background?: string | undefined;
@@ -31,7 +34,7 @@ export function SlideText({
       ? {}
       : {
           fontFamily: FONT[style.text.font],
-          fontSize: `calc(${String(style.text.size)} / 1080 * 100cqh)`,
+          fontSize: `calc(${String(style.text.size * fit)} / 1080 * 100cqh)`,
           color: style.text.color,
           textAlign: style.text.align,
           lineHeight: style.text.lineHeight ?? 1.25,

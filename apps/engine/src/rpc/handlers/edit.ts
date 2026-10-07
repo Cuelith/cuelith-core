@@ -116,6 +116,8 @@ export const editHandlers: HandlerMap = {
       else if (params.background !== undefined) item.background = params.background;
       if (params.credits === null) delete item.credits;
       else if (params.credits !== undefined) item.credits = params.credits;
+      if (params.textStyle === null) delete item.textStyle;
+      else if (params.textStyle !== undefined) item.textStyle = params.textStyle;
       if (params.tags !== undefined) item.tags = params.tags;
       if (params.attachments !== undefined) {
         checkAttachments(ctx, params.attachments);
