@@ -108,15 +108,6 @@ test("molte schede: una sola riga che scorre, con elenco completo", async ({ run
     const first = nav?.querySelector("button");
     for (let i = 0; i < 14; i++) first?.before(first.cloneNode(true));
   });
-  const info = await station.evaluate(() => {
-    const nav = document.querySelector("nav[aria-label='Plugin']");
-    return {
-      buttons: nav?.querySelectorAll("button").length,
-      navH: nav?.getBoundingClientRect().height,
-      inner: window.innerHeight,
-      outer: window.outerHeight,
-    };
-  });
   const add = await station.getByRole("button", { name: "Aggiungi plugin" }).boundingBox();
   const viewHeight = await station.evaluate(() => window.innerHeight);
   expect((add?.y ?? 0) + (add?.height ?? 0)).toBeLessThanOrEqual(viewHeight + 1);
