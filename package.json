@@ -2,7 +2,7 @@
   "name": "cuelith-core",
   "private": true,
   "type": "module",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "license": "GPL-3.0-or-later",
   "packageManager": "pnpm@12.8.1",
   "engines": {

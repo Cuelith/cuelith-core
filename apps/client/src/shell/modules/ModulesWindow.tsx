@@ -415,13 +415,18 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
   const plugins = useInstalledList(installedKey);
   const licenses = useLicenses(installedKey);
   const [removing, setRemoving] = useState<InstalledPlugin | undefined>();
+  // Operazione lunga in corso (installa da file o cartella, disinstalla): si mostra e si bloccano i pulsanti.
+  const [working, setWorking] = useState<"install" | "uninstall" | undefined>();
   const desktop = window.cuelithDesktop;
 
   const installFromFile = async (kind: "file" | "folder") => {
     if (desktop === undefined) return;
     const path = await desktop.chooseModuleFile(kind);
     if (path === undefined) return;
-    const done = await run("plugin.install", { path });
+    setWorking("install");
+    const done = await run("plugin.install", { path }).finally(() => {
+      setWorking(undefined);
+    });
     if (done === undefined) return;
     notify("core.modules.installedNotice", { id: done.id, version: done.version }, "info");
     // Come dal marketplace: subito la guida al primo uso, se il modulo ne ha una.
@@ -522,19 +527,31 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
       <div className="flex items-center gap-3 border-t border-line pt-3">
         <Button
           size="sm"
-          disabled={desktop === undefined}
+          disabled={desktop === undefined || working !== undefined}
           onClick={() => void installFromFile("file")}
         >
           {t("core.modules.installFromFile")}
         </Button>
         <Button
           size="sm"
-          disabled={desktop === undefined}
+          disabled={desktop === undefined || working !== undefined}
           onClick={() => void installFromFile("folder")}
         >
           {t("core.modules.installFromFolder")}
         </Button>
-        <span className="text-xs text-faint">{t("core.modules.installFromFileHint")}</span>
+        {working === undefined ? (
+          <span className="text-xs text-faint">{t("core.modules.installFromFileHint")}</span>
+        ) : (
+          <span role="status" className="flex items-center gap-2 text-xs text-muted">
+            <span
+              aria-hidden="true"
+              className="inline-block size-3.5 animate-spin rounded-full border-2 border-line border-t-cue"
+            />
+            {t(
+              working === "install" ? "core.modules.installingLocal" : "core.modules.uninstalling",
+            )}
+          </span>
+        )}
       </div>
       {removing !== undefined && (
         <ModalDialog
@@ -557,7 +574,10 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
                 <Button
                   tone="live"
                   onClick={() => {
-                    void run("plugin.uninstall", { pluginId: removing.manifest.id });
+                    setWorking("uninstall");
+                    void run("plugin.uninstall", { pluginId: removing.manifest.id }).finally(() => {
+                      setWorking(undefined);
+                    });
                     close();
                   }}
                 >

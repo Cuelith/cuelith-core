@@ -279,6 +279,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     logger,
   };
 
+  modules.setStopWaiter((id) => supervisor.whenStopped(id));
   modules.onChange(() => {
     if (locales.refresh()) publishLang();
     refreshPlugins();

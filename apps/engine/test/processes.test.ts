@@ -202,6 +202,22 @@ describe("processo del modulo", { timeout: 30_000 }, () => {
     expect(engine.context.supervisor.pid(ID)).not.toBe(info.pid);
   });
 
+  it("si puo' disinstallare mentre gira: il processo si chiude e la cartella sparisce", async () => {
+    const { install, active, ok, engine, data } = await start();
+    await install(fixture());
+    await active();
+    const pid = engine.context.supervisor.pid(ID) ?? 0;
+    const dir = join(data, "plugins", ID);
+    expect(existsSync(dir)).toBe(true);
+    await ok("plugin.uninstall", { pluginId: ID });
+    expect(alive(pid)).toBe(false);
+    expect(existsSync(dir)).toBe(false);
+    expect((await ok("plugin.list", {})).plugins.some((p) => p.manifest.id === ID)).toBe(false);
+    // Lo si puo' installare di nuovo subito.
+    await install(fixture());
+    await active();
+  });
+
   it("si ferma insieme al motore", async () => {
     const { install, active, engine } = await start();
     await install(fixture());

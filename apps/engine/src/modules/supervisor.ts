@@ -140,6 +140,11 @@ export class ModuleSupervisor {
     }
   }
 
+  /** Si risolve quando il processo del modulo (se ce n'e' uno in chiusura) e' terminato. */
+  whenStopped(id: string): Promise<void> {
+    return this.#running.get(id)?.stopping ?? Promise.resolve();
+  }
+
   /** Stato del processo di un modulo con codice, se il supervisore lo segue. */
   status(id: string): { state: PluginState; error?: string } | undefined {
     const running = this.#running.get(id);

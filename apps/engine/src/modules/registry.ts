@@ -81,9 +81,15 @@ export class ModuleRegistry {
   #runtimeStatus: (id: string) => { state: PluginState; error?: string } | undefined = () =>
     undefined;
   #gate: LicenseGate | undefined;
+  #whenStopped: (id: string) => Promise<void> = () => Promise.resolve();
 
   constructor(logger: Logger) {
     this.#logger = logger;
+  }
+
+  /** Collega chi ferma i processi: prima di cancellare i file di un modulo si aspetta che si sia chiuso. */
+  setStopWaiter(whenStopped: (id: string) => Promise<void>): void {
+    this.#whenStopped = whenStopped;
   }
 
   /** Collega il servizio delle licenze: i plugin a pagamento partono solo se ammessi. */
@@ -165,6 +171,12 @@ export class ModuleRegistry {
     }
     for (const [id, record] of Object.entries(this.#state.installed)) {
       this.#installed.set(id, await this.#loadRecord(id, record));
+    }
+    // Cartelle di moduli non piu' nell'elenco (cancellazione rimasta a meta'): si tolgono.
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith(".") || entry.name in this.#state.installed)
+        continue;
+      await rm(join(dir, entry.name), { recursive: true, force: true }).catch(() => undefined);
     }
   }
 
@@ -420,8 +432,21 @@ export class ModuleRegistry {
       this.#state = { ...this.#state, installed: rest };
       await this.#saveState();
       this.#installed.delete(id);
-      await rm(join(this.#requireDir(), id), { recursive: true, force: true });
+      // Avvisa chi ascolta (il supervisore ferma il processo), poi aspetta che sia chiuso: su
+      // Windows una cartella con file aperti non si cancella.
       this.#changed();
+      await this.#whenStopped(id);
+      try {
+        await rm(join(this.#requireDir(), id), {
+          recursive: true,
+          force: true,
+          maxRetries: 10,
+          retryDelay: 200,
+        });
+      } catch (error) {
+        // Il modulo e' gia' tolto dall'elenco: i file rimasti si cancellano al prossimo avvio.
+        this.#logger.warn(`modulo ${id}: file non cancellati, si riprova al prossimo avvio`, error);
+      }
     });
   }
 }
