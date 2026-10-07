@@ -14,6 +14,7 @@ import { CORE_PANEL_COMPONENTS } from "../panels/core-panels.js";
 import { ModulePanelFrame } from "../panels/ModulePanelFrame.js";
 import { ModulePanelsContext, type ModulePanel } from "../station/modulePanels.js";
 import { SHOW_TAB_EVENT } from "../station/tabs.js";
+import { TabStrip } from "./TabStrip.js";
 import { EmptyState, Panel, PanelChrome } from "../ui/Panel.js";
 
 function UnavailablePanel({ panelId }: { panelId: string }) {
@@ -105,39 +106,14 @@ function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: re
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div
-        role="tablist"
+      <TabStrip
+        panelIds={panelIds}
+        active={active}
+        baseId={baseId}
+        title={(panelId) => panelTitle(t, panelId, modules)}
+        onChoose={choose}
         onKeyDown={onKey}
-        className="flex shrink-0 gap-4 border-b border-line px-3 pt-2.5"
-      >
-        {panelIds.map((panelId) => {
-          const selected = panelId === active;
-          return (
-            <button
-              key={panelId}
-              id={`${baseId}-${panelId}`}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={`${baseId}-panel`}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => {
-                choose(panelId);
-              }}
-              // Trascinando qualcosa sopra una scheda la si apre: cosi' un elemento
-              // delle Librerie si porta nella Scaletta anche se stanno nella stessa area.
-              onDragEnter={() => {
-                if (!selected) choose(panelId);
-              }}
-              className={`-mb-px border-b-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] ${
-                selected ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg"
-              }`}
-            >
-              {panelTitle(t, panelId, modules)}
-            </button>
-          );
-        })}
-      </div>
+      />
       <div
         id={`${baseId}-panel`}
         role="tabpanel"

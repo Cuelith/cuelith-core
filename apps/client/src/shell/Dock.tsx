@@ -31,33 +31,39 @@ export function Dock({
   return (
     <nav
       aria-label={t("core.dock.label")}
-      className="flex flex-col items-center gap-2 border-r border-line py-2.5"
+      className="flex min-h-0 flex-col items-center gap-2 border-r border-line py-2.5"
     >
-      {tools.map((panel) => (
-        <button
-          key={panel.id}
-          type="button"
-          aria-label={t(panel.title)}
-          title={t(panel.title)}
-          onClick={() => {
-            showTab(panel.id);
-          }}
-          className="grid h-9 w-9 place-items-center rounded-lg bg-mod-chip font-mono text-[10px] font-semibold text-mod hover:outline hover:outline-mod-line"
-        >
-          {panel.icon === undefined ? (
-            initials(t(panel.title))
-          ) : (
-            <img src={panel.icon} alt="" className="h-6 w-6" draggable={false} />
-          )}
-        </button>
-      ))}
+      {/* Con molti plugin le icone scorrono; il "+" resta sempre raggiungibile sotto. */}
+      <div
+        className="flex min-h-0 flex-col items-center gap-2 overflow-y-auto px-2 py-0.5 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {tools.map((panel) => (
+          <button
+            key={panel.id}
+            type="button"
+            aria-label={t(panel.title)}
+            title={t(panel.title)}
+            onClick={() => {
+              showTab(panel.id);
+            }}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-mod-chip font-mono text-[10px] font-semibold text-mod hover:outline hover:outline-mod-line"
+          >
+            {panel.icon === undefined ? (
+              initials(t(panel.title))
+            ) : (
+              <img src={panel.icon} alt="" className="h-6 w-6" draggable={false} />
+            )}
+          </button>
+        ))}
+      </div>
       {canManage && (
         <button
           type="button"
           onClick={onManageModules}
           aria-label={t("core.dock.addModule")}
           title={t("core.dock.addModule")}
-          className="grid h-9 w-9 place-items-center rounded-lg border border-dashed border-faint text-lg leading-none text-muted hover:border-muted hover:text-fg"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-dashed border-faint text-lg leading-none text-muted hover:border-muted hover:text-fg"
         >
           +
         </button>
