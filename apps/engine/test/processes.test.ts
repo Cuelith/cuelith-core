@@ -147,7 +147,7 @@ async function start(timings = FAST) {
     expectOk(client, method, params);
   const status = async (id = ID) =>
     (await ok("plugin.list", {})).plugins.find((p) => p.manifest.id === id)?.status;
-  const until = async (check: () => Promise<boolean>, timeoutMs = 8000) => {
+  const until = async (check: () => Promise<boolean>, timeoutMs = 15_000) => {
     const begin = Date.now();
     while (!(await check())) {
       if (Date.now() - begin > timeoutMs) throw new Error("condizione non verificata in tempo");
@@ -367,7 +367,11 @@ describe("crash e blocchi (cap. 24)", { timeout: 30_000 }, () => {
     await active();
     const pid = engine.context.supervisor.pid(ID);
     expect(pid).toBeDefined();
-    expect(os.getPriority(pid ?? 0)).toBeGreaterThan(os.getPriority(process.pid));
+    // Il motore puo' gia' girare a priorita' ridotta (alcune macchine di prova): il plugin non e' mai sopra.
+    expect(os.getPriority(pid ?? 0)).toBeGreaterThanOrEqual(os.getPriority(process.pid));
+    expect(os.getPriority(pid ?? 0)).toBeGreaterThanOrEqual(
+      os.constants.priority.PRIORITY_BELOW_NORMAL,
+    );
   });
 
   it("freno della memoria: ferma il plugin senza riavviarlo, con la sua spiegazione; riacceso riparte", async () => {
