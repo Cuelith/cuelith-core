@@ -27,9 +27,10 @@ test("la postazione vuota mostra barra, dock col + e le tre colonne di Presenta"
   );
   await expect(header.getByText("Nessuna uscita")).toBeVisible();
 
-  // Dock: col nucleo nudo c'e' solo il "+".
+  // Dock: col nucleo nudo ci sono la ricerca e il "+" (niente plugin: niente icone).
   const dock = station.getByRole("navigation", { name: "Plugin" });
-  await expect(dock.getByRole("button")).toHaveCount(1);
+  await expect(dock.getByRole("button")).toHaveCount(2);
+  await expect(dock.getByRole("button", { name: "Cerca e vai (Ctrl+K)" })).toBeVisible();
   await expect(dock.getByRole("button", { name: "Aggiungi plugin" })).toBeVisible();
 
   // Tre colonne: Scaletta | Slide | Programma sopra l'Anteprima.

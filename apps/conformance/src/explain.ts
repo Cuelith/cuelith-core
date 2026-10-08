@@ -20,6 +20,9 @@ const MEANINGS: Readonly<Record<string, string>> = {
   "protocol.manifest.localeNeedsLocales":
     'a language plugin must list its files in "contributes.locales"',
   "protocol.manifest.localeNeedsNoRuntime": 'a language plugin has "runtime": {"type": "none"}',
+  "protocol.manifest.imageFormat": "the cover image must be a PNG, JPEG or WebP file",
+  "protocol.manifest.settingInvalid":
+    "a setting is inconsistent: check its type, default, limits and choices",
   "protocol.manifest.nativeNoBinary": "a native runtime needs at least one binary for a platform",
   "protocol.manifest.nativePermission": 'a native runtime must declare the "native" permission',
   "protocol.manifest.duplicateId": "two items have the same id",

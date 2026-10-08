@@ -32,9 +32,9 @@ describe("ID di installazione e preferenze (decisione 0004)", () => {
 
   it("controllo automatico degli aggiornamenti: attivo di base, si spegne e resta spento", async () => {
     const dir = folder();
-    expect(await loadPreferences(dir)).toEqual({ autoCheckUpdates: true });
-    await savePreferences(dir, { autoCheckUpdates: false });
-    expect(await loadPreferences(dir)).toEqual({ autoCheckUpdates: false });
+    expect(await loadPreferences(dir)).toEqual({ autoCheckUpdates: true, welcomeSeen: false });
+    await savePreferences(dir, { autoCheckUpdates: false, welcomeSeen: true });
+    expect(await loadPreferences(dir)).toEqual({ autoCheckUpdates: false, welcomeSeen: true });
   });
 });
 

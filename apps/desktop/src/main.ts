@@ -13,7 +13,9 @@ import {
   confirmUnsaved,
   saveTextFile,
 } from "./files.js";
+import { readInstallLang } from "./installLang.js";
 import {
+  DEFAULT_PREFERENCES,
   loadInstallation,
   loadPreferences,
   resetInstallation,
@@ -91,7 +93,12 @@ async function launchEngine(): Promise<Engine> {
     displays: electronDisplays,
     // Al primo avvio la lingua del sistema, se installata; poi vale la scelta
     // dell'utente (Impostazioni). CUELITH_LANG la fissa, per le prove.
-    lang: process.env.CUELITH_LANG ?? app.getLocale().split("-")[0] ?? "it",
+    // Prima quella scelta nell'installatore (install-lang.txt), poi quella del sistema.
+    lang:
+      process.env.CUELITH_LANG ??
+      (app.isPackaged ? readInstallLang(process.resourcesPath) : undefined) ??
+      app.getLocale().split("-")[0] ??
+      "it",
     ...(lanPortOverride === undefined ? {} : { lanPort: Number(lanPortOverride) }),
     ...(announceOff ? { announce: false } : {}),
     metrics: electronMetrics({
@@ -492,6 +499,8 @@ function registerAppInfo(running: Engine): void {
       version: app.getVersion(),
       installationId: installation?.id,
       autoCheckUpdates: preferences?.autoCheckUpdates ?? true,
+      // Le prove dell'app lo saltano (CUELITH_WELCOME=off), come chi l'ha gia' visto.
+      welcomeSeen: process.env.CUELITH_WELCOME === "off" || (preferences?.welcomeSeen ?? false),
       update: updates?.state ?? { status: "unsupported" },
     };
   });
@@ -499,9 +508,16 @@ function registerAppInfo(running: Engine): void {
   ipcMain.handle("cuelith:set-auto-check", async (event, on: unknown) => {
     fromStation(event);
     await ready;
-    preferences = { autoCheckUpdates: on === true };
+    preferences = { ...(preferences ?? DEFAULT_PREFERENCES), autoCheckUpdates: on === true };
     await savePreferences(dir, preferences);
     updates?.setAutoCheck(preferences.autoCheckUpdates);
+  });
+
+  ipcMain.handle("cuelith:set-welcome-seen", async (event) => {
+    fromStation(event);
+    await ready;
+    preferences = { ...(preferences ?? DEFAULT_PREFERENCES), welcomeSeen: true };
+    await savePreferences(dir, preferences);
   });
 
   ipcMain.handle("cuelith:reset-installation-id", async (event) => {

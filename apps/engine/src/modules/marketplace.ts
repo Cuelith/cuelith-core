@@ -2,8 +2,10 @@ import { readFile } from "node:fs/promises";
 import {
   ErrorCode,
   PROTOCOL_VERSION,
+  RegistryExtrasSchema,
   RegistryIndexSchema,
   RpcError,
+  type RegistryExtras,
   type RegistryPlugin,
   type RegistryVersion,
 } from "@cuelith/protocol";
@@ -21,6 +23,12 @@ export interface MarketplaceOptions {
    * gratuiti): finché l'indice 2 non è pubblicato il marketplace funziona lo stesso.
    */
   readonly fallbackUrl?: string;
+  /**
+   * Immagini e guide d'uso dei plugin (protocollo 1.19): un file a parte, perche' i programmi
+   * gia' installati rifiutano un indice con campi nuovi. Facoltativo: se manca o non si legge,
+   * il marketplace funziona lo stesso, senza immagini.
+   */
+  readonly extrasUrl?: string;
   /** Copia dell'ultimo indice scaricato, per lavorare senza internet. */
   readonly cacheFile: string;
   readonly engineVersion: string;
@@ -54,15 +62,30 @@ export class Marketplace {
     return this.#o.fetch ?? fetch;
   }
 
-  #compatible(plugins: readonly RegistryPlugin[]): RegistryPlugin[] {
+  #compatible(plugins: readonly RegistryPlugin[], extras?: RegistryExtras): RegistryPlugin[] {
     return plugins.flatMap((plugin) => {
       const versions = plugin.versions.filter(
         (v) =>
           satisfies(this.#o.engineVersion, v.engines.cuelith, { includePrerelease: true }) &&
           satisfies(PROTOCOL_VERSION, v.engines.protocol),
       );
-      return versions.length === 0 ? [] : [{ ...plugin, versions }];
+      const extra = extras?.plugins[plugin.id];
+      return versions.length === 0 ? [] : [{ ...plugin, ...extra, versions }];
     });
+  }
+
+  /** Immagini e guide d'uso, se il file c'e' e ha la forma giusta; altrimenti niente (mai un errore). */
+  async #extras(): Promise<RegistryExtras | undefined> {
+    if (this.#o.extrasUrl === undefined) return undefined;
+    try {
+      const response = await this.#fetch(this.#o.extrasUrl, {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!response.ok) return undefined;
+      return RegistryExtrasSchema.parse(await response.json());
+    } catch {
+      return undefined;
+    }
   }
 
   async list(refresh = false): Promise<MarketplaceList> {
@@ -74,13 +97,19 @@ export class Marketplace {
         const response = await this.#fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) });
         if (!response.ok) throw new Error(`HTTP ${String(response.status)}`);
         const index = RegistryIndexSchema.parse(await response.json());
+        const extras = await this.#extras();
         const fetchedAt = new Date().toISOString();
-        await writeFileAtomic(this.#o.cacheFile, `${JSON.stringify({ fetchedAt, index })}\n`).catch(
-          (error: unknown) => {
-            this.#o.logger.warn("copia dell'indice dei moduli non salvata", error);
-          },
-        );
-        this.#last = { plugins: this.#compatible(index.plugins), source: "network", fetchedAt };
+        await writeFileAtomic(
+          this.#o.cacheFile,
+          `${JSON.stringify({ fetchedAt, index, ...(extras === undefined ? {} : { extras }) })}\n`,
+        ).catch((error: unknown) => {
+          this.#o.logger.warn("copia dell'indice dei moduli non salvata", error);
+        });
+        this.#last = {
+          plugins: this.#compatible(index.plugins, extras),
+          source: "network",
+          fetchedAt,
+        };
         return this.#last;
       } catch (error) {
         errors.push(`${url}: ${String(error)}`);
@@ -96,11 +125,13 @@ export class Marketplace {
       const raw = JSON.parse(await readFile(this.#o.cacheFile, "utf8")) as {
         fetchedAt?: unknown;
         index?: unknown;
+        extras?: unknown;
       };
       const index = RegistryIndexSchema.parse(raw.index);
+      const extras = RegistryExtrasSchema.safeParse(raw.extras);
       const fetchedAt = typeof raw.fetchedAt === "string" ? raw.fetchedAt : undefined;
       return {
-        plugins: this.#compatible(index.plugins),
+        plugins: this.#compatible(index.plugins, extras.success ? extras.data : undefined),
         source: "cache",
         ...(fetchedAt === undefined ? {} : { fetchedAt }),
       };

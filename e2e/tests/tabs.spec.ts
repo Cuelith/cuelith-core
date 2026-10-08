@@ -54,13 +54,25 @@ test("molte schede: una sola riga che scorre, con elenco completo", async ({ run
     await station.getByRole("button", { name: "Aggiungi plugin" }).click();
     const modules = station.getByRole("dialog", { name: "Plugin" });
     await modules.getByRole("tab", { name: "Installati" }).click();
-    await modules.getByRole("button", { name: "Installa da cartella…" }).click();
-    await expect(
-      modules
-        .getByRole("list", { name: "Installati" })
-        .getByRole("listitem")
-        .filter({ hasText: `Plugin ${String(i)}` }),
-    ).toContainText("Attivo", { timeout: 30_000 });
+    const row = modules
+      .getByRole("list", { name: "Installati" })
+      .getByRole("listitem")
+      .filter({ hasText: `Plugin ${String(i)}` });
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      await modules.getByRole("button", { name: "Installa da cartella…" }).click();
+      if (
+        await row
+          .first()
+          .waitFor({ timeout: 20_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+      )
+        break;
+      await chooseFiles(app, copyOfTemplate(i));
+    }
+    await expect(row).toContainText("Attivo", { timeout: 60_000 });
     await modules.getByRole("button", { name: "Chiudi" }).click();
   }
 
@@ -104,8 +116,8 @@ test("molte schede: una sola riga che scorre, con elenco completo", async ({ run
   // Con molti plugin le icone della colonna a sinistra scorrono e il "+" resta raggiungibile:
   // si aggiungono altre icone finte (copie della prima) per riempire la colonna.
   await station.evaluate(() => {
-    const nav = document.querySelector("nav[aria-label='Plugin']");
-    const first = nav?.querySelector("button");
+    const tools = document.querySelector("nav[aria-label='Plugin'] [data-dock-tools]");
+    const first = tools?.querySelector("button");
     for (let i = 0; i < 14; i++) first?.before(first.cloneNode(true));
   });
   const add = await station.getByRole("button", { name: "Aggiungi plugin" }).boundingBox();

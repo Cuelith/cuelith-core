@@ -17,9 +17,11 @@ export interface Installation {
 export interface Preferences {
   /** Controllo automatico degli aggiornamenti (disattivabile). */
   readonly autoCheckUpdates: boolean;
+  /** L'avvio guidato (decisione 0018) e' gia' stato visto o saltato su questo computer. */
+  readonly welcomeSeen: boolean;
 }
 
-export const DEFAULT_PREFERENCES: Preferences = { autoCheckUpdates: true };
+export const DEFAULT_PREFERENCES: Preferences = { autoCheckUpdates: true, welcomeSeen: false };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -64,6 +66,8 @@ export async function loadPreferences(dir: string): Promise<Preferences> {
       typeof raw?.autoCheckUpdates === "boolean"
         ? raw.autoCheckUpdates
         : DEFAULT_PREFERENCES.autoCheckUpdates,
+    welcomeSeen:
+      typeof raw?.welcomeSeen === "boolean" ? raw.welcomeSeen : DEFAULT_PREFERENCES.welcomeSeen,
   };
 }
 

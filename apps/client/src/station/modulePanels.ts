@@ -70,17 +70,24 @@ export const ModulePanelsContext = createContext<ReadonlyMap<string, ModulePanel
 export function useModuleUi(): {
   readonly panels: readonly ModulePanel[];
   readonly editors: ReadonlyMap<string, string>;
+  /** Tutti i plugin installati (anche non attivi): per le loro impostazioni. */
+  readonly installed: readonly InstalledPlugin[];
+  /** L'elenco dei plugin e' stato letto almeno una volta. */
+  readonly ready: boolean;
 } {
   const connection = useConnection();
   const plugins = useEngine().state?.live.plugins;
   const key = JSON.stringify(plugins);
   const [installed, setInstalled] = useState<readonly InstalledPlugin[]>([]);
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
     connection
       .call("plugin.list", {})
       .then(({ plugins: list }) => {
-        if (!cancelled) setInstalled(list);
+        if (cancelled) return;
+        setInstalled(list);
+        setReady(true);
       })
       .catch(() => undefined);
     return () => {
@@ -88,7 +95,7 @@ export function useModuleUi(): {
     };
   }, [connection, key]);
   return useMemo(
-    () => ({ panels: panelsOf(installed), editors: editorsOf(installed) }),
-    [installed],
+    () => ({ panels: panelsOf(installed), editors: editorsOf(installed), installed, ready }),
+    [installed, ready],
   );
 }

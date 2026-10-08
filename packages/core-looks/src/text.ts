@@ -120,9 +120,17 @@ export function textFits(
   const reserve = options.reserveBottomPx ?? 0;
   const px = style.size * scale * (box.height / REFERENCE_HEIGHT);
   const area = usableArea(style, box, reserve);
-  const lines = wrapLines(text, area.width, px, style, measure);
+  const lines =
+    style.fit === undefined
+      ? wrapLines(text, area.width, px, style, measure)
+      : shown(text, style).split("\n");
   const height = lines.length * px * (style.lineHeight ?? DEFAULT_LINE_HEIGHT);
-  return { fits: height <= area.height, lines: lines.length, height };
+  // Con l'adattamento le righe del testo restano intere: se una non entra in larghezza, non entra.
+  const weight = style.weight ?? "normal";
+  const wide =
+    style.fit !== undefined &&
+    lines.some((line) => measure(line, px, weight, style.font) > area.width * WIDTH_SAFETY);
+  return { fits: !wide && height <= area.height, lines: lines.length, height };
 }
 
 /**
@@ -145,6 +153,37 @@ export function fitScale(
   // Ricerca della scala piu' grande che entra (la funzione e' monotona: piu' piccolo, piu' entra).
   let low = min;
   let high = 1;
+  for (let step = 0; step < 14; step += 1) {
+    const middle = (low + high) / 2;
+    if (allFit(middle)) low = middle;
+    else high = middle;
+  }
+  return low;
+}
+
+/** Sotto questa scala non si scende mai, nemmeno per non spezzare una riga. */
+const HARD_FLOOR = 0.1;
+
+/**
+ * Scala con cui disegnare davvero. Come `fitScale`, ma se neppure al minimo dello stile entra
+ * tutto si scende ancora: in diretta e' meglio un testo piccolo che una riga spezzata.
+ * Senza adattamento vale sempre 1.
+ */
+export function renderScale(
+  texts: readonly string[],
+  style: TextStyle,
+  box: OutputBox,
+  measure: MeasureText,
+  reserveBottomPx = 0,
+): number {
+  if (style.fit === undefined) return 1;
+  const found = fitScale(texts, style, box, measure, reserveBottomPx);
+  if (found !== undefined) return found;
+  const allFit = (scale: number): boolean =>
+    texts.every((text) => textFits(text, style, box, measure, { scale, reserveBottomPx }).fits);
+  if (!allFit(HARD_FLOOR)) return HARD_FLOOR;
+  let low = HARD_FLOOR;
+  let high = style.fit.min;
   for (let step = 0; step < 14; step += 1) {
     const middle = (low + high) / 2;
     if (allFit(middle)) low = middle;

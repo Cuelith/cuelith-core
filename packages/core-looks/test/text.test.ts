@@ -5,6 +5,7 @@ import {
   checkStyle,
   effectiveTextStyle,
   fitScale,
+  renderScale,
   textFits,
   wrapLines,
   type MeasureText,
@@ -31,7 +32,15 @@ describe("compatibilita' degli stili", () => {
   it("i campi nuovi si accettano nei loro limiti e non altri", () => {
     const ok = {
       ...DEFAULT_ROOM_STYLE,
-      text: { ...base, lineHeight: 1.5, weight: "bold", uppercase: true, fit: { min: 0.6 } },
+      text: {
+        ...base,
+        lineHeight: 1.5,
+        weight: "bold",
+        uppercase: true,
+        fit: { min: 0.6 },
+        outline: { width: 4, color: "#000000" },
+        shadow: { offset: 3, blur: 5, color: "#111111" },
+      },
     };
     expect(FullscreenStyleSchema.safeParse(ok).success).toBe(true);
     for (const bad of [
@@ -39,6 +48,8 @@ describe("compatibilita' degli stili", () => {
       { weight: "heavy" },
       { fit: { min: 0.1 } },
       { fit: { min: 0.6, extra: 1 } },
+      { outline: { width: 30, color: "#000000" } },
+      { shadow: { offset: 2, blur: 2 } },
       { colour: "#fff" },
     ]) {
       const text = { ...base, ...bad };
@@ -156,12 +167,12 @@ describe("adattamento", () => {
   });
 
   it("con l'opzione, rimpicciolisce il minimo necessario e il risultato entra davvero", () => {
-    const style = { ...base, size: 220, fit: { min: 0.4 } };
+    const style = { ...base, size: 220, fit: { min: 0.2 } };
     const texts = [twoLines, "Amen"];
     const scale = fitScale(texts, style, wide, measure);
     expect(scale).toBeDefined();
     expect(scale ?? 0).toBeLessThan(1);
-    expect(scale ?? 0).toBeGreaterThanOrEqual(0.4);
+    expect(scale ?? 0).toBeGreaterThanOrEqual(0.2);
     for (const text of texts)
       expect(textFits(text, style, wide, measure, { scale: scale ?? 1 }).fits).toBe(true);
     // E non si e' rimpicciolito piu' del necessario.
@@ -171,7 +182,7 @@ describe("adattamento", () => {
   });
 
   it("la scala e' una sola per tutte le slide: decide la piu' lunga", () => {
-    const style = { ...base, size: 220, fit: { min: 0.3 } };
+    const style = { ...base, size: 220, fit: { min: 0.2 } };
     const onlyLong = fitScale([twoLines], style, wide, measure);
     const withShort = fitScale([twoLines, "Amen", "Si"], style, wide, measure);
     expect(withShort).toBeCloseTo(onlyLong ?? 0, 5);
@@ -180,6 +191,42 @@ describe("adattamento", () => {
   it("se neppure al minimo entra, nessuna scala", () => {
     const style = { ...base, size: 220, fit: { min: 0.95 } };
     expect(fitScale([twoLines], style, wide, measure)).toBeUndefined();
+  });
+});
+
+describe("righe intere (adattamento acceso)", () => {
+  const verse = "Glorioso giorno hai illuminato il mio cuore";
+  const slide = `Tu mi hai chiamato e sono corso da Te\n${verse}`;
+
+  it("con l'adattamento le righe del testo non vanno mai a capo da sole", () => {
+    const style = { ...base, size: 150, fit: { min: 0.3 } };
+    const result = textFits(slide, style, wide, measure);
+    expect(result.lines).toBe(2);
+  });
+
+  it("senza l'adattamento si va a capo come prima", () => {
+    const style = { ...base, size: 150 };
+    expect(textFits(slide, style, wide, measure).lines).toBeGreaterThan(2);
+  });
+
+  it("la scala fa entrare la riga piu' lunga in una riga sola", () => {
+    const style = { ...base, size: 150, fit: { min: 0.3 } };
+    const scale = fitScale([slide], style, wide, measure) ?? 0;
+    expect(scale).toBeLessThan(1);
+    expect(textFits(slide, style, wide, measure, { scale }).lines).toBe(2);
+    expect(textFits(slide, style, wide, measure, { scale }).fits).toBe(true);
+  });
+
+  it("se neppure al minimo entra, per il disegno si scende ancora: meglio piccolo che spezzato", () => {
+    const style = { ...base, size: 150, fit: { min: 0.9 } };
+    expect(fitScale([slide], style, wide, measure)).toBeUndefined();
+    const scale = renderScale([slide], style, wide, measure);
+    expect(scale).toBeLessThan(0.9);
+    expect(textFits(slide, style, wide, measure, { scale }).fits).toBe(true);
+  });
+
+  it("senza adattamento il disegno usa la dimensione dello stile", () => {
+    expect(renderScale([slide], { ...base, size: 150 }, wide, measure)).toBe(1);
   });
 });
 
@@ -195,7 +242,7 @@ describe("controllo su tutte le uscite", () => {
   });
 
   it("vale il caso peggiore: la uscita stretta decide", () => {
-    const style = { ...base, size: 150, fit: { min: 0.3 } };
+    const style = { ...base, size: 80, fit: { min: 0.3 } };
     const result = checkStyle(texts, style, [wide, portrait], measure);
     expect(result.ok).toBe(true);
     expect(result.scale).toBeLessThan(1);

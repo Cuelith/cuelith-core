@@ -87,6 +87,14 @@ export const cueHandlers: HandlerMap = {
     }),
   }),
 
+  // «Solo sfondo» (protocollo 1.17): il testo sparisce da tutte le uscite, lo sfondo resta.
+  "live.textHidden": (ctx, _session, params) => ({
+    rev: ctx.store.update((draft) => {
+      if (params.hidden) draft.live.textHidden = true;
+      else delete draft.live.textHidden;
+    }),
+  }),
+
   // ---- Timer della regia (protocollo 1.7): conto alla rovescia condiviso ----
   "timer.set": (ctx, _session, params) => ({
     rev: ctx.store.update((draft) => {

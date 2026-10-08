@@ -6,6 +6,7 @@ import {
   type RegistryPlugin,
 } from "@cuelith/protocol";
 import { pluginIconUrl } from "../../station/modulePanels.js";
+import { usePluginSettings } from "../../station/pluginSettings.js";
 import { useEffect, useId, useState } from "react";
 import { useConnection, useEngine, useT, type Translate } from "../../engine/react.js";
 import { useRun, useStation } from "../../station/station.js";
@@ -14,7 +15,13 @@ import { INPUT, ModalDialog } from "../../ui/Dialogs.js";
 import { isLicensed, LicenseActions, LicenseLine, PaidBox, useLicenses } from "./LicensePanel.js";
 import { OnboardingDialog } from "./OnboardingDialog.js";
 
-type Tab = "market" | "installed";
+type Tab = "market" | "installed" | "locales";
+
+/** Plugin, o lingue: le lingue stanno in una scheda tutta loro, non tra i plugin. */
+type Scope = "plugins" | "locales";
+
+const inScope = (family: string, scope: Scope): boolean =>
+  (family === "locale") === (scope === "locales");
 
 interface Market {
   readonly plugins: readonly RegistryPlugin[];
@@ -36,7 +43,7 @@ export function newer(a: string, b: string): boolean {
   return false;
 }
 
-function permissionLabel(t: Translate, permission: string): string {
+export function permissionLabel(t: Translate, permission: string): string {
   if (permission.startsWith("network:")) {
     return t("core.permission.networkHost", { host: permission.slice("network:".length) });
   }
@@ -71,7 +78,7 @@ export function ModulesWindow({ onClose }: { onClose: () => void }) {
             aria-label={t("core.modules.title")}
             className="flex gap-4 border-b border-line px-5"
           >
-            {(["market", "installed"] as const).map((id) => (
+            {(["market", "installed", "locales"] as const).map((id) => (
               <button
                 key={id}
                 id={`${tabsId}-${id}`}
@@ -97,9 +104,38 @@ export function ModulesWindow({ onClose }: { onClose: () => void }) {
             className="min-h-80 overflow-auto px-5 py-4"
           >
             {tab === "market" ? (
-              <Marketplace installedKey={JSON.stringify(installed)} onInstalled={setGuide} />
+              <Marketplace
+                scope="plugins"
+                installedKey={JSON.stringify(installed)}
+                onInstalled={setGuide}
+              />
+            ) : tab === "installed" ? (
+              <Installed scope="plugins" onGuide={setGuide} />
             ) : (
-              <Installed onGuide={setGuide} />
+              <div className="flex flex-col gap-6">
+                <section
+                  aria-label={t("core.modules.locales.installed")}
+                  className="flex flex-col gap-2"
+                >
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    {t("core.modules.locales.installed")}
+                  </h3>
+                  <Installed scope="locales" onGuide={setGuide} />
+                </section>
+                <section
+                  aria-label={t("core.modules.locales.available")}
+                  className="flex flex-col gap-2"
+                >
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    {t("core.modules.locales.available")}
+                  </h3>
+                  <Marketplace
+                    scope="locales"
+                    installedKey={JSON.stringify(installed)}
+                    onInstalled={setGuide}
+                  />
+                </section>
+              </div>
             )}
           </div>
           <div className="flex justify-end border-t border-line px-5 py-3">
@@ -116,6 +152,28 @@ export function ModulesWindow({ onClose }: { onClose: () => void }) {
         </div>
       )}
     </ModalDialog>
+  );
+}
+
+/** «Usa questa lingua» per una lingua installata e attiva; «In uso» per quella corrente. */
+function LocaleUse({ manifest, current }: { manifest: PluginManifest; current: string }) {
+  const t = useT();
+  const run = useRun();
+  const code = manifest.contributes.locales?.[0]?.lang;
+  if (code === undefined) return null;
+  return code === current ? (
+    <span className="rounded border border-cue/60 px-1.5 py-0.5 text-[10px] text-cue">
+      {t("core.modules.locales.inUse")}
+    </span>
+  ) : (
+    <Button
+      size="sm"
+      onClick={() => {
+        void run("locale.set", { lang: code });
+      }}
+    >
+      {t("core.modules.locales.use")}
+    </Button>
   );
 }
 
@@ -138,9 +196,11 @@ function useInstalledList(installedKey: string): readonly InstalledPlugin[] {
 }
 
 function Marketplace({
+  scope,
   installedKey,
   onInstalled,
 }: {
+  scope: Scope;
   installedKey: string;
   onInstalled: (manifest: PluginManifest) => void;
 }) {
@@ -151,6 +211,7 @@ function Marketplace({
   const [market, setMarket] = useState<Market | undefined>();
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
+  const [price, setPrice] = useState<"all" | "free" | "paid">("all");
   const [confirm, setConfirm] = useState<{ plugin: RegistryPlugin; update: boolean } | undefined>();
   const [busy, setBusy] = useState<string | undefined>();
   const installed = useInstalledList(installedKey);
@@ -214,9 +275,18 @@ function Marketplace({
           : t("core.modules.unreachable");
 
   const q = query.trim().toLocaleLowerCase();
-  const plugins = (market?.plugins ?? []).filter(
-    (p) => q === "" || `${p.name} ${p.description} ${p.publisher}`.toLocaleLowerCase().includes(q),
-  );
+  const ofScope = (market?.plugins ?? []).filter((p) => inScope(p.family, scope));
+  const anyPaid = ofScope.some((p) => p.access === "paid");
+  const plugins = ofScope
+    .filter((p) => price === "all" || (price === "paid") === (p.access === "paid"))
+    .filter(
+      (p) =>
+        q === "" || `${p.name} ${p.description} ${p.publisher}`.toLocaleLowerCase().includes(q),
+    )
+    // Quelli da installare per primi; gia' installati in fondo.
+    .map((p) => ({ p, mine: installed.some((i) => i.manifest.id === p.id) }))
+    .sort((a, b) => Number(a.mine) - Number(b.mine))
+    .map(({ p }) => p);
 
   return (
     <div className="flex flex-col gap-3">
@@ -240,6 +310,27 @@ function Marketplace({
           {t("core.modules.refresh")}
         </Button>
       </div>
+      {anyPaid && (
+        <div role="group" aria-label={t("core.modules.filter.label")} className="flex gap-1.5">
+          {(["all", "free", "paid"] as const).map((name) => (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={price === name}
+              onClick={() => {
+                setPrice(name);
+              }}
+              className={`rounded-md border px-2 py-0.5 text-xs ${
+                price === name
+                  ? "border-cue bg-cue-bg text-fg"
+                  : "border-line-2 text-muted hover:text-fg"
+              }`}
+            >
+              {t(`core.modules.filter.${name}`)}
+            </button>
+          ))}
+        </div>
+      )}
       <p
         className={`text-xs ${market?.source === "none" ? "text-stage" : "text-faint"}`}
         aria-live="polite"
@@ -257,7 +348,9 @@ function Marketplace({
       )}
       <ul
         className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3"
-        aria-label={t("core.modules.tab.market")}
+        aria-label={t(
+          scope === "locales" ? "core.modules.locales.available" : "core.modules.tab.market",
+        )}
       >
         {plugins.map((plugin) => {
           const latest = plugin.versions[0];
@@ -307,7 +400,9 @@ function Marketplace({
                   {t(plugin.verified ? "core.modules.verified" : "core.modules.unverified")}
                 </span>
               </div>
+              <Cover src={plugin.image} />
               <p className="text-sm text-muted">{plugin.description}</p>
+              <HowToUse guide={plugin.guide} lang={lang} />
               {paid && license !== undefined && license.state !== "none" && (
                 <LicenseLine license={license} />
               )}
@@ -407,12 +502,20 @@ function Marketplace({
   );
 }
 
-function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void }) {
+function Installed({
+  scope,
+  onGuide,
+}: {
+  scope: Scope;
+  onGuide: (manifest: PluginManifest) => void;
+}) {
   const t = useT();
+  const pluginSettings = usePluginSettings();
   const run = useRun();
   const { notify } = useStation();
   const installedKey = JSON.stringify(useEngine().state?.live.plugins);
-  const plugins = useInstalledList(installedKey);
+  const plugins = useInstalledList(installedKey).filter((p) => inScope(p.manifest.family, scope));
+  const { lang } = useEngine();
   const licenses = useLicenses(installedKey);
   const [removing, setRemoving] = useState<InstalledPlugin | undefined>();
   // Operazione lunga in corso (installa da file o cartella, disinstalla): si mostra e si bloccano i pulsanti.
@@ -437,7 +540,12 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
 
   return (
     <div className="flex flex-col gap-3">
-      <ul className="flex flex-col gap-2" aria-label={t("core.modules.tab.installed")}>
+      <ul
+        className="flex flex-col gap-2"
+        aria-label={t(
+          scope === "locales" ? "core.modules.locales.installed" : "core.modules.tab.installed",
+        )}
+      >
         {plugins.map((plugin) => {
           const { manifest, status } = plugin;
           const problem = status.error;
@@ -489,6 +597,19 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
                   }}
                 >
                   {t("core.modules.guide")}
+                </Button>
+              )}
+              {scope === "locales" && plugin.enabled && (
+                <LocaleUse manifest={manifest} current={lang} />
+              )}
+              {pluginSettings.has(manifest.id) && (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    pluginSettings.open(manifest.id);
+                  }}
+                >
+                  {t("core.pluginSettings.open")}
                 </Button>
               )}
               <Button
@@ -593,7 +714,42 @@ function Installed({ onGuide }: { onGuide: (manifest: PluginManifest) => void })
 }
 
 /** Icona del modulo (SVG del pacchetto o del registry); sigla solo se manca. */
-function ModuleIcon({ src, name }: { src: string | undefined; name: string }) {
+/** Immagine di copertina di un plugin (protocollo 1.19), se ne ha una: sempre 16:9, mai a tutta altezza. */
+export function Cover({ src }: { src: string | undefined }) {
+  if (src === undefined) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      draggable={false}
+      className="aspect-video w-full rounded-md border border-line object-cover"
+    />
+  );
+}
+
+/** «Come si usa»: i passi della guida del plugin, nella lingua in uso (altrimenti italiano o inglese). */
+export function HowToUse({ guide, lang }: { guide: RegistryPlugin["guide"]; lang: string }) {
+  const t = useT();
+  const steps = guide?.[lang] ?? guide?.it ?? guide?.en;
+  if (steps === undefined || steps.length === 0) return null;
+  return (
+    <details className="text-sm text-muted">
+      <summary className="cursor-pointer select-none text-xs text-fg">
+        {t("core.modules.howTo")}
+      </summary>
+      <ol className="mt-2 flex list-decimal flex-col gap-1.5 pl-5">
+        {steps.map((step) => (
+          <li key={step.title}>
+            <strong className="text-fg">{step.title}</strong> {step.body}
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+export function ModuleIcon({ src, name }: { src: string | undefined; name: string }) {
   return (
     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-mod-chip font-mono text-[11px] font-semibold text-mod">
       {src === undefined ? (

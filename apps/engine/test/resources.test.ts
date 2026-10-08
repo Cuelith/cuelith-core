@@ -42,8 +42,15 @@ function monitor(
   provider: MetricsProvider,
   peaksFile: string,
   modules: { id: string; usage: ResourceUsage | undefined }[] = [],
+  extra: {
+    memory?: () => { totalMB: number; freeMB: number };
+    stopForLowMemory?: (id: string) => boolean;
+  } = {},
 ) {
-  const supervisor = { usages: () => modules } as unknown as ModuleSupervisor;
+  const supervisor = {
+    usages: () => modules,
+    stopForLowMemory: extra.stopForLowMemory ?? (() => false),
+  } as unknown as ModuleSupervisor;
   const registry = {
     find: (id: string) =>
       id === "cuelith.ndi"
@@ -66,8 +73,88 @@ function monitor(
     peaksFile,
     logger: silentLogger,
     intervalMs: 60_000,
+    ...(extra.memory === undefined ? {} : { memory: extra.memory }),
   });
 }
+
+describe("freno della memoria", () => {
+  const peaks = () => join(mkdtempSync(join(tmpdir(), "cuelith-guard-")), "resources.json");
+  const provider = () => scripted([{ parts: [] }]);
+  const heavy = [
+    { id: "acme.leggero", usage: usage(40, 1) },
+    { id: "acme.pesante", usage: usage(900, 5) },
+    { id: "acme.medio", usage: usage(300, 2) },
+    { id: "acme.muto", usage: undefined },
+  ];
+
+  it("con la memoria quasi finita ferma solo il plugin piu' pesante", async () => {
+    const stopped: string[] = [];
+    const m = monitor(provider(), peaks(), heavy, {
+      memory: () => ({ totalMB: 16_000, freeMB: 300 }),
+      stopForLowMemory: (id) => {
+        stopped.push(id);
+        return true;
+      },
+    });
+    await m.start();
+    await m.stop();
+    expect(stopped).toEqual(["acme.pesante"]);
+  });
+
+  it("con memoria a sufficienza non ferma nessuno (anche se un plugin e' pesante)", async () => {
+    const stopped: string[] = [];
+    const m = monitor(provider(), peaks(), heavy, {
+      memory: () => ({ totalMB: 16_000, freeMB: 5000 }),
+      stopForLowMemory: (id) => {
+        stopped.push(id);
+        return true;
+      },
+    });
+    await m.start();
+    await m.stop();
+    expect(stopped).toEqual([]);
+  });
+
+  it("non ferma i plugin leggeri: se nessuno pesa abbastanza, non fa nulla", async () => {
+    const stopped: string[] = [];
+    const m = monitor(
+      provider(),
+      peaks(),
+      [
+        { id: "acme.a", usage: usage(60, 1) },
+        { id: "acme.b", usage: usage(90, 1) },
+      ],
+      {
+        memory: () => ({ totalMB: 16_000, freeMB: 100 }),
+        stopForLowMemory: (id) => {
+          stopped.push(id);
+          return true;
+        },
+      },
+    );
+    await m.start();
+    await m.stop();
+    expect(stopped).toEqual([]);
+  });
+
+  it("la soglia cresce con la memoria totale (4%) e non scende sotto i 400 MB", async () => {
+    const stopped: string[] = [];
+    const run = async (totalMB: number, freeMB: number) => {
+      const m = monitor(provider(), peaks(), heavy, {
+        memory: () => ({ totalMB, freeMB }),
+        stopForLowMemory: (id) => {
+          stopped.push(id);
+          return true;
+        },
+      });
+      await m.start();
+      await m.stop();
+    };
+    await run(64_000, 2000); // 4% di 64 GB = 2560 MB: libera 2000 -> ferma
+    await run(4000, 450); // 4% = 160 -> soglia 400: libera 450 -> non ferma
+    expect(stopped).toEqual(["acme.pesante"]);
+  });
+});
 
 describe("contatore delle risorse", () => {
   it("piattaforma e moduli, con nomi, minimi, massimi e consumo dichiarato", async () => {

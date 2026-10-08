@@ -259,6 +259,9 @@ function Shortcuts() {
         [[`${MOD}+4`], t("core.shortcuts.modeDirector")],
         [[`${MOD}+5`], t("core.shortcuts.modeCompact")],
         [[`${MOD}+,`], t("core.shortcuts.settings")],
+        [[`${MOD}+K`], t("core.shortcuts.search")],
+        [["Ctrl+Tab"], t("core.shortcuts.tabPrevious")],
+        [[`Ctrl+${t("core.shortcuts.key.shift")}+Tab`], t("core.shortcuts.tabNext")],
       ],
     },
   ];

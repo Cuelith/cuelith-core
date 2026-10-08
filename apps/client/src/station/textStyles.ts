@@ -2,7 +2,7 @@ import {
   canvasMeasure,
   checkStyle,
   creditsReserve,
-  fitScale,
+  renderScale,
   FONT_FAMILIES,
   FullscreenStyleSchema,
   type FullscreenStyle,
@@ -130,9 +130,12 @@ export function itemFit(
   if (style?.text.fit === undefined || item === undefined) return 1;
   const box = roomOutputs(doc)[0] ?? { width: 1920, height: 1080 };
   const credits = item.credits !== undefined && item.credits.show !== "none";
-  return (
-    fitScale(itemTexts(item), style.text, box, measure(), creditsReserve(box.height, credits)) ??
-    style.text.fit.min
+  return renderScale(
+    itemTexts(item),
+    style.text,
+    box,
+    measure(),
+    creditsReserve(box.height, credits),
   );
 }
 

@@ -170,11 +170,13 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
       !withBackground || uri === undefined ? undefined : mediaUrl(uri);
     const image = urlOf(background?.uri ?? fallback);
     const upcoming = urlOf(nextBackground?.uri ?? fallback);
+    // «Solo sfondo» (protocollo 1.17): sul pubblico resta lo sfondo, senza testo ne' crediti.
+    const bareBackground = doc.live.textHidden === true;
     return {
       ...base,
       blackout,
       // Cambiare sfondo e' un cambio di contenuto: vale la dissolvenza.
-      key: image === undefined ? key : `${key}|${image}`,
+      key: `${image === undefined ? key : `${key}|${image}`}${bareBackground ? "|bare" : ""}`,
       transition: style.data.transition,
       preload: upcoming === undefined || upcoming === image ? [] : [upcoming],
       frame: {
@@ -182,12 +184,12 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
         background: style.data.background.color,
         image,
         dim: style.data.background.dim ?? 0,
-        text,
+        text: bareBackground ? undefined : text,
         // Lo stile globale scelto vince; senza, lo stile del look con le modifiche dell'editor.
         style: effectiveTextStyle(style.data.text, style.data.globalText?.text, item?.textStyle),
         fitTexts,
         message,
-        credits: showContent ? credits : undefined,
+        credits: showContent && !bareBackground ? credits : undefined,
       },
     };
   }

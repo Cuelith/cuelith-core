@@ -1,9 +1,13 @@
 import { areaPanelIds, providerOf } from "@cuelith/protocol";
 import { CurrentModeContext } from "../station/currentMode.js";
+import { usePins } from "../station/pins.js";
+import { useScreensSwapped } from "../station/screenSwap.js";
+import { usePluginSettings } from "../station/pluginSettings.js";
 import {
   useContext,
   useEffect,
   useId,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -57,12 +61,25 @@ function readTab(key: string): string | undefined {
 }
 
 /** Piu' pannelli nella stessa area, come schede (cap. 16: "schede dentro le sezioni"). */
-function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: readonly string[] }) {
+function TabbedArea({
+  storageKey,
+  panelIds,
+  closable,
+  onCloseTab,
+}: {
+  storageKey: string;
+  panelIds: readonly string[];
+  /** Schede che si possono chiudere (aperte dalla ricerca, non fissate). */
+  closable: ReadonlySet<string>;
+  onCloseTab: (panelId: string) => void;
+}) {
   const t = useT();
   const modules = useContext(ModulePanelsContext);
   const baseId = useId();
+  const pluginSettings = usePluginSettings();
   const [saved, setSaved] = useState(() => readTab(storageKey));
   const active = saved !== undefined && panelIds.includes(saved) ? saved : (panelIds[0] ?? "");
+  const activeModule = modules.get(active);
 
   const choose = (panelId: string) => {
     setSaved(panelId);
@@ -73,11 +90,58 @@ function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: re
     }
   };
 
-  // Il dock puo' chiedere di mostrare la scheda di un modulo.
+  // Le schede usate di recente, la piu' recente per prima: Ctrl+Tab torna alla precedente.
+  const recent = useRef<string[]>([]);
+  useEffect(() => {
+    recent.current = [active, ...recent.current.filter((id) => id !== active)].slice(0, 20);
+  }, [active]);
+  const previous = () =>
+    recent.current.find((id) => id !== active && panelIds.includes(id)) ?? panelIds[0];
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (!event.ctrlKey || event.altKey || event.key !== "Tab") return;
+      if (document.querySelector("dialog[open]") !== null) return;
+      event.preventDefault();
+      // Ctrl+Tab: l'ultima scheda usata; Ctrl+Maiusc+Tab: la scheda seguente, in cerchio.
+      const index = panelIds.indexOf(active);
+      const next = event.shiftKey
+        ? panelIds[(index + 1) % panelIds.length]
+        : recent.current.find((id) => id !== active && panelIds.includes(id));
+      if (next !== undefined && next !== active) choose(next);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  });
+  const closeTab = (panelId: string) => {
+    if (panelId === active) choose(previous() ?? "");
+    onCloseTab(panelId);
+  };
+
+  // Una scheda chiesta prima che esista (un plugin non fissato, aperto dalla ricerca) si mostra
+  // appena compare.
+  const wanted = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const id = wanted.current;
+    if (id === undefined || !panelIds.includes(id)) return;
+    wanted.current = undefined;
+    setSaved(id);
+    try {
+      localStorage.setItem(storageKey, id);
+    } catch {
+      // Vale comunque per questa sessione.
+    }
+  }, [panelIds, storageKey]);
+
+  // Il dock e la ricerca possono chiedere di mostrare la scheda di un modulo.
   useEffect(() => {
     const onShow = (event: Event) => {
       const panelId = (event as CustomEvent<string>).detail;
-      if (!panelIds.includes(panelId)) return;
+      if (!panelIds.includes(panelId)) {
+        wanted.current = panelId;
+        return;
+      }
       setSaved(panelId);
       try {
         localStorage.setItem(storageKey, panelId);
@@ -113,6 +177,36 @@ function TabbedArea({ storageKey, panelIds }: { storageKey: string; panelIds: re
         title={(panelId) => panelTitle(t, panelId, modules)}
         onChoose={choose}
         onKeyDown={onKey}
+        closable={closable}
+        onClose={closeTab}
+        trailing={
+          activeModule !== undefined && pluginSettings.has(activeModule.pluginId) ? (
+            <button
+              type="button"
+              aria-label={t("core.pluginSettings.title", { name: activeModule.pluginName })}
+              title={t("core.pluginSettings.title", { name: activeModule.pluginName })}
+              onClick={() => {
+                pluginSettings.open(activeModule.pluginId);
+              }}
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted hover:text-fg"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                aria-hidden="true"
+              >
+                <circle cx="10" cy="10" r="2.6" />
+                <path
+                  d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          ) : undefined
+        }
       />
       <div
         id={`${baseId}-panel`}
@@ -142,8 +236,32 @@ export function ModeView({
   modulePanels: readonly ModulePanel[];
 }) {
   const { layout } = mode;
+  const [swapped] = useScreensSwapped();
+  // «Presenta»: con le dimensioni scambiate il Programma prende lo spazio dell'Anteprima e viceversa.
+  const rows =
+    swapped && mode.qualifiedId === "core.present"
+      ? [layout.rows[1] ?? "auto", layout.rows[0] ?? "auto", ...layout.rows.slice(2)]
+      : layout.rows;
   const modules = new Map(modulePanels.map((p) => [p.id, p]));
-  const side = modulePanels.filter((p) => p.placement === "side").map((p) => p.id);
+  const sideAll = modulePanels.filter((p) => p.placement === "side").map((p) => p.id);
+  // Schede: i plugin fissati e quelli aperti da poco dalla ricerca (finche' dura la sessione).
+  const pins = usePins(sideAll);
+  const [opened, setOpened] = useState<readonly string[]>([]);
+  const sideKey = sideAll.join("|");
+  useEffect(() => {
+    const onShow = (event: Event) => {
+      const panelId = (event as CustomEvent<string>).detail;
+      if (sideKey.split("|").includes(panelId)) {
+        setOpened((list) => (list.includes(panelId) ? list : [...list, panelId]));
+      }
+    };
+    window.addEventListener(SHOW_TAB_EVENT, onShow);
+    return () => {
+      window.removeEventListener(SHOW_TAB_EVENT, onShow);
+    };
+  }, [sideKey]);
+  const side = sideAll.filter((id) => pins.isPinned(id) || opened.includes(id));
+  const closable = new Set(opened.filter((id) => !pins.isPinned(id)));
   const entries = Object.entries(layout.panels).map(
     ([area, panels]) => [area, areaPanelIds(panels)] as const,
   );
@@ -151,7 +269,7 @@ export function ModeView({
   const sideArea = entries.find(([, ids]) => ids.includes("core.playlist"))?.[0];
   const style: CSSProperties = {
     gridTemplateColumns: layout.columns.join(" "),
-    gridTemplateRows: layout.rows.join(" "),
+    gridTemplateRows: rows.join(" "),
     gridTemplateAreas: layout.areas.map((row) => `"${row.join(" ")}"`).join(" "),
   };
   const lastColumn = new Set(layout.areas.map((row) => row[row.length - 1]));
@@ -181,6 +299,10 @@ export function ModeView({
                   <TabbedArea
                     storageKey={`cuelith.tabs.${mode.qualifiedId}.${area}`}
                     panelIds={ids}
+                    closable={closable}
+                    onCloseTab={(panelId) => {
+                      setOpened((list) => list.filter((id) => id !== panelId));
+                    }}
                   />
                 )}
               </div>

@@ -17,6 +17,8 @@ export interface AppInfo {
   readonly version: string;
   readonly installationId: string | undefined;
   readonly autoCheckUpdates: boolean;
+  /** L'avvio guidato e' gia' stato visto o saltato su questo computer. */
+  readonly welcomeSeen: boolean;
   readonly update: UpdateState;
 }
 
@@ -25,6 +27,7 @@ export type InstallResult = "installing" | "onAir" | "notReady" | "cancelled";
 
 export interface DesktopApp {
   readonly appInfo: () => Promise<AppInfo>;
+  readonly setWelcomeSeen: () => Promise<void>;
   readonly setAutoCheckUpdates: (on: boolean) => Promise<void>;
   readonly resetInstallationId: () => Promise<string>;
   readonly checkUpdates: () => Promise<void>;

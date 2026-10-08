@@ -33,6 +33,12 @@ nsis:
   allowToChangeInstallationDirectory: true
   artifactName: Cuelith-Setup-${version}.${ext}
   shortcutName: Cuelith
+  # Lingua dell'installatore a scelta all'inizio (italiano o inglese); l'app parte nella stessa
+  # (build/installer.nsh scrive install-lang.txt). Se Cuelith e' gia' installato, lo dice.
+  multiLanguageInstaller: true
+  installerLanguages: [it_IT, en_US]
+  displayLanguageSelector: true
+  include: build/installer.nsh
 linux:
   target:
     - target: AppImage

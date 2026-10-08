@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useT } from "../engine/react.js";
 import { MenuButton } from "../ui/Menu.js";
 
@@ -35,6 +35,11 @@ interface TabStripProps {
   readonly title: (panelId: string) => string;
   readonly onChoose: (panelId: string) => void;
   readonly onKeyDown: (event: KeyboardEvent) => void;
+  /** Schede che si possono chiudere (quelle aperte dalla ricerca e non fissate). */
+  readonly closable?: ReadonlySet<string>;
+  readonly onClose?: (panelId: string) => void;
+  /** In fondo alla riga, fuori dallo scorrimento (es. l'ingranaggio del plugin attivo). */
+  readonly trailing?: ReactNode;
 }
 
 /**
@@ -43,7 +48,17 @@ interface TabStripProps {
  * schede nascoste sfumano, la scheda attiva si porta da sola in vista e un
  * pulsante apre l'elenco completo.
  */
-export function TabStrip({ panelIds, active, baseId, title, onChoose, onKeyDown }: TabStripProps) {
+export function TabStrip({
+  panelIds,
+  active,
+  baseId,
+  title,
+  onChoose,
+  onKeyDown,
+  closable,
+  onClose,
+  trailing,
+}: TabStripProps) {
   const t = useT();
   const strip = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ left: false, right: false });
@@ -123,29 +138,45 @@ export function TabStrip({ panelIds, active, baseId, title, onChoose, onKeyDown 
       >
         {panelIds.map((panelId) => {
           const selected = panelId === active;
+          const canClose = closable?.has(panelId) === true && onClose !== undefined;
           return (
-            <button
-              key={panelId}
-              id={`${baseId}-${panelId}`}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={`${baseId}-panel`}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => {
-                onChoose(panelId);
-              }}
-              // Trascinando qualcosa sopra una scheda la si apre: cosi' un elemento
-              // delle Librerie si porta nella Scaletta anche se stanno nella stessa area.
-              onDragEnter={() => {
-                if (!selected) onChoose(panelId);
-              }}
-              className={`-mb-px shrink-0 whitespace-nowrap border-b-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] ${
-                selected ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg"
-              }`}
-            >
-              {title(panelId)}
-            </button>
+            <span key={panelId} className="flex shrink-0 items-start gap-1">
+              <button
+                id={`${baseId}-${panelId}`}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls={`${baseId}-panel`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => {
+                  onChoose(panelId);
+                }}
+                // Trascinando qualcosa sopra una scheda la si apre: cosi' un elemento
+                // delle Librerie si porta nella Scaletta anche se stanno nella stessa area.
+                onDragEnter={() => {
+                  if (!selected) onChoose(panelId);
+                }}
+                className={`-mb-px shrink-0 whitespace-nowrap border-b-2 pb-2 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                  selected ? "border-fg text-fg" : "border-transparent text-muted hover:text-fg"
+                }`}
+              >
+                {title(panelId)}
+              </button>
+              {canClose && (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label={t("core.tabs.close", { name: title(panelId) })}
+                  title={t("core.tabs.close", { name: title(panelId) })}
+                  onClick={() => {
+                    onClose(panelId);
+                  }}
+                  className="-mt-0.5 flex h-4 w-4 items-center justify-center rounded text-[11px] leading-none text-faint hover:bg-bg-3 hover:text-fg"
+                >
+                  ×
+                </button>
+              )}
+            </span>
           );
         })}
       </div>
@@ -178,6 +209,7 @@ export function TabStrip({ panelIds, active, baseId, title, onChoose, onKeyDown 
           </MenuButton>
         </>
       )}
+      {trailing}
     </div>
   );
 }

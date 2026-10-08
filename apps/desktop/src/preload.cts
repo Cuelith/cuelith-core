@@ -23,6 +23,7 @@ electron.contextBridge.exposeInMainWorld("cuelithDesktop", {
     electron.ipcRenderer.invoke("cuelith:choose-media-files", kind === "image" ? "image" : "audio"),
   /** Versione, ID di installazione, preferenze e stato degli aggiornamenti (decisione 0004). */
   appInfo: (): Promise<unknown> => electron.ipcRenderer.invoke("cuelith:app-info"),
+  setWelcomeSeen: (): Promise<unknown> => electron.ipcRenderer.invoke("cuelith:set-welcome-seen"),
   setAutoCheckUpdates: (on: unknown): Promise<unknown> =>
     electron.ipcRenderer.invoke("cuelith:set-auto-check", on === true),
   resetInstallationId: (): Promise<unknown> =>

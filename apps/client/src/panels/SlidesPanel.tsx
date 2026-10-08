@@ -1,5 +1,5 @@
 import { slideSequence, type Item } from "@cuelith/protocol";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
 import { useLibraries } from "../station/library.js";
 import { directItemId } from "../station/direct.js";
@@ -13,6 +13,40 @@ import { EmptyState, Panel } from "../ui/Panel.js";
 import { backgroundUrl } from "../station/backgrounds.js";
 import { SlideText } from "../ui/SlideText.js";
 
+/** Dimensioni delle miniature: piccole per vedere tutto un brano, grandi per leggere il testo. */
+const ZOOMS = {
+  s: { min: 110, label: "S" },
+  m: { min: 150, label: "M" },
+  l: { min: 240, label: "L" },
+} as const;
+type Zoom = keyof typeof ZOOMS;
+const ZOOM_KEY = "cuelith.slides.zoom";
+
+function readZoom(): Zoom {
+  try {
+    const saved = localStorage.getItem(ZOOM_KEY);
+    return saved === "s" || saved === "l" ? saved : "m";
+  } catch {
+    return "m";
+  }
+}
+
+/** Colore dell'etichetta di una sezione, dalla sua lettera (V strofa, C ritornello, B ponte...). */
+function groupTone(group: string): string {
+  switch (group.charAt(0).toLowerCase()) {
+    case "c":
+      return "bg-cue-bg text-cue";
+    case "b":
+      return "bg-stage-bg text-stage";
+    case "p":
+      return "bg-cue-bg text-mod";
+    case "v":
+      return "bg-mod-chip text-mod";
+    default:
+      return "bg-bg-3 text-muted";
+  }
+}
+
 /**
  * Slide dell'elemento scelto, in miniature 16:9 disegnate col look Sala.
  * Clic = anteprima, doppio clic = in onda. Bordo rosso in onda, ciano in anteprima.
@@ -23,6 +57,14 @@ export function SlidesPanel() {
   const { selectedEntryId } = useStation();
   const { editShowItem } = useEditItem();
   const run = useRun();
+  const [zoom, setZoom] = useState<Zoom>(readZoom);
+  // La slide in onda o in anteprima si porta da sola in vista (brani lunghi).
+  const focused = useRef<HTMLLIElement | null>(null);
+  const liveKey =
+    state === undefined ? "" : `${state.live.cursor.slideIndex}/${state.live.preview.slideIndex}`;
+  useEffect(() => {
+    focused.current?.scrollIntoView({ block: "nearest" });
+  }, [liveKey]);
   if (state === undefined) return null;
 
   const { live } = state;
@@ -52,6 +94,14 @@ export function SlidesPanel() {
   const liveIndex =
     live.layers.content.visible && here(live.cursor) ? live.cursor.slideIndex : undefined;
   const previewIndex = here(live.preview) ? live.preview.slideIndex : undefined;
+  const choose = (next: Zoom) => {
+    setZoom(next);
+    try {
+      localStorage.setItem(ZOOM_KEY, next);
+    } catch {
+      // La dimensione vale comunque finche' la finestra resta aperta.
+    }
+  };
 
   return (
     <Panel
@@ -61,6 +111,28 @@ export function SlidesPanel() {
           <DirectActions item={item} />
         ) : (
           <div className="flex gap-1.5">
+            <div
+              role="group"
+              aria-label={t("core.slides.zoom")}
+              className="flex overflow-hidden rounded-md border border-line-2"
+            >
+              {(Object.keys(ZOOMS) as Zoom[]).map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  aria-pressed={zoom === size}
+                  title={t("core.slides.zoom")}
+                  onClick={() => {
+                    choose(size);
+                  }}
+                  className={`px-2 py-0.5 text-xs ${
+                    zoom === size ? "bg-cue-bg text-fg" : "text-muted hover:text-fg"
+                  }`}
+                >
+                  {ZOOMS[size].label}
+                </button>
+              ))}
+            </div>
             <SaveToLibrary item={item} />
             <Button
               size="sm"
@@ -77,6 +149,9 @@ export function SlidesPanel() {
       <h3 className="truncate font-display text-lg font-semibold">
         {item.title === "" ? t("core.editor.untitled") : item.title}
       </h3>
+      <p className="-mt-1 text-xs text-faint">
+        {t("core.playlist.slideCount", { count: slides.length })}
+      </p>
       {directId !== undefined ? (
         <p className="text-xs" data-testid="direct-badge">
           <span
@@ -94,13 +169,21 @@ export function SlidesPanel() {
       ) : (
         <ol
           aria-label={t("core.panel.slides")}
-          className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] content-start gap-2.5"
+          className="grid content-start gap-2.5"
+          style={{
+            gridTemplateColumns: `repeat(auto-fill, minmax(${String(ZOOMS[zoom].min)}px, 1fr))`,
+          }}
         >
           {slides.map((slide, index) => {
             const isLive = index === liveIndex;
             const isPreview = !isLive && index === previewIndex;
             return (
-              <li key={`${slide.id}/${String(index)}`}>
+              <li
+                key={`${slide.id}/${String(index)}`}
+                ref={(node) => {
+                  if (isLive || (liveIndex === undefined && isPreview)) focused.current = node;
+                }}
+              >
                 <button
                   type="button"
                   aria-label={t("core.slides.tileLabel", { n: index + 1 })}
@@ -130,7 +213,7 @@ export function SlidesPanel() {
                   {slide.group !== undefined && (
                     <span
                       data-testid="slide-group"
-                      className="absolute top-1 left-1 rounded bg-mod-chip px-1.5 font-mono text-[10px] font-semibold text-mod"
+                      className={`absolute top-1 left-1 rounded px-1.5 font-mono text-[10px] font-semibold ${groupTone(slide.group)}`}
                     >
                       {slide.group.toUpperCase()}
                     </span>
@@ -145,6 +228,12 @@ export function SlidesPanel() {
                     }`}
                   >
                     {index + 1}
+                    {/* Non solo il colore: chi non distingue il rosso dal ciano legge lo stato. */}
+                    {(isLive || isPreview) && (
+                      <span className="ml-1 font-sans">
+                        {t(isLive ? "core.slides.state.live" : "core.slides.state.preview")}
+                      </span>
+                    )}
                   </span>
                 </button>
               </li>

@@ -18,7 +18,9 @@ export const PRESENT_MODE: Mode = {
   shortcut: "Mod+1",
   layout: {
     columns: ["25fr", "40fr", "33fr"],
-    rows: ["auto", "auto", "1fr", "auto"],
+    // Colonna destra senza scorrimento verticale: programma e anteprima si dividono lo spazio
+    // (l'anteprima ne ha di piu'), sfondi e stili sono due righe che scorrono di lato.
+    rows: ["minmax(0px, 2fr)", "minmax(0px, 3fr)", "auto", "auto"],
     areas: [
       ["playlist", "slides", "program"],
       ["playlist", "slides", "preview"],

@@ -1,9 +1,10 @@
 import "pixi.js/unsafe-eval";
 import { Application, Container, Graphics, Sprite, Text, Texture, type Ticker } from "pixi.js";
+import { GifSource, GifSprite } from "pixi.js/gif";
 import {
   canvasMeasure,
   creditsReserve,
-  fitScale,
+  renderScale,
   type MeasureText,
 } from "@cuelith-core/core-looks";
 import { formatTimer, timerPhase, timerRemaining } from "@cuelith/protocol";
@@ -71,6 +72,8 @@ export class Painter {
   readonly #cover = new Graphics();
   /** Immagini di sfondo gia' caricate (undefined = non caricabile: si disegna senza). */
   readonly #images = new Map<string, Texture | undefined>();
+  /** Sfondi animati (GIF con piu' fotogrammi): la texture sola e' ferma, servono tutti i fotogrammi. */
+  readonly #gifs = new Map<string, GifSource>();
   readonly #loading = new Map<string, Promise<void>>();
   /** Cresce a ogni nuovo stato: un'immagine arrivata tardi non sovrascrive uno stato piu' nuovo. */
   #ticket = 0;
@@ -130,10 +133,8 @@ export class Painter {
     if (this.#images.has(url)) return Promise.resolve();
     let loading = this.#loading.get(url);
     if (loading === undefined) {
-      const image = new Image();
-      image.src = url;
       loading = Promise.race([
-        image.decode().then(() => Texture.from(image)),
+        this.#decode(url),
         new Promise<undefined>((resolve) => setTimeout(resolve, IMAGE_TIMEOUT_MS, undefined)),
       ])
         .catch(() => undefined)
@@ -144,6 +145,23 @@ export class Painter {
       this.#loading.set(url, loading);
     }
     return loading;
+  }
+
+  /** Legge l'immagine; una GIF con piu' fotogrammi resta animata (la prima immagine fa da texture ferma). */
+  async #decode(url: string): Promise<Texture> {
+    const bytes = await (await fetch(url)).arrayBuffer();
+    const head = new Uint8Array(bytes, 0, Math.min(4, bytes.byteLength));
+    if (String.fromCharCode(...head) === "GIF8") {
+      const source = GifSource.from(bytes);
+      if (source.totalFrames > 1) {
+        this.#gifs.set(url, source);
+        return source.textures[0] ?? Texture.EMPTY;
+      }
+    }
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return Texture.from(image);
   }
 
   #show(view: OutputView): void {
@@ -244,7 +262,14 @@ export class Painter {
       frame.kind === "fullscreen" && frame.image ? this.#images.get(frame.image) : undefined;
     if (texture !== undefined && frame.kind === "fullscreen") {
       // L'immagine riempie l'uscita senza deformarsi (il di piu' resta fuori).
-      const sprite = new Sprite(texture);
+      const gif = frame.image === undefined ? undefined : this.#gifs.get(frame.image);
+      const sprite = gif === undefined ? new Sprite(texture) : new GifSprite({ source: gif });
+      // I fotogrammi sono condivisi tra i disegni: distruggere lo sprite non li distrugge.
+      if (sprite instanceof GifSprite) {
+        sprite.destroy = (): void => {
+          GifSprite.prototype.destroy.call(sprite, false);
+        };
+      }
       const fit = Math.max(w / texture.width, h / texture.height);
       sprite.anchor.set(0.5);
       sprite.scale.set(fit);
@@ -262,13 +287,13 @@ export class Painter {
     const fit =
       frame.style.fit === undefined || frame.text === undefined
         ? 1
-        : (fitScale(
+        : renderScale(
             frame.fitTexts.includes(frame.text) ? frame.fitTexts : [...frame.fitTexts, frame.text],
             frame.style,
             { width: w, height: h },
             measure(),
             frame.kind === "fullscreen" ? creditsReserve(h, frame.credits !== undefined) : 0,
-          ) ?? frame.style.fit.min);
+          );
     const size = frame.style.size * scale * fit;
     this.#textInfo = JSON.stringify({
       size: Math.round(size * 10) / 10,
@@ -276,6 +301,8 @@ export class Painter {
       bold: frame.style.weight === "bold",
       uppercase: frame.style.uppercase === true,
       color: frame.style.color,
+      outline: frame.style.outline?.width ?? 0,
+      shadow: frame.style.shadow?.offset ?? 0,
     });
     const textStyle = (fontSize: number, color: string, wrap: number) => ({
       fontFamily: FONT[frame.style.font],
@@ -283,9 +310,30 @@ export class Painter {
       fill: color,
       align: frame.style.align,
       fontWeight: frame.style.weight === "bold" ? ("700" as const) : ("400" as const),
-      wordWrap: true,
+      // Con l'adattamento le righe restano intere: si rimpicciolisce, non si spezza.
+      wordWrap: frame.style.fit === undefined,
       wordWrapWidth: wrap,
       lineHeight: fontSize * (frame.style.lineHeight ?? 1.25),
+      ...(frame.style.outline === undefined || frame.style.outline.width === 0
+        ? {}
+        : {
+            stroke: {
+              color: frame.style.outline.color,
+              width: frame.style.outline.width * scale * fit,
+              join: "round" as const,
+            },
+          }),
+      ...(frame.style.shadow === undefined
+        ? {}
+        : {
+            dropShadow: {
+              color: frame.style.shadow.color,
+              alpha: 1,
+              blur: frame.style.shadow.blur * scale * fit,
+              distance: frame.style.shadow.offset * scale * fit,
+              angle: Math.PI / 2,
+            },
+          }),
     });
     const shown = (value: string): string =>
       frame.style.uppercase === true ? value.toUpperCase() : value;

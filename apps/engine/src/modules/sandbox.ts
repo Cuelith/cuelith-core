@@ -8,6 +8,11 @@ export interface SpawnSpec {
   readonly args: readonly string[];
   readonly env: Readonly<Record<string, string>>;
   readonly cwd: string;
+  /**
+   * Il processo gira con priorita' piu' bassa (plugin Node): se un plugin si mette a consumare, la
+   * postazione e le uscite, che hanno la priorita' normale, passano comunque per prime.
+   */
+  readonly lowPriority?: boolean;
 }
 
 /**
@@ -116,6 +121,7 @@ export function spawnSpec(
       CUELITH_NETWORK: network === "*" ? "*" : network.join(","),
     },
     cwd: moduleDir,
+    lowPriority: true,
   };
 }
 

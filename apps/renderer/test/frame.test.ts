@@ -86,6 +86,18 @@ describe("describeOutput", () => {
     expect(view?.transition).toEqual({ type: "fade", durationMs: 300 });
   });
 
+  it("Solo sfondo: la Sala perde testo e crediti e dissolve; il Palco tiene il testo", () => {
+    const { doc, room, stage } = makeDoc();
+    const before = describeOutput(doc, room);
+    doc.live.textHidden = true;
+    const bare = describeOutput(doc, room);
+    expect(bare?.frame).toMatchObject({ kind: "fullscreen", text: undefined, credits: undefined });
+    expect(bare?.key).not.toBe(before?.key);
+    expect(describeOutput(doc, stage)?.frame).toMatchObject({ kind: "stage", text: "Prima" });
+    delete doc.live.textHidden;
+    expect(describeOutput(doc, room)?.frame).toMatchObject({ text: "Prima" });
+  });
+
   it("Palco: testo, prossima slide e orologio, a taglio", () => {
     const { doc, stage } = makeDoc();
     const view = describeOutput(doc, stage);

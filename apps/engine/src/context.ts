@@ -7,6 +7,7 @@ import type { LicenseService } from "./licenses/service.js";
 import type { Locales } from "./modules/locales.js";
 import type { Marketplace } from "./modules/marketplace.js";
 import type { ModuleRegistry } from "./modules/registry.js";
+import type { PluginSettings } from "./modules/settings.js";
 import type { ModuleSupervisor } from "./modules/supervisor.js";
 import type { NetworkService } from "./network.js";
 import type { ResourceMonitor } from "./resources.js";
@@ -22,6 +23,8 @@ export interface EngineContext {
   /** Cambia la lingua dell'interfaccia e la ricorda; false se non e' installata. */
   setLanguage(lang: Lang): Promise<boolean>;
   readonly modules: ModuleRegistry;
+  /** Scelte dell'utente per le impostazioni dei plugin (protocollo 1.18). */
+  readonly pluginSettings: PluginSettings;
   /** Processi dei moduli con codice (passo 9b). */
   readonly supervisor: ModuleSupervisor;
   /** Contatore delle risorse (protocollo 1.9). */

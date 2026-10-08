@@ -69,6 +69,13 @@ export function processMetrics(): MetricsProvider {
 
 const PEAKS_SAVE_MS = 60_000;
 
+/**
+ * Freno della memoria: sotto questa quantita' libera (il maggiore tra il minimo in MB e la frazione
+ * della memoria totale) si ferma il plugin piu' pesante, se pesa almeno `minPluginMB`. Meglio un
+ * plugin fermo, con la sua spiegazione, che un computer senza memoria in mezzo a una diretta.
+ */
+export const MEMORY_GUARD = { minFreeMB: 400, minFreeFraction: 0.04, minPluginMB: 150 } as const;
+
 export interface ResourceMonitorOptions {
   readonly provider: MetricsProvider;
   readonly registry: ModuleRegistry;
@@ -79,6 +86,8 @@ export interface ResourceMonitorOptions {
   readonly logger: Logger;
   /** Ogni quanto si misura in background (i massimi non si perdono). */
   readonly intervalMs?: number;
+  /** Memoria del computer (le prove la decidono; di norma e' quella vera). */
+  readonly memory?: () => { totalMB: number; freeMB: number };
 }
 
 /**
@@ -87,6 +96,11 @@ export interface ResourceMonitorOptions {
  * dei processi e il consumo che i moduli mandano col controllo periodico) e
  * ricorda minimi e massimi; i massimi restano su disco.
  */
+const defaultMemory = () => ({
+  totalMB: os.totalmem() / (1024 * 1024),
+  freeMB: os.freemem() / (1024 * 1024),
+});
+
 export class ResourceMonitor {
   readonly #options: ResourceMonitorOptions;
   readonly #low = new Map<string, ResourceUsage>();
@@ -163,6 +177,7 @@ export class ResourceMonitor {
           if (part.current !== undefined) this.#track(part.id, part.current);
         }
         this.#sampledAt = now;
+        this.#guardMemory();
         await this.#savePeaks(false);
       } catch (error) {
         this.#options.logger.warn("misura delle risorse non riuscita", error);
@@ -171,6 +186,19 @@ export class ResourceMonitor {
       }
     })();
     return this.#sampling;
+  }
+
+  /** Se la memoria libera e' sotto la soglia, ferma il plugin piu' pesante (uno per misura). */
+  #guardMemory(): void {
+    const { totalMB, freeMB } = (this.#options.memory ?? defaultMemory)();
+    if (freeMB >= Math.max(MEMORY_GUARD.minFreeMB, totalMB * MEMORY_GUARD.minFreeFraction)) return;
+    const heaviest = this.#options.supervisor
+      .usages()
+      .filter(
+        (entry) => entry.usage !== undefined && entry.usage.memoryMB >= MEMORY_GUARD.minPluginMB,
+      )
+      .sort((a, b) => (b.usage?.memoryMB ?? 0) - (a.usage?.memoryMB ?? 0))[0];
+    if (heaviest !== undefined) this.#options.supervisor.stopForLowMemory(heaviest.id);
   }
 
   #track(id: string, usage: ResourceUsage): void {

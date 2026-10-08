@@ -357,9 +357,28 @@ export class ModuleRegistry {
         }
 
         const target = join(root, id, version);
-        await mkdir(join(root, id), { recursive: true });
-        await rm(target, { recursive: true, force: true });
-        await renameWithRetry(staging, target);
+        // Stessa versione di quella in funzione: la sua cartella e' in uso (su Windows bloccata dal
+        // processo acceso). Come per la disinstallazione, prima si ferma il plugin, poi si sostituisce;
+        // l'installazione finita lo rimette in funzione.
+        const inUse =
+          this.#state.installed[id]?.version === version ? this.#installed.get(id) : undefined;
+        if (inUse !== undefined) {
+          this.#installed.delete(id);
+          this.#changed();
+          await this.#whenStopped(id);
+        }
+        try {
+          await mkdir(join(root, id), { recursive: true });
+          await rm(target, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+          await renameWithRetry(staging, target);
+        } catch (error) {
+          // Non e' riuscito: il plugin di prima torna com'era.
+          if (inUse !== undefined) {
+            this.#installed.set(id, inUse);
+            this.#changed();
+          }
+          throw error;
+        }
 
         const old = this.#state.installed[id];
         const record: InstallRecord = {

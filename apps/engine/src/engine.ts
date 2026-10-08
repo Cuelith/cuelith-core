@@ -7,6 +7,7 @@ import {
   isOnAir,
   LangSchema,
   REGISTRY_INDEX_URL,
+  REGISTRY_EXTRAS_URL,
   REGISTRY_INDEX_V2_URL,
   type Lang,
 } from "@cuelith/protocol";
@@ -20,6 +21,7 @@ import type { SecretStore } from "./licenses/secrets.js";
 import { Locales } from "./modules/locales.js";
 import { Marketplace, type Fetch } from "./modules/marketplace.js";
 import { ModuleRegistry } from "./modules/registry.js";
+import { PluginSettings } from "./modules/settings.js";
 import type { NodeRuntime } from "./modules/sandbox.js";
 import { ModuleSupervisor, type SupervisorTimings } from "./modules/supervisor.js";
 import { PanelWarmer } from "./modules/warm.js";
@@ -134,11 +136,18 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
   const host = options.host ?? "127.0.0.1";
 
   const modules = new ModuleRegistry(logger);
+  const pluginSettings = new PluginSettings(join(options.paths.data, "plugin-settings.json"));
+  await pluginSettings.load();
   await modules.loadBundled(options.paths.bundledPlugins, options.version);
   await modules.loadInstalled(join(options.paths.data, "plugins"));
   const marketplace = new Marketplace({
     url: options.registryUrl ?? REGISTRY_INDEX_V2_URL,
     ...(options.registryUrl === undefined ? { fallbackUrl: REGISTRY_INDEX_URL } : {}),
+    // Immagini e guide d'uso stanno accanto all'indice (protocollo 1.19).
+    extrasUrl:
+      options.registryUrl === undefined
+        ? REGISTRY_EXTRAS_URL
+        : new URL("extras.json", options.registryUrl).href,
     cacheFile: join(options.paths.data, "registry-cache.json"),
     engineVersion: options.version,
     logger,
@@ -216,6 +225,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
     logger,
     dataDir: options.paths.data,
     lang: () => locales.active,
+    settings: (manifest) => pluginSettings.effective(manifest),
     // Le richieste dei moduli passano dagli stessi controlli delle postazioni.
     dispatch: (request, session) => dispatch(request, session, context, handlers),
     ...(options.nodeRuntime === undefined ? {} : { nodeRuntime: options.nodeRuntime }),
@@ -266,6 +276,7 @@ export async function startEngine(options: EngineOptions): Promise<Engine> {
       return true;
     },
     modules,
+    pluginSettings,
     supervisor,
     resources,
     marketplace,

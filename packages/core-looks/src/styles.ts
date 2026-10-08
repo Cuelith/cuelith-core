@@ -30,6 +30,16 @@ export const TextStyleSchema = z.strictObject({
    * Assente = nessun adattamento.
    */
   fit: z.strictObject({ min: z.number().min(0.3).max(1) }).optional(),
+  /** Bordo delle lettere: spessore in pixel su un'uscita alta 1080 pixel (scala con l'uscita). */
+  outline: z.strictObject({ width: z.number().min(0).max(20), color: Color }).optional(),
+  /** Ombra: distanza e sfumatura in pixel su un'uscita alta 1080 pixel. */
+  shadow: z
+    .strictObject({
+      offset: z.number().min(0).max(30),
+      blur: z.number().min(0).max(30),
+      color: Color,
+    })
+    .optional(),
 });
 export type TextStyle = z.infer<typeof TextStyleSchema>;
 

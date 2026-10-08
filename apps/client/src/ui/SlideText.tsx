@@ -19,10 +19,13 @@ export function SlideText({
   credits,
   background,
   fit = 1,
+  hideText = false,
 }: {
   text: string;
   /** Fattore di adattamento (decisione 0015): 1 = nessuno. */
   fit?: number | undefined;
+  /** «Solo sfondo»: lo sfondo resta, il testo e i crediti no. */
+  hideText?: boolean | undefined;
   style: FullscreenStyle | undefined;
   /** Immagine di sfondo (indirizzo sul motore), col velo del look sopra. */
   background?: string | undefined;
@@ -34,6 +37,12 @@ export function SlideText({
       ? {}
       : {
           fontFamily: FONT[style.text.font],
+          // La dimensione ottica del carattere dipende dai pixel: in un riquadro piccolo le lettere
+          // si allargherebbero e il testo uscirebbe dal bordo. Si fissa a quella dell'uscita.
+          fontVariationSettings: `"opsz" ${String(
+            Math.min(144, Math.max(9, style.text.size * fit)),
+          )}`,
+          fontOpticalSizing: "none",
           fontSize: `calc(${String(style.text.size * fit)} / 1080 * 100cqh)`,
           color: style.text.color,
           textAlign: style.text.align,
@@ -41,10 +50,23 @@ export function SlideText({
           fontWeight: style.text.weight === "bold" ? 700 : 400,
           textTransform: style.text.uppercase === true ? "uppercase" : "none",
           padding: `calc(${String(style.text.margin)} * 100cqmin)`,
+          ...(style.text.outline === undefined || style.text.outline.width === 0
+            ? {}
+            : {
+                WebkitTextStroke: `calc(${String(style.text.outline.width * fit)} / 1080 * 100cqh) ${style.text.outline.color}`,
+                paintOrder: "stroke fill",
+              }),
+          ...(style.text.shadow === undefined
+            ? {}
+            : {
+                textShadow: `0 calc(${String(style.text.shadow.offset * fit)} / 1080 * 100cqh) calc(${String(style.text.shadow.blur * fit)} / 1080 * 100cqh) ${style.text.shadow.color}`,
+              }),
         };
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center whitespace-pre-line"
+      className={`absolute inset-0 flex items-center justify-center ${
+        style?.text.fit === undefined ? "whitespace-pre-line" : "whitespace-pre"
+      }`}
       style={css}
     >
       {background !== undefined && (
@@ -63,8 +85,8 @@ export function SlideText({
           style={{ opacity: style?.background.dim }}
         />
       )}
-      <span className="relative w-full">{text}</span>
-      {credits !== undefined && (
+      {!hideText && <span className="relative w-full">{text}</span>}
+      {credits !== undefined && !hideText && (
         <span
           data-testid="credits"
           className="absolute inset-x-0 text-center font-body opacity-75"

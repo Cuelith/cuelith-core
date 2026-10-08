@@ -10,6 +10,7 @@ import {
   RpcError,
   rpcNotification,
   type Lang,
+  type PluginManifest,
   type PluginState,
   type ResourceUsage,
   type RpcRequest,
@@ -59,6 +60,8 @@ export interface SupervisorOptions {
   /** Cartella dati dell'app: dentro, plugin-data/<id> per ogni modulo. */
   readonly dataDir: string;
   readonly lang: () => Lang;
+  /** Valori delle impostazioni di un modulo (predefiniti e scelte dell'utente). */
+  readonly settings?: (manifest: PluginManifest) => Record<string, string | number | boolean>;
   /** Esegue una richiesta di un modulo come quelle delle postazioni (ruolo, parametri). */
   readonly dispatch: (request: RpcRequest, session: Session) => Promise<RpcResponse>;
   readonly nodeRuntime?: NodeRuntime;
@@ -81,6 +84,8 @@ interface Running {
   pingTimer: NodeJS.Timeout | undefined;
   /** Ultimo consumo riportato dal modulo col controllo periodico (protocollo 1.9). */
   usage: ResourceUsage | undefined;
+  /** Fermato dal freno della memoria: non si riavvia da solo. */
+  guard: boolean;
 }
 
 const MAX_LOG = 4000;
@@ -164,6 +169,23 @@ export class ModuleSupervisor {
     return [...this.#running]
       .filter(([, running]) => running.state === "active")
       .map(([id, running]) => ({ id, usage: running.usage }));
+  }
+
+  /**
+   * Freno di sicurezza: la memoria del computer sta per finire e questo plugin e' il piu' pesante.
+   * Lo si ferma (senza riavvio automatico) perche' non cada tutto il resto; resta spento con
+   * l'errore «memoria quasi esaurita» finche' l'utente non lo riaccende. Vero se lo ha fermato.
+   */
+  stopForLowMemory(id: string): boolean {
+    const running = this.#running.get(id);
+    if (running?.state !== "active" || running.proc === undefined || running.proc.exited) {
+      return false;
+    }
+    this.#options.logger.error(`modulo ${id}: fermato, la memoria del computer sta per finire`);
+    running.error = "core.module.lowMemory";
+    running.guard = true;
+    running.proc.kill();
+    return true;
   }
 
   storage(pluginId: string): ModuleStorage {
@@ -256,6 +278,7 @@ export class ModuleSupervisor {
       stopping: undefined,
       restartTimer: undefined,
       pingTimer: undefined,
+      guard: false,
       usage: undefined,
     };
     this.#running.set(id, running);
@@ -319,11 +342,13 @@ export class ModuleSupervisor {
     running.proc = proc;
     running.session = session;
 
-    const settings = Object.fromEntries(
-      (manifest.contributes.settings ?? []).flatMap((s) =>
-        s.default === undefined ? [] : [[s.key, s.default]],
-      ),
-    );
+    const settings =
+      this.#options.settings?.(manifest) ??
+      Object.fromEntries(
+        (manifest.contributes.settings ?? []).flatMap((s) =>
+          s.default === undefined ? [] : [[s.key, s.default]],
+        ),
+      );
     try {
       await proc.request(
         "plugin.activate",
@@ -415,6 +440,12 @@ export class ModuleSupervisor {
     this.#options.logger.error(
       `modulo ${id}: processo terminato (codice ${String(code)}, segnale ${String(signal)})${tail}`,
     );
+    if (running.guard) {
+      // Fermato di proposito per la memoria: niente riavvio, resta spento con la sua spiegazione.
+      running.state = "crashed";
+      this.#statusChanged();
+      return;
+    }
     const now = Date.now();
     const crashes = [...running.crashes, now].filter(
       (t) => now - t <= this.#timings.restartWindowMs,
@@ -495,6 +526,11 @@ export class ModuleSupervisor {
       }
       this.#deliver({ name: `${id}.${name}`, payload: p.payload });
     }
+  }
+
+  /** Dice ai moduli iscritti che le impostazioni di un plugin sono cambiate (valori in uso). */
+  notifySettings(pluginId: string, settings: Record<string, string | number | boolean>): void {
+    this.#deliver({ name: "core.plugin.settingsChanged", payload: { pluginId, settings } });
   }
 
   #deliver(event: EngineEvent): void {

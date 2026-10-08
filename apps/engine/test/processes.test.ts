@@ -1,5 +1,5 @@
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import os, { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EngineMethodName, EngineMethodParams } from "@cuelith/protocol";
 import { afterEach, describe, expect, it } from "vitest";
@@ -202,6 +202,23 @@ describe("processo del modulo", { timeout: 30_000 }, () => {
     expect(engine.context.supervisor.pid(ID)).not.toBe(info.pid);
   });
 
+  it("si puo' reinstallare (aggiornare) mentre gira: il vecchio processo si chiude, il nuovo parte", async () => {
+    const { install, active, ok, engine, status } = await start();
+    await install(fixture());
+    await active();
+    const first = engine.context.supervisor.pid(ID);
+    await install(fixture());
+    // Nessun errore interno (su Windows la cartella del processo acceso e' bloccata): si riparte puliti.
+    await active();
+    const second = engine.context.supervisor.pid(ID);
+    expect(second).toBeDefined();
+    expect(second).not.toBe(first);
+    expect(await status()).toMatchObject({ state: "active" });
+    expect((await ok("plugin.list", {})).plugins.filter((p) => p.manifest.id === ID)).toHaveLength(
+      1,
+    );
+  });
+
   it("si puo' disinstallare mentre gira: il processo si chiude e la cartella sparisce", async () => {
     const { install, active, ok, engine, data } = await start();
     await install(fixture());
@@ -342,6 +359,36 @@ describe("crash e blocchi (cap. 24)", { timeout: 30_000 }, () => {
     await ok("plugin.disable", { pluginId: ID });
     await ok("plugin.enable", { pluginId: ID });
     await active();
+  });
+
+  it("il plugin gira con priorita' piu' bassa del motore: la postazione e le uscite passano per prime", async () => {
+    const { install, active, engine } = await start();
+    await install(fixture());
+    await active();
+    const pid = engine.context.supervisor.pid(ID);
+    expect(pid).toBeDefined();
+    expect(os.getPriority(pid ?? 0)).toBeGreaterThan(os.getPriority(process.pid));
+  });
+
+  it("freno della memoria: ferma il plugin senza riavviarlo, con la sua spiegazione; riacceso riparte", async () => {
+    const { install, active, status, until, ok, engine } = await start();
+    await install(fixture());
+    await active();
+    const pid = engine.context.supervisor.pid(ID);
+    expect(engine.context.supervisor.stopForLowMemory(ID)).toBe(true);
+    await until(async () => (await status())?.state === "crashed");
+    expect(await status()).toMatchObject({ state: "crashed", error: "core.module.lowMemory" });
+    await until(() => Promise.resolve(!alive(pid ?? 0)));
+    // Non si riavvia da solo, nemmeno dopo i ritardi dei riavvii normali.
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(await status()).toMatchObject({ state: "crashed", error: "core.module.lowMemory" });
+    // Un plugin fermo non si ferma una seconda volta.
+    expect(engine.context.supervisor.stopForLowMemory(ID)).toBe(false);
+    // L'utente lo riaccende: riparte pulito.
+    await ok("plugin.disable", { pluginId: ID });
+    await ok("plugin.enable", { pluginId: ID });
+    await active();
+    expect((await status())?.error).toBeUndefined();
   });
 
   it("un comando che non risponde entro il tempo massimo: 5040, processo terminato e riavviato", async () => {

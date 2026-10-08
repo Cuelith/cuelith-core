@@ -7,6 +7,7 @@ import { itemOfEntry } from "../station/show.js";
 import { useRun, useStation } from "../station/station.js";
 import { judgeStyle, loadFonts, useTextStyles, type SavedStyle } from "../station/textStyles.js";
 import { ModalDialog } from "../ui/Dialogs.js";
+import { HScroll } from "../ui/HScroll.js";
 import { Panel } from "../ui/Panel.js";
 import { SlideText } from "../ui/SlideText.js";
 
@@ -118,14 +119,14 @@ export function TextStylesPanel() {
     void run("textstyle.delete", { id: style.id });
   };
 
-  const chip = "rounded-md border px-2 py-0.5 text-xs";
+  const chip = "flex-none rounded-md border px-2 py-0.5 text-xs";
   const verdicts = new Map(
     styles.map((style) => [style.id, judgeStyle(state, style.style, selected)]),
   );
 
   return (
     <Panel label={t("core.panel.textstyles")} tight>
-      <div role="group" aria-label={t("core.textstyles.list")} className="flex flex-wrap gap-1.5">
+      <HScroll role="group" label={t("core.textstyles.list")}>
         <button
           type="button"
           aria-pressed={activeId === undefined}
@@ -153,7 +154,7 @@ export function TextStylesPanel() {
                 })
               : undefined;
           return (
-            <span key={style.id} className="inline-flex">
+            <span key={style.id} className="inline-flex flex-none">
               <button
                 type="button"
                 aria-pressed={active}
@@ -202,7 +203,7 @@ export function TextStylesPanel() {
         >
           +
         </button>
-      </div>
+      </HScroll>
 
       {styles.length === 0 && <p className="text-xs text-faint">{t("core.textstyles.empty")}</p>}
       {note !== undefined && edited === undefined && (
@@ -430,6 +431,123 @@ function StyleEditor({
             }}
           />
           {t("core.textstyles.uppercase")}
+        </label>
+        <label className="col-span-2 flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={text.outline !== undefined}
+            onChange={(event) => {
+              const { outline: _removed, ...rest } = text;
+              const next: TextStyle = event.target.checked
+                ? { ...rest, outline: { width: 3, color: "#000000" } }
+                : rest;
+              setText(next);
+              later({ text: next });
+            }}
+          />
+          {t("core.textstyles.outline")}
+          {text.outline !== undefined && (
+            <span className="ml-auto flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                max={20}
+                aria-label={t("core.textstyles.outlineWidth")}
+                value={text.outline.width}
+                onChange={(event) => {
+                  change({
+                    outline: {
+                      color: text.outline?.color ?? "#000000",
+                      width: Math.min(20, Math.max(0, num(event.target.value, 3))),
+                    },
+                  });
+                }}
+                className={`${FIELD} w-14`}
+              />
+              <input
+                type="color"
+                aria-label={t("core.textstyles.outlineColor")}
+                value={text.outline.color}
+                onChange={(event) => {
+                  change({
+                    outline: {
+                      width: text.outline?.width ?? 3,
+                      color: event.target.value.toUpperCase(),
+                    },
+                  });
+                }}
+                className="h-6 w-10 rounded-md border border-line-2 bg-bg"
+              />
+            </span>
+          )}
+        </label>
+        <label className="col-span-2 flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={text.shadow !== undefined}
+            onChange={(event) => {
+              const { shadow: _removed, ...rest } = text;
+              const next: TextStyle = event.target.checked
+                ? { ...rest, shadow: { offset: 4, blur: 6, color: "#000000" } }
+                : rest;
+              setText(next);
+              later({ text: next });
+            }}
+          />
+          {t("core.textstyles.shadow")}
+          {text.shadow !== undefined && (
+            <span className="ml-auto flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                max={30}
+                aria-label={t("core.textstyles.shadowOffset")}
+                value={text.shadow.offset}
+                onChange={(event) => {
+                  change({
+                    shadow: {
+                      blur: text.shadow?.blur ?? 6,
+                      color: text.shadow?.color ?? "#000000",
+                      offset: Math.min(30, Math.max(0, num(event.target.value, 4))),
+                    },
+                  });
+                }}
+                className={`${FIELD} w-14`}
+              />
+              <input
+                type="number"
+                min={0}
+                max={30}
+                aria-label={t("core.textstyles.shadowBlur")}
+                value={text.shadow.blur}
+                onChange={(event) => {
+                  change({
+                    shadow: {
+                      offset: text.shadow?.offset ?? 4,
+                      color: text.shadow?.color ?? "#000000",
+                      blur: Math.min(30, Math.max(0, num(event.target.value, 6))),
+                    },
+                  });
+                }}
+                className={`${FIELD} w-14`}
+              />
+              <input
+                type="color"
+                aria-label={t("core.textstyles.shadowColor")}
+                value={text.shadow.color}
+                onChange={(event) => {
+                  change({
+                    shadow: {
+                      offset: text.shadow?.offset ?? 4,
+                      blur: text.shadow?.blur ?? 6,
+                      color: event.target.value.toUpperCase(),
+                    },
+                  });
+                }}
+                className="h-6 w-10 rounded-md border border-line-2 bg-bg"
+              />
+            </span>
+          )}
         </label>
         <label className="col-span-2 flex items-center gap-2">
           <input

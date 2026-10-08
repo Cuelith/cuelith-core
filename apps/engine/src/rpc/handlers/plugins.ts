@@ -55,6 +55,21 @@ export const pluginHandlers: HandlerMap = {
     return {};
   },
 
+  /** Valori in uso delle impostazioni di un plugin (predefiniti e scelte dell'utente). */
+  "pluginsettings.get": (ctx, _session, params) => {
+    const found = ctx.modules.installed().find((p) => p.manifest.id === params.pluginId);
+    if (found === undefined) throw new RpcError(ErrorCode.NotFound, "core.error.moduleNotFound");
+    return { values: ctx.pluginSettings.effective(found.manifest) };
+  },
+
+  "pluginsettings.set": async (ctx, _session, params) => {
+    const found = ctx.modules.installed().find((p) => p.manifest.id === params.pluginId);
+    if (found === undefined) throw new RpcError(ErrorCode.NotFound, "core.error.moduleNotFound");
+    const values = await ctx.pluginSettings.set(found.manifest, params.values);
+    ctx.supervisor.notifySettings(params.pluginId, values);
+    return {};
+  },
+
   "plugin.uninstall": async (ctx, _session, params) => {
     await ctx.modules.uninstall(params.pluginId);
     return {};

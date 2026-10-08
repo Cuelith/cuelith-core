@@ -68,6 +68,8 @@ class FakeNet {
   readonly packages = new Map<string, Uint8Array>();
   plugins: RegistryPlugin[] = [];
   online = true;
+  /** extras.json (immagini e guide d'uso); senza, il file non c'e'. */
+  extras: unknown;
 
   publish(
     id: string,
@@ -115,6 +117,11 @@ class FakeNet {
           generatedAt: "2026-09-30T10:00:00.000Z",
           plugins: this.plugins,
         }),
+      );
+    }
+    if (url.endsWith("/extras.json")) {
+      return Promise.resolve(
+        this.extras === undefined ? new Response("", { status: 404 }) : Response.json(this.extras),
       );
     }
     const data = this.packages.get(url);
@@ -165,6 +172,33 @@ describe("marketplace", () => {
     net.online = false;
     const offline = await ok("registry.list", { refresh: true });
     expect(offline).toMatchObject({ source: "cache", plugins: [{ id: "cuelith.greetings" }] });
+  });
+
+  it("immagine e guida d'uso arrivano da extras.json, restano nella copia e non rompono nulla se mancano", async () => {
+    const net = new FakeNet();
+    net.publish("cuelith.greetings", "1.0.0", greetings("1.0.0"));
+    const png = `data:image/png;base64,${Buffer.from("immagine").toString("base64")}`;
+    const guide = { it: [{ title: "Primo passo", body: "Apri lo strumento." }] };
+    net.extras = {
+      schema: 1,
+      generatedAt: "2026-10-07T10:00:00.000Z",
+      plugins: { "cuelith.greetings": { image: png, guide }, "altro.plugin": { image: png } },
+    };
+    const { ok } = await start(net);
+    const online = await ok("registry.list", { refresh: true });
+    expect(online.plugins[0]).toMatchObject({ id: "cuelith.greetings", image: png, guide });
+    // Senza internet la copia porta anche immagine e guida.
+    net.online = false;
+    const offline = await ok("registry.list", { refresh: true });
+    expect(offline).toMatchObject({ source: "cache", plugins: [{ image: png, guide }] });
+    // Il file degli extra rotto o assente: il marketplace c'e' lo stesso, senza immagini.
+    net.online = true;
+    net.extras = { schema: 7 };
+    const broken = await ok("registry.list", { refresh: true });
+    expect(broken.plugins.map((p) => p.id)).toEqual(["cuelith.greetings"]);
+    expect(broken.plugins[0]?.image).toBeUndefined();
+    net.extras = undefined;
+    expect((await ok("registry.list", { refresh: true })).plugins[0]?.image).toBeUndefined();
   });
 
   it("senza internet e senza copia: elenco vuoto, nessun errore", async () => {

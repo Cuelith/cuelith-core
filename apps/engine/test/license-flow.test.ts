@@ -314,6 +314,8 @@ describe("riavvio, scadenza e revoca", () => {
 
   it("un rimborso: al controllo in background il plugin si spegne da solo e dice perché", async () => {
     const w = world();
+    // Il Notaio finto firma con l'ora del sistema: qui il tempo parte da START, come nel resto della prova.
+    w.notary.clock = () => START;
     const data = folder();
     const secrets = new FakeSecrets();
     await installed(w, data, secrets);
@@ -321,7 +323,10 @@ describe("riavvio, scadenza e revoca", () => {
     // Siamo al giorno 31: il programma prova a rinnovare, il fornitore dice «revocata».
     const { plugin } = await boot(w, { data, secrets, now: () => START + 31 * DAY, tick: true });
     expect((await plugin(PAID))?.status.state).toBe("active");
-    await sleep(250);
+    // Si aspetta l'esito, non un istante fisso: dipende da quanto e' carica la macchina.
+    for (let i = 0; i < 40 && (await plugin(PAID))?.status.state !== "disabled"; i += 1) {
+      await sleep(100);
+    }
     const status = (await plugin(PAID))?.status;
     expect(status?.state).toBe("disabled");
     expect(status?.error).toBe("core.license.revoked");

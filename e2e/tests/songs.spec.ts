@@ -192,6 +192,19 @@ test("modulo Brani: nuovo brano nell'editor, scaletta, tasti delle sezioni, impo
   await editor.getByLabel("Ordine di proiezione").fill("v1 c1 v2 c1");
   await expect(editor.getByTestId("song-order")).toContainText("V1 → C1 → V2 → C1");
   await expect(issues).toHaveCount(0);
+  // Cosa vede il pubblico: le slide nell'ordine di proiezione, senza accordi.
+  const preview = editor.getByRole("region", { name: "Cosa vede il pubblico" });
+  await expect(preview.getByRole("listitem")).toHaveText([
+    "V1Santo, santo",
+    "V1santo il Signore",
+    "C1Osanna, osanna",
+    "V2Benedetto colui che viene",
+    "C1Osanna, osanna",
+  ]);
+  // Salto rapido alle sezioni e conteggio delle slide; crediti e altri dati restano chiusi.
+  await expect(editor.getByRole("navigation", { name: "Vai alla sezione" })).toContainText("V1");
+  await expect(editor.locator('.s-section[data-section="v1"]')).toContainText("2 slide");
+  await expect(editor.getByLabel("Copyright")).toBeHidden();
   await page.screenshot({ path: path.join(screenshotsDir, "canti-editor.png") });
 
   // Salva e metti in scaletta: si ripete solo se non e' successo nulla.

@@ -31,6 +31,8 @@ export interface RunningApp {
 }
 
 export interface LaunchOptions {
+  /** Vero per provare l'avvio guidato: di solito le prove lo saltano. */
+  welcome?: boolean;
   /** Profilo da riusare (riavvio); se assente se ne crea uno nuovo. */
   readonly userData?: string;
   readonly env?: Readonly<Record<string, string>>;
@@ -55,6 +57,8 @@ export async function launchApp(options: LaunchOptions = {}): Promise<RunningApp
         ...env,
         // Le prove leggono l'interfaccia in italiano, qualunque sia la lingua del
         // sistema, e con il solo italiano incluso: chi prova le lingue lo cambia.
+        // L'avvio guidato si vede solo alla prima volta: le prove lo saltano, salvo quella che lo prova.
+        CUELITH_WELCOME: options.welcome === true ? "on" : "off",
         CUELITH_LANG: "it",
         CUELITH_LANGS: "it",
         ...options.env,

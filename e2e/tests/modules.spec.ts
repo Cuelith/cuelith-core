@@ -79,6 +79,27 @@ function registryFolder(): string {
       ],
     }),
   );
+  // Immagine di copertina (un PNG di un pixel) e guida d'uso, come le pubblica il registry (1.19).
+  const png =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==";
+  writeFileSync(
+    path.join(dir, "extras.json"),
+    JSON.stringify({
+      schema: 1,
+      generatedAt: "2026-10-07T10:00:00.000Z",
+      plugins: {
+        [ID]: {
+          image: png,
+          guide: {
+            it: [
+              { title: "Apri i Saluti", body: "Dalla colonna a sinistra scegli lo strumento." },
+              { title: "Mandali in onda", body: "Scrivi un saluto e premi Invio." },
+            ],
+          },
+        },
+      },
+    }),
+  );
   return dir;
 }
 
@@ -106,11 +127,19 @@ test("marketplace: installa con i permessi, guida al primo uso, spegni e disinst
 }) => {
   const { station, problems } = market;
   const window = await openModules(station);
-  const card = window.getByRole("list", { name: "Marketplace" }).getByRole("listitem").filter({
-    hasText: "Saluti",
-  });
+  // La scheda e' l'elemento esterno: i passi della guida sono anch'essi elementi di un elenco.
+  const card = window
+    .getByRole("list", { name: "Marketplace" })
+    .getByRole("listitem")
+    .filter({ hasText: "Saluti" })
+    .first();
   await expect(card).toContainText("Verificato");
   await expect(card).toContainText("Cuelith · Funzione · 1.0.0");
+  // Copertina e «Come si usa» prima ancora di installare (protocollo 1.19).
+  await expect(card.locator("img").first()).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await card.getByText("Come si usa").click();
+  await expect(card).toContainText("Apri i Saluti");
+  await expect(card).toContainText("Scrivi un saluto e premi Invio.");
   await station.screenshot({ path: path.join(screenshotsDir, "moduli-marketplace.png") });
 
   await card.getByRole("button", { name: "Installa" }).click();
@@ -154,11 +183,25 @@ test("senza marketplace raggiungibile lo dice, e l'italiano resta obbligatorio",
   const { station, problems } = running;
   // Qui il marketplace e' quello vero: l'indice potrebbe non esistere ancora.
   const window = await openModules(station);
-  await expect(window.getByText(/Marketplace non raggiungibile|Elenco aggiornato/)).toBeVisible();
-  await window.getByRole("tab", { name: "Installati" }).click();
-  const italian = window.getByRole("list", { name: "Installati" }).getByRole("listitem").filter({
-    hasText: "Italiano",
+  // Rete vera: il programma aspetta fino a 15 s per l'indice e altrettanti per gli extra.
+  await expect(window.getByText(/Marketplace non raggiungibile|Elenco aggiornato/)).toBeVisible({
+    timeout: 45_000,
   });
+  // Le lingue hanno una scheda tutta loro: non stanno tra i plugin.
+  await window.getByRole("tab", { name: "Installati" }).click();
+  await expect(
+    window
+      .getByRole("list", { name: "Installati" })
+      .getByRole("listitem")
+      .filter({ hasText: "Italiano" }),
+  ).toHaveCount(0);
+  await window.getByRole("tab", { name: "Lingue" }).click();
+  const italian = window
+    .getByRole("list", { name: "Lingue installate" })
+    .getByRole("listitem")
+    .filter({
+      hasText: "Italiano",
+    });
   // Modulo passivo: lavora in background, niente icona nella colonna degli strumenti.
   await expect(italian).toContainText(/Lingua · In background · \d+\.\d+\.\d+ · Incluso · Attivo/);
   await expect(italian.locator("img")).toHaveAttribute("src", /icon\.svg$/);
@@ -166,3 +209,82 @@ test("senza marketplace raggiungibile lo dice, e l'italiano resta obbligatorio",
   await expect(italian.getByRole("button", { name: "Disinstalla" })).toHaveCount(0);
   expect(problems).toEqual([]);
 });
+
+const welcomeTest = base.extend<{ fresh: RunningApp }>({
+  // eslint-disable-next-line no-empty-pattern -- Playwright richiede la destrutturazione
+  fresh: async ({}, use) => {
+    const running = await launchApp({
+      welcome: true,
+      env: { CUELITH_TEST_REGISTRY_DIR: registryFolder() },
+    });
+    try {
+      await use(running);
+    } finally {
+      await running.close();
+    }
+  },
+});
+
+// Avvio guidato (decisione 0018): al primo avvio, senza strumenti, propone i plugin e li installa.
+welcomeTest(
+  "avvio guidato: propone i plugin, installa con un clic e non torna da solo",
+  async ({ fresh }) => {
+    const { station, problems } = fresh;
+    const welcome = station.getByRole("dialog", { name: "Benvenuto in Cuelith" });
+    await expect(welcome).toBeVisible();
+    const card = welcome
+      .getByRole("list", { name: "Plugin consigliati" })
+      .getByRole("listitem")
+      .filter({
+        hasText: "Saluti",
+      });
+    await expect(card).toContainText("Permessi:");
+    await expect(card).toContainText("salvare i propri dati");
+    await station.screenshot({ path: path.join(screenshotsDir, "avvio-guidato.png") });
+
+    await card.getByRole("button", { name: "Installa" }).click();
+    // La guida al primo uso del plugin, come dal marketplace.
+    const guide = station.getByRole("dialog", { name: "Primi passi con «Saluti»" });
+    await expect(guide).toBeVisible();
+    await guide.getByRole("button", { name: "Avanti" }).click();
+    await guide.getByRole("button", { name: "Ho capito" }).click();
+    await expect(card).toContainText("Installato");
+
+    // «Fatto» chiude e ricorda: non si ripresenta, ma si ritrova con la ricerca.
+    await welcome.getByRole("button", { name: "Fatto" }).click();
+    await expect(welcome).toBeHidden();
+    await station.keyboard.press("Control+k");
+    await station.keyboard.type("benvenuto");
+    await station.keyboard.press("Enter");
+    await expect(welcome).toBeVisible();
+    // Riaperta, sa cosa c'è già: niente da installare due volte.
+    await expect(card).toContainText("Installato");
+    await expect(card.getByRole("button", { name: "Installa" })).toHaveCount(0);
+    await welcome.getByRole("button", { name: "Più tardi" }).click();
+    expect(problems).toEqual([]);
+  },
+);
+
+welcomeTest(
+  "avvio guidato: «Più tardi» lo chiude e non si ripresenta al riavvio",
+  async ({ fresh }) => {
+    const { station } = fresh;
+    const welcome = station.getByRole("dialog", { name: "Benvenuto in Cuelith" });
+    await expect(welcome).toBeVisible();
+    await welcome.getByRole("button", { name: "Più tardi" }).click();
+    await expect(welcome).toBeHidden();
+    // Una nuova lettura delle informazioni dell'app: «visto» e' salvato sul computer.
+    await expect
+      .poll(() =>
+        station.evaluate(async () => {
+          const desktop = (
+            window as unknown as {
+              cuelithDesktop?: { appInfo: () => Promise<{ welcomeSeen: boolean }> };
+            }
+          ).cuelithDesktop;
+          return (await desktop?.appInfo())?.welcomeSeen;
+        }),
+      )
+      .toBe(true);
+  },
+);

@@ -15,7 +15,22 @@ interface Shown {
   bold: boolean;
   uppercase: boolean;
   color: string;
+  outline: number;
+  shadow: number;
 }
+
+/** Quanto il testo di ogni riquadro (programma, anteprima) esce dallo spazio utile: deve essere 0. */
+const overflow = (page: Page): Promise<number[]> =>
+  page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("span.relative.w-full")].map((span) => {
+      const box = span.parentElement;
+      if (box === null) return 0;
+      const pad = parseFloat(getComputedStyle(box).paddingLeft);
+      const range = document.createRange();
+      range.selectNodeContents(span);
+      return Math.max(0, range.getBoundingClientRect().width - (box.clientWidth - 2 * pad));
+    }),
+  );
 const shown = async (page: Page): Promise<Shown> =>
   JSON.parse((await page.locator("body").getAttribute("data-textstyle")) ?? "{}") as Shown;
 
@@ -58,6 +73,8 @@ test("stili del testo: editor, stile globale che lo sostituisce, adattamento e b
   await form.getByLabel("Dimensione", { exact: true }).fill("144");
   await form.getByLabel("Maiuscolo").check();
   await form.getByLabel("Grassetto").uncheck();
+  await form.getByLabel("Bordo", { exact: true }).check();
+  await form.getByLabel("Ombra", { exact: true }).check();
   await station.waitForTimeout(400);
   await form.getByRole("button", { name: "Chiudi" }).click();
   await expect(form).toBeHidden();
@@ -69,9 +86,16 @@ test("stili del testo: editor, stile globale che lo sostituisce, adattamento e b
   await styles.getByRole("button", { name: "Stile 1", exact: true }).click();
   await expect.poll(async () => (await shown(projector)).uppercase).toBe(true);
   const withGlobal = await shown(projector);
-  expect(withGlobal.size).toBeCloseTo((144 / 72) * base.size, 0);
+  // Lo stile ha l'adattamento: la riga in maiuscolo non entra intera alla dimensione chiesta,
+  // quindi si rimpicciolisce (non va a capo), ma non oltre il minimo.
+  expect(withGlobal.size).toBeLessThanOrEqual((144 / 72) * base.size + 0.5);
+  expect(withGlobal.size).toBeGreaterThanOrEqual((144 / 72) * base.size * 0.6 - 1);
   expect(withGlobal.bold).toBe(false);
+  expect(withGlobal.outline).toBe(3);
+  expect(withGlobal.shadow).toBe(4);
   await expect(styles.getByText("Stile «Stile 1» attivo")).toBeVisible();
+  // Nei riquadri il testo resta dentro lo spazio utile (le lettere non si allargano nel piccolo).
+  for (const excess of await overflow(station)) expect(excess).toBeLessThan(2);
   await station.screenshot({ path: path.join(screenshotsDir, "stili-testo-attivo.png") });
 
   // Nell'editor le modifiche sono sospese, non perse.
@@ -96,20 +120,21 @@ test("stili del testo: editor, stile globale che lo sostituisce, adattamento e b
   // --- Adattamento: uno stile enorme con "adatta" entra rimpicciolendo ---
   await styles.getByRole("button", { name: "Nuovo stile dallo stato attuale" }).click();
   const huge = station.getByRole("dialog", { name: "Stile Stile 2" });
-  await huge.getByLabel("Dimensione", { exact: true }).fill("330");
+  await huge.getByLabel("Dimensione", { exact: true }).fill("180");
   await station.waitForTimeout(600);
   await huge.getByRole("button", { name: "Chiudi" }).click();
   await expect(huge).toBeHidden();
   await styles.getByRole("button", { name: "Stile 2", exact: true }).click();
-  await expect.poll(async () => (await shown(projector)).size).toBeGreaterThan(base.size * 1.5);
+  await expect.poll(async () => (await shown(projector)).size).toBeGreaterThan(base.size * 1.2);
   const fitted = await shown(projector);
-  // Piu' piccolo di quanto chiede lo stile (330) ma non meno del minimo (60%).
-  expect(fitted.size).toBeLessThan((330 / 72) * base.size);
-  expect(fitted.size).toBeGreaterThanOrEqual((330 / 72) * base.size * 0.6 - 1);
+  // Piu' piccolo di quanto chiede lo stile (180) ma non meno del minimo (60%).
+  expect(fitted.size).toBeLessThan((180 / 72) * base.size);
+  expect(fitted.size).toBeGreaterThanOrEqual((180 / 72) * base.size * 0.6 - 1);
 
   // --- Blocco: senza adattamento lo stesso stile non entra e l'uscita non cambia ---
   await styles.getByRole("button", { name: "Modifica lo stile Stile 2" }).click();
   await huge.getByLabel("Adatta se non entra").uncheck();
+  await huge.getByLabel("Dimensione", { exact: true }).fill("400");
   await station.waitForTimeout(600);
   await expect(huge.getByRole("alert")).toContainText("Non entra");
   await expect(huge.getByRole("alert")).toContainText("Il testo proiettato non cambia");

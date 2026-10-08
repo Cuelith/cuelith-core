@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import os from "node:os";
 import {
   ErrorCode,
   RpcError,
@@ -55,6 +56,13 @@ export class ModuleProcess {
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });
+    if (spec.lowPriority === true && this.#child.pid !== undefined) {
+      try {
+        os.setPriority(this.#child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);
+      } catch {
+        // Il sistema non lo permette: il plugin gira comunque, a priorita' normale.
+      }
+    }
 
     let buffer = "";
     this.#child.stdout?.setEncoding("utf8");

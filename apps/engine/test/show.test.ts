@@ -161,6 +161,19 @@ describe("anteprima e programma", () => {
     });
   });
 
+  it("solo sfondo: resta acceso cambiando slide e si toglie con un secondo comando", async () => {
+    const song = await addText("Canto", ["S1", "S2"]);
+    await ok("cue.goto", { entryId: song.entryId, slideIndex: 0 });
+    expect(state().live.textHidden).toBeUndefined();
+    await ok("live.textHidden", { hidden: true });
+    expect(state().live.textHidden).toBe(true);
+    await ok("cue.next", {});
+    expect(state().live.textHidden).toBe(true);
+    expect(state().live.layers.content.slideIndex).toBe(1);
+    await ok("live.textHidden", { hidden: false });
+    expect(state().live.textHidden).toBeUndefined();
+  });
+
   it("rifiuta slide inesistenti", async () => {
     const song = await addText("Canto", ["S1"]);
     expect(await fails("cue.goto", { entryId: song.entryId, slideIndex: 3 })).toEqual([
