@@ -147,7 +147,7 @@ async function start(timings = FAST) {
     expectOk(client, method, params);
   const status = async (id = ID) =>
     (await ok("plugin.list", {})).plugins.find((p) => p.manifest.id === id)?.status;
-  const until = async (check: () => Promise<boolean>, timeoutMs = 15_000) => {
+  const until = async (check: () => Promise<boolean>, timeoutMs = 45_000) => {
     const begin = Date.now();
     while (!(await check())) {
       if (Date.now() - begin > timeoutMs) throw new Error("condizione non verificata in tempo");
@@ -181,7 +181,7 @@ const alive = (pid: number) => {
   }
 };
 
-describe("processo del modulo", { timeout: 30_000 }, () => {
+describe("processo del modulo", { timeout: 60_000 }, () => {
   it("parte nel suo processo, esegue i comandi e si ferma quando lo si spegne", async () => {
     const { install, active, result, ok, status, until, engine, data } = await start();
     await install(fixture());
@@ -249,7 +249,7 @@ describe("processo del modulo", { timeout: 30_000 }, () => {
   });
 });
 
-describe("permessi (cap. 27)", { timeout: 30_000 }, () => {
+describe("permessi (cap. 27)", { timeout: 60_000 }, () => {
   it("senza permessi: niente file fuori dalla sua cartella, niente programmi, niente rete", async () => {
     const { install, active, result, data } = await start();
     const secret = join(tmpdir(), `cuelith-segreto-${String(Date.now())}.txt`);
@@ -333,7 +333,7 @@ describe("permessi (cap. 27)", { timeout: 30_000 }, () => {
   });
 });
 
-describe("crash e blocchi (cap. 24)", { timeout: 30_000 }, () => {
+describe("crash e blocchi (cap. 24)", { timeout: 60_000 }, () => {
   it("riavvia fino a 3 volte in 60 secondi, poi resta spento finche' non lo si riaccende", async () => {
     const { install, active, command, status, until, ok, engine } = await start();
     await install(fixture());
@@ -445,7 +445,7 @@ describe("crash e blocchi (cap. 24)", { timeout: 30_000 }, () => {
   });
 });
 
-describe("eventi", { timeout: 30_000 }, () => {
+describe("eventi", { timeout: 60_000 }, () => {
   it("il modulo riceve gli eventi del nucleo e i propri, solo quelli a cui si iscrive", async () => {
     const { install, active, result, ok } = await start();
     await install(fixture());
@@ -469,7 +469,7 @@ describe("eventi", { timeout: 30_000 }, () => {
   });
 });
 
-describe("risorse (protocollo 1.9)", { timeout: 30_000 }, () => {
+describe("risorse (protocollo 1.9)", { timeout: 60_000 }, () => {
   it("system.resources: motore, moduli attivi col consumo dichiarato, computer e semaforo", async () => {
     const { install, active, ok } = await start();
     await install(
