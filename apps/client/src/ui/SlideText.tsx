@@ -1,4 +1,5 @@
 import { fontInfo, weightFor, type FullscreenStyle } from "@cuelith-core/core-looks";
+import { segmentsOf, type Span } from "@cuelith/protocol";
 import type { CSSProperties } from "react";
 
 /**
@@ -9,6 +10,7 @@ import type { CSSProperties } from "react";
  */
 export function SlideText({
   text,
+  spans,
   style,
   credits,
   background,
@@ -16,6 +18,8 @@ export function SlideText({
   hideText = false,
 }: {
   text: string;
+  /** Parole formattate del testo (protocollo 1.21): dimensione, grassetto, corsivo, colore. */
+  spans?: readonly Span[] | undefined;
   /** Fattore di adattamento (decisione 0015): 1 = nessuno. */
   fit?: number | undefined;
   /** «Solo sfondo»: lo sfondo resta, il testo e i crediti no. */
@@ -88,7 +92,31 @@ export function SlideText({
           style={{ opacity: style?.background.dim }}
         />
       )}
-      {!hideText && <span className="relative w-full">{text}</span>}
+      {!hideText && (
+        <span className="relative w-full">
+          {style === undefined || spans === undefined || spans.length === 0
+            ? text
+            : segmentsOf(text, spans).map((segment, index) => {
+                const info = fontInfo(style.text.font);
+                const look: CSSProperties = {
+                  ...(segment.size === undefined
+                    ? {}
+                    : { fontSize: `${String(segment.size * 100)}%` }),
+                  ...(segment.bold === true ? { fontWeight: weightFor(info, "bold") } : {}),
+                  // Come sulle uscite: il corsivo solo se il carattere ne ha uno vero.
+                  ...(segment.italic === true && info.italic ? { fontStyle: "italic" } : {}),
+                  ...(segment.color === undefined ? {} : { color: segment.color }),
+                };
+                return Object.keys(look).length === 0 ? (
+                  segment.text
+                ) : (
+                  <span key={index} style={look}>
+                    {segment.text}
+                  </span>
+                );
+              })}
+        </span>
+      )}
       {credits !== undefined && !hideText && (
         <span
           data-testid="credits"

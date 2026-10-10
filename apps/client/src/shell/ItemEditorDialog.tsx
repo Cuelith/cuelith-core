@@ -1,4 +1,5 @@
 import {
+  DEFAULT_ROOM_STYLE,
   FONT_GROUPS,
   FONTS,
   checkStyle,
@@ -11,9 +12,13 @@ import {
   ATTACHMENT_ROLES,
   AUTHOR_ROLES,
   newId,
+  shiftSpans,
+  styleRange,
   type Attachment,
   type Item,
+  type RichText,
   type Slide,
+  type Span,
   type TextOverride,
 } from "@cuelith/protocol";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
@@ -25,19 +30,26 @@ import {
   type CreditsForm,
 } from "../station/credits.js";
 import { useLibraryTags } from "../station/library.js";
-import { joinSlides, roomStyle, splitSlides } from "../station/show.js";
+import { joinSlidesRich, roomStyle, slideSpans, splitSlidesRich } from "../station/show.js";
 import { measure, roomOutputs, useFontsVersion } from "../station/textStyles.js";
 import { useRun, useStation, type EditorRequest } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { FieldLabel, INPUT } from "../ui/Dialogs.js";
 import { SlideText } from "../ui/SlideText.js";
+import { FormatBar } from "./FormatBar.js";
 
-const textField = (value: string) => ({ kind: "text" as const, value });
+const textField = (value: string, spans?: readonly Span[]) => ({
+  kind: "text" as const,
+  value,
+  ...(spans === undefined || spans.length === 0 ? {} : { spans: [...spans] }),
+});
 type Tab = "text" | "style" | "credits" | "extra";
 
 interface Draft {
   readonly title: string;
   readonly text: string;
+  /** Parole formattate del testo intero (protocollo 1.21), nelle stesse posizioni di `text`. */
+  readonly spans: readonly Span[];
   readonly credits: CreditsForm;
   /** Stile del testo di questo elemento (decisione 0015): solo cio' che l'utente ha toccato. */
   readonly textStyle: TextOverride | undefined;
@@ -46,9 +58,11 @@ interface Draft {
 }
 
 function draftOf(item: Item | undefined): Draft {
+  const rich = item === undefined ? undefined : joinSlidesRich(item.slides);
   return {
     title: item?.title ?? "",
-    text: item === undefined ? "" : joinSlides(item.slides),
+    text: rich?.text ?? "",
+    spans: rich?.spans ?? [],
     credits: creditsToForm(item?.credits),
     textStyle: item?.textStyle,
     tags: item?.tags ?? [],
@@ -60,12 +74,13 @@ function draftOf(item: Item | undefined): Draft {
  * Slide del testo scritto, riusando id e altri campi (accordi, note) delle
  * slide esistenti nella stessa posizione.
  */
-function slidesFrom(texts: readonly string[], existing: readonly Slide[]): Slide[] {
-  return texts.map((value, index) => {
+function slidesFrom(texts: readonly RichText[], existing: readonly Slide[]): Slide[] {
+  return texts.map((rich, index) => {
     const current = existing[index];
+    const field = textField(rich.text, rich.spans);
     return current === undefined
-      ? { id: newId(), fields: { text: textField(value) } }
-      : { ...current, fields: { ...current.fields, text: textField(value) } };
+      ? { id: newId(), fields: { text: field } }
+      : { ...current, fields: { ...current.fields, text: field } };
   });
 }
 
@@ -92,6 +107,9 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(showItem));
   const [tab, setTab] = useState<Tab>("text");
   const [saving, setSaving] = useState(false);
+  const area = useRef<HTMLTextAreaElement>(null);
+  const areaId = useId();
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
 
   useEffect(() => {
     const element = dialog.current;
@@ -116,7 +134,8 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
     };
   }, [connection, request]);
 
-  const slides = splitSlides(draft.text);
+  const parts = splitSlidesRich(draft.text, draft.spans);
+  const slides = parts.map((part) => part.text);
   // Con uno stile globale attivo il testo scritto deve ancora entrare nelle uscite: lo si dice mentre si scrive.
   const room = state === undefined ? undefined : roomStyle(state);
   const fitProblem = (() => {
@@ -125,7 +144,7 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
     const boxes = roomOutputs(state);
     const credits = draft.credits.show !== "none";
     const reserve = Math.max(...boxes.map((box) => creditsReserve(box.height, credits)));
-    const result = checkStyle(slides, active.text, boxes, measure(), reserve);
+    const result = checkStyle(parts, active.text, boxes, measure(), reserve);
     const first = result.failures[0];
     return result.ok || first === undefined
       ? undefined
@@ -156,7 +175,7 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
       const created = await run("item.create", {
         type: "core.text",
         title,
-        slides: slides.map((value) => ({ fields: { text: textField(value) } })),
+        slides: parts.map((part) => ({ fields: { text: textField(part.text, part.spans) } })),
         ...(credits === undefined ? {} : { credits }),
         ...(tags.length === 0 ? {} : { tags }),
         ...(attachments.length === 0 ? {} : { attachments }),
@@ -185,7 +204,7 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
         id: base?.id ?? newId(),
         type: base?.type ?? "core.text",
         title,
-        slides: slidesFrom(slides, base?.slides ?? []),
+        slides: slidesFrom(parts, base?.slides ?? []),
         meta: base?.meta ?? {},
         ...(credits === undefined ? {} : { credits }),
         ...(draft.textStyle === undefined ? {} : { textStyle: draft.textStyle }),
@@ -226,14 +245,20 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
         attachments: patch.attachments,
       })) !== undefined;
     for (let i = 0; ok && i < slides.length; i++) {
-      const value = slides[i] ?? "";
+      const part = parts[i] ?? { text: "" };
+      const value = part.text;
       const current = item.slides[i];
       if (current === undefined) {
         ok =
-          (await run("slide.insert", { itemId, slide: { fields: { text: textField(value) } } })) !==
-          undefined;
-      } else if (current.fields["text"]?.value !== value) {
-        const fields = { ...current.fields, text: textField(value) };
+          (await run("slide.insert", {
+            itemId,
+            slide: { fields: { text: textField(value, part.spans) } },
+          })) !== undefined;
+      } else if (
+        current.fields["text"]?.value !== value ||
+        JSON.stringify(slideSpans(current) ?? []) !== JSON.stringify(part.spans ?? [])
+      ) {
+        const fields = { ...current.fields, text: textField(value, part.spans) };
         ok = (await run("slide.update", { itemId, slideId: current.id, fields })) !== undefined;
       }
     }
@@ -321,12 +346,64 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
                 />
               </label>
               {tab === "text" && (
-                <label className="flex flex-col gap-1.5">
-                  <FieldLabel>{t("core.editor.textLabel")}</FieldLabel>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor={areaId}>
+                    <FieldLabel>{t("core.editor.textLabel")}</FieldLabel>
+                  </label>
+                  <FormatBar
+                    area={area}
+                    text={draft.text}
+                    spans={draft.spans}
+                    selection={selection}
+                    font={
+                      effectiveTextStyle(
+                        room?.text ?? DEFAULT_ROOM_STYLE.text,
+                        room?.globalText?.text,
+                        draft.textStyle,
+                      ).font
+                    }
+                    onChange={(spans) => {
+                      set({ spans });
+                    }}
+                  />
                   <textarea
+                    id={areaId}
+                    ref={area}
                     value={draft.text}
                     onChange={(event) => {
-                      set({ text: event.target.value });
+                      // La formattazione segue le parole mentre si scrive.
+                      set({
+                        text: event.target.value,
+                        spans: shiftSpans(draft.text, event.target.value, draft.spans),
+                      });
+                    }}
+                    onSelect={(event) => {
+                      const box = event.currentTarget;
+                      if (
+                        box.selectionStart !== selection.start ||
+                        box.selectionEnd !== selection.end
+                      ) {
+                        setSelection({ start: box.selectionStart, end: box.selectionEnd });
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (!event.ctrlKey && !event.metaKey) return;
+                      const key = event.key.toLowerCase();
+                      if (key !== "b" && key !== "i") return;
+                      event.preventDefault();
+                      const box = event.currentTarget;
+                      if (box.selectionEnd <= box.selectionStart) return;
+                      set({
+                        spans: styleRange(
+                          draft.text,
+                          draft.spans,
+                          box.selectionStart,
+                          box.selectionEnd,
+                          {
+                            [key === "b" ? "bold" : "italic"]: "toggle",
+                          },
+                        ),
+                      });
                     }}
                     rows={12}
                     className={`${INPUT} resize-y font-display text-base leading-snug`}
@@ -340,13 +417,41 @@ export function ItemEditorDialog({ request }: { request: EditorRequest }) {
                       })}
                     </span>
                   )}
+                  {room !== undefined && parts.some((part) => (part.spans?.length ?? 0) > 0) && (
+                    <span className="flex flex-col gap-1.5">
+                      <FieldLabel>{t("core.editor.format.preview")}</FieldLabel>
+                      <span className="flex gap-2 overflow-x-auto pb-1">
+                        {parts.map((part, index) => (
+                          <span
+                            // Le slide non hanno un nome: l'ordine e' la loro identita' mentre si scrive.
+                            key={index}
+                            className="relative aspect-video w-44 flex-none overflow-hidden rounded-md border border-line bg-screen"
+                            style={{ containerType: "size" }}
+                          >
+                            <SlideText
+                              text={part.text}
+                              spans={part.spans}
+                              style={{
+                                ...room,
+                                text: effectiveTextStyle(
+                                  room.text,
+                                  room.globalText?.text,
+                                  draft.textStyle,
+                                ),
+                              }}
+                            />
+                          </span>
+                        ))}
+                      </span>
+                    </span>
+                  )}
                   <span className="flex justify-between gap-3 text-xs text-faint">
                     <span>{t("core.editor.textHint")}</span>
                     <span className="shrink-0 font-mono" data-testid="slide-count">
                       {t("core.editor.slideCount", { count: slides.length })}
                     </span>
                   </span>
-                </label>
+                </div>
               )}
               {tab === "style" && (
                 <TextStyleEditor

@@ -6,6 +6,7 @@ import {
   previewSlide,
   programSlide,
   roomStyleFor,
+  slideSpans,
   slideText,
   type ShownSlide,
 } from "../station/show.js";
@@ -74,6 +75,7 @@ export function ProgramPanel() {
         ) : (
           <SlideText
             text={slideText(shown.slide)}
+            spans={slideSpans(shown.slide)}
             style={style}
             fit={fit}
             hideText={bare}
@@ -171,6 +173,7 @@ export function PreviewPanel() {
     ) : (
       <SlideText
         text={slideText(slide.slide)}
+        spans={slideSpans(slide.slide)}
         style={style}
         fit={fit}
         credits={slide.credits}

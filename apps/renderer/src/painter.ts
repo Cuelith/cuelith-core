@@ -6,11 +6,14 @@ import {
   creditsReserve,
   cssFont,
   fontInfo,
+  isRich,
+  layoutRich,
+  linesHeight,
   renderScale,
   weightFor,
   type MeasureText,
 } from "@cuelith-core/core-looks";
-import { formatTimer, timerPhase, timerRemaining } from "@cuelith/protocol";
+import { formatTimer, timerPhase, timerRemaining, type RichText } from "@cuelith/protocol";
 import type { Frame, OutputView } from "./frame.js";
 
 /** Misura del testo con i caratteri veri, su un canvas che non si vede (creato alla prima richiesta). */
@@ -126,18 +129,31 @@ export class Painter {
       this.#prepare(view, ticket);
       return;
     }
-    const font = cssFont(view.frame.style, 48);
-    if (this.#fonts.has(font)) {
+    // Anche i pezzi in grassetto o corsivo (parole formattate) hanno il loro carattere da caricare.
+    const style = view.frame.style;
+    const spans = view.frame.kind === "fullscreen" ? (view.frame.spans ?? []) : [];
+    const wanted = new Set([cssFont(style, 48)]);
+    for (const span of spans) {
+      wanted.add(
+        cssFont(
+          {
+            ...style,
+            weight: span.bold === true ? "bold" : style.weight,
+            italic: span.italic ?? style.italic,
+          },
+          48,
+        ),
+      );
+    }
+    const missing = [...wanted].filter((font) => !this.#fonts.has(font));
+    if (missing.length === 0) {
       this.#prepare(view, ticket);
       return;
     }
-    void document.fonts
-      .load(font)
-      .catch(() => [])
-      .then(() => {
-        this.#fonts.add(font);
-        if (ticket === this.#ticket) this.#prepare(view, ticket);
-      });
+    void Promise.all(missing.map((font) => document.fonts.load(font).catch(() => []))).then(() => {
+      for (const font of missing) this.#fonts.add(font);
+      if (ticket === this.#ticket) this.#prepare(view, ticket);
+    });
   }
 
   #prepare(view: OutputView, ticket: number): void {
@@ -273,6 +289,92 @@ export class Painter {
     this.onDrawn?.();
   }
 
+  /**
+   * Testo con parole formattate: si dispone con le stesse regole del controllo dello spazio
+   * (`layoutRich`) e si disegna riga per riga su una tela, a pezzi con il loro stile. Una sola
+   * immagine per slide: niente da ricalcolare a ogni fotogramma.
+   */
+  #richText(
+    rich: RichText,
+    frame: Extract<Frame, { kind: "fullscreen" }>,
+    d: { w: number; h: number; margin: number; size: number; scale: number; fit: number },
+  ): Sprite {
+    const { w, h, margin, size, scale, fit } = d;
+    const style = frame.style;
+    const lines = layoutRich(rich, style, size, w - 2 * margin, measure());
+    const block = linesHeight(lines);
+    const ratio = this.#app.renderer.resolution;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(w * ratio));
+    canvas.height = Math.max(1, Math.round(h * ratio));
+    const context = canvas.getContext("2d");
+    const sprite = new Sprite(Texture.from(canvas));
+    // Distruggere lo sprite distrugge anche la sua tela: e' solo sua.
+    sprite.destroy = (options): void => {
+      Sprite.prototype.destroy.call(sprite, {
+        ...(typeof options === "object" ? options : {}),
+        texture: true,
+        textureSource: true,
+      });
+    };
+    if (context === null) return sprite;
+    context.scale(ratio, ratio);
+    context.textBaseline = "alphabetic";
+    context.lineJoin = "round";
+    const band = creditsReserve(h, frame.credits !== undefined) / 2;
+    const top =
+      style.vAlign === "top"
+        ? margin
+        : style.vAlign === "bottom"
+          ? h - margin - band - block
+          : (h - block) / 2;
+    const outline =
+      style.outline === undefined || style.outline.width === 0 ? undefined : style.outline;
+    const shadow = style.shadow;
+    let y = top;
+    for (const line of lines) {
+      const x0 =
+        style.align === "left"
+          ? margin
+          : style.align === "right"
+            ? w - margin - line.width
+            : (w - line.width) / 2;
+      // La linea di base: dentro l'altezza di riga, centrata sull'altezza del carattere piu' grande.
+      context.font = cssFont({ ...style, weight: line.runs[0]?.face.weight }, line.px);
+      const metrics = context.measureText("Hg");
+      const ascent = metrics.fontBoundingBoxAscent;
+      const baseline = y + (line.height - (ascent + metrics.fontBoundingBoxDescent)) / 2 + ascent;
+      let x = x0;
+      for (const run of line.runs) {
+        context.font = cssFont(run.face, run.px);
+        context.letterSpacing = `${String((run.face.letterSpacing ?? 0) * run.px)}px`;
+        const spill = (on: boolean): void => {
+          context.shadowColor = on && shadow !== undefined ? shadow.color : "transparent";
+          context.shadowBlur = on && shadow !== undefined ? shadow.blur * scale * fit : 0;
+          context.shadowOffsetY = on && shadow !== undefined ? shadow.offset * scale * fit : 0;
+        };
+        if (outline !== undefined) {
+          spill(true);
+          context.lineWidth = outline.width * scale * fit;
+          context.strokeStyle = outline.color;
+          context.strokeText(run.text, x, baseline);
+          spill(false);
+        } else {
+          spill(shadow !== undefined);
+        }
+        context.fillStyle = run.color ?? style.color;
+        context.fillText(run.text, x, baseline);
+        spill(false);
+        x += run.width;
+      }
+      y += line.height;
+    }
+    sprite.texture.source.update();
+    sprite.width = w;
+    sprite.height = h;
+    return sprite;
+  }
+
   #render(frame: Frame): Container {
     const { width: w, height: h } = this.#app.screen;
     const layer = new Container();
@@ -311,11 +413,20 @@ export class Painter {
     const scale = h / 1080;
     const margin = frame.style.margin * Math.min(w, h);
     // Adattamento: se lo stile lo prevede e una slide non entra, tutto l'elemento si rimpicciolisce uguale.
+    // Il testo in onda, con le sue parole formattate se ne ha (solo sulle uscite a tutto schermo).
+    const shownRich: RichText | undefined =
+      frame.text === undefined
+        ? undefined
+        : frame.kind === "fullscreen" && frame.spans !== undefined
+          ? { text: frame.text, spans: frame.spans }
+          : { text: frame.text };
     const fit =
-      frame.style.fit === undefined || frame.text === undefined
+      frame.style.fit === undefined || shownRich === undefined
         ? 1
         : renderScale(
-            frame.fitTexts.includes(frame.text) ? frame.fitTexts : [...frame.fitTexts, frame.text],
+            frame.fitTexts.some((other) => other.text === shownRich.text)
+              ? frame.fitTexts
+              : [...frame.fitTexts, shownRich],
             frame.style,
             { width: w, height: h },
             measure(),
@@ -331,6 +442,7 @@ export class Painter {
       letterSpacing: frame.style.letterSpacing ?? 0,
       vAlign: frame.style.vAlign ?? "middle",
       font: frame.style.font,
+      rich: shownRich !== undefined && isRich(shownRich),
       uppercase: frame.style.uppercase === true,
       color: frame.style.color,
       outline: frame.style.outline?.width ?? 0,
@@ -375,7 +487,9 @@ export class Painter {
       frame.style.uppercase === true ? value.toUpperCase() : value;
 
     if (frame.kind === "fullscreen") {
-      if (frame.text !== undefined) {
+      if (shownRich !== undefined && isRich(shownRich)) {
+        layer.addChild(this.#richText(shownRich, frame, { w, h, margin, size, scale, fit }));
+      } else if (frame.text !== undefined) {
         const text = new Text({
           text: shown(frame.text),
           style: textStyle(size, frame.style.color, w - 2 * margin),

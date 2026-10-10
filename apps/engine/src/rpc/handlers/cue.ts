@@ -1,4 +1,11 @@
-import { ErrorCode, RpcError, timerRemaining, type StateDocument } from "@cuelith/protocol";
+import {
+  ErrorCode,
+  RpcError,
+  cleanSpans,
+  styleRange,
+  timerRemaining,
+  type StateDocument,
+} from "@cuelith/protocol";
 import {
   goLive,
   previewPosition,
@@ -92,6 +99,62 @@ export const cueHandlers: HandlerMap = {
     rev: ctx.store.update((draft) => {
       if (params.hidden) draft.live.textHidden = true;
       else delete draft.live.textHidden;
+    }),
+  }),
+
+  // ---- Parole formattate in un testo in modifica (protocollo 1.22, decisione 0022) ----
+  // L'editor di un plugin descrive il testo e il tratto selezionato; il plugin annesso della
+  // formattazione chiede le modifiche; lo stato le porta a chi scrive. Niente di tutto questo
+  // entra nello show: e' solo la conversazione tra i due.
+  "richtext.session": (ctx, _session, params) => ({
+    rev: ctx.store.update((draft) => {
+      const length = params.text.length;
+      const previous = draft.live.richText;
+      const same = previous?.owner === params.owner && previous.field === params.field;
+      const spans = cleanSpans(params.text, params.spans);
+      draft.live.richText = {
+        owner: params.owner,
+        field: params.field,
+        text: params.text,
+        ...(spans.length === 0 ? {} : { spans }),
+        selection: {
+          start: Math.min(params.selection.start, length),
+          end: Math.min(params.selection.end, length),
+        },
+        ...(params.font === undefined ? {} : { font: params.font }),
+        applied: same ? previous.applied : 0,
+      };
+    }),
+  }),
+  "richtext.end": (ctx, _session, params) => ({
+    rev: ctx.store.update((draft) => {
+      const current = draft.live.richText;
+      // Solo chi ha aperto la sessione la chiude: un altro editor non toglie il testo a questo.
+      if (current?.owner === params.owner && current.field === params.field) {
+        delete draft.live.richText;
+      }
+    }),
+  }),
+  "richtext.apply": (ctx, _session, params) => ({
+    rev: ctx.store.update((draft) => {
+      const current = draft.live.richText;
+      if (current === undefined) {
+        throw new RpcError(ErrorCode.NotFound, "core.error.richTextNoSession");
+      }
+      const { start, end } = current.selection;
+      if (end <= start) {
+        throw new RpcError(ErrorCode.InvalidParameters, "core.error.richTextNoSelection");
+      }
+      const change = params.change;
+      const spans = styleRange(current.text, current.spans, start, end, {
+        ...(change.size === undefined ? {} : { size: change.size }),
+        ...(change.bold === undefined ? {} : { bold: change.bold }),
+        ...(change.italic === undefined ? {} : { italic: change.italic }),
+        ...(change.color === undefined ? {} : { color: change.color }),
+      });
+      if (spans.length === 0) delete current.spans;
+      else current.spans = spans;
+      current.applied += 1;
     }),
   }),
 

@@ -181,11 +181,34 @@ describe("describeOutput", () => {
 
   it("porta i testi di tutte le slide dell'elemento per l'adattamento, senza quelle vuote", () => {
     const { doc, room } = makeDoc();
-    expect(describeOutput(doc, room)?.frame).toMatchObject({ fitTexts: ["Prima", "Seconda"] });
+    const both = [{ text: "Prima" }, { text: "Seconda" }];
+    expect(describeOutput(doc, room)?.frame).toMatchObject({ fitTexts: both });
     const item = Object.values(doc.show.items)[0];
     if (item === undefined) throw new Error("stato mancante");
     item.slides.push({ id: newId(), fields: { text: { kind: "text", value: "" } } });
-    expect(describeOutput(doc, room)?.frame).toMatchObject({ fitTexts: ["Prima", "Seconda"] });
+    expect(describeOutput(doc, room)?.frame).toMatchObject({ fitTexts: both });
+  });
+
+  it("le parole formattate arrivano all'uscita a tutto schermo, il testo semplice resta lo stesso", () => {
+    const { doc, room, stage } = makeDoc();
+    const item = Object.values(doc.show.items)[0];
+    if (item === undefined) throw new Error("stato mancante");
+    const spans = [{ start: 0, end: 5, size: 2, bold: true }];
+    item.slides[0] = {
+      ...(item.slides[0] as (typeof item.slides)[number]),
+      fields: { text: { kind: "text", value: "Prima", spans } },
+    };
+    const frame = describeOutput(doc, room)?.frame;
+    expect(frame).toMatchObject({ kind: "fullscreen", text: "Prima", spans });
+    expect(frame).toMatchObject({ fitTexts: [{ text: "Prima", spans }, { text: "Seconda" }] });
+    // Il palco mostra solo il testo, senza formattazione.
+    const palco = describeOutput(doc, stage)?.frame;
+    expect(palco).toMatchObject({ kind: "stage", text: "Prima" });
+    expect(palco).not.toHaveProperty("spans");
+    // Un testo senza formattazione non porta intervalli.
+    const fresh = makeDoc();
+    const bare = describeOutput(fresh.doc, fresh.room)?.frame;
+    expect(bare).toMatchObject({ kind: "fullscreen", spans: undefined });
   });
 
   it("il messaggio compare solo sui look che hanno il layer dei messaggi", () => {

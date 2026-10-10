@@ -7,6 +7,7 @@ import {
   type FullscreenStyle,
   type TextStyle,
 } from "@cuelith-core/core-looks";
+import type { Span } from "@cuelith/protocol";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../engine/react.js";
 import { useFontsVersion } from "../station/textStyles.js";
@@ -154,6 +155,7 @@ export function StyleEditor({
   armed,
   note,
   sample,
+  sampleSpans,
   fromSlide,
   baseStyle,
   onSave,
@@ -164,6 +166,7 @@ export function StyleEditor({
   armed: boolean;
   note: string | undefined;
   sample: string;
+  sampleSpans?: readonly Span[] | undefined;
   /** Il testo viene dalla slide in anteprima (altrimenti e' il testo di prova). */
   fromSlide: boolean;
   baseStyle: FullscreenStyle;
@@ -548,7 +551,7 @@ export function StyleEditor({
             className="relative aspect-video w-full overflow-hidden rounded-md border border-line bg-screen"
             style={{ containerType: "size" }}
           >
-            <SlideText text={sample} style={{ ...baseStyle, text }} />
+            <SlideText text={sample} spans={sampleSpans} style={{ ...baseStyle, text }} />
           </div>
           <p className="text-xs text-faint">
             {fromSlide

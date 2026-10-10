@@ -1,4 +1,5 @@
 import { fontInfo, weightFor } from "./fonts.js";
+import { isRich, layoutRich, linesHeight, richOf, type TextInput } from "./rich.js";
 import type { TextOverride, TextStyle } from "./styles.js";
 
 // Stile effettivo del testo e controllo dello spazio (decisione 0015). Codice puro,
@@ -106,7 +107,7 @@ export interface FitResult {
 
 /** Il testo entra nello spazio dell'uscita, con la dimensione dello stile moltiplicata per `scale`? */
 export function textFits(
-  text: string,
+  input: TextInput,
   style: TextStyle,
   box: OutputBox,
   measure: MeasureText,
@@ -116,6 +117,21 @@ export function textFits(
   const reserve = options.reserveBottomPx ?? 0;
   const px = style.size * scale * (box.height / REFERENCE_HEIGHT);
   const area = usableArea(style, box, reserve);
+  if (isRich(input)) {
+    // Parole formattate: si dispone come fanno le uscite e si misura il risultato.
+    const lines = layoutRich(
+      input,
+      style,
+      px,
+      style.fit === undefined ? area.width : undefined,
+      measure,
+    );
+    const widest = Math.max(0, ...lines.map((line) => line.width));
+    const tooWide = style.fit !== undefined && widest > area.width * WIDTH_SAFETY;
+    const total = linesHeight(lines);
+    return { fits: !tooWide && total <= area.height, lines: lines.length, height: total };
+  }
+  const text = richOf(input).text;
   const lines =
     style.fit === undefined
       ? wrapLines(text, area.width, px, style, measure)
@@ -134,7 +150,7 @@ export function textFits(
  * (non sotto il minimo) con cui entrano tutte; altrimenti nessuna (undefined).
  */
 export function fitScale(
-  texts: readonly string[],
+  texts: readonly TextInput[],
   style: TextStyle,
   box: OutputBox,
   measure: MeasureText,
@@ -165,7 +181,7 @@ const HARD_FLOOR = 0.1;
  * Senza adattamento vale sempre 1.
  */
 export function renderScale(
-  texts: readonly string[],
+  texts: readonly TextInput[],
   style: TextStyle,
   box: OutputBox,
   measure: MeasureText,
@@ -200,7 +216,7 @@ export interface StyleCheck {
  * basta una uscita su cui una slide non entra (neppure al minimo) perche' non vada bene.
  */
 export function checkStyle(
-  texts: readonly string[],
+  texts: readonly TextInput[],
   style: TextStyle,
   boxes: readonly OutputBox[],
   measure: MeasureText,

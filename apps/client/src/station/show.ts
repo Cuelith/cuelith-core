@@ -7,9 +7,13 @@ import {
 import {
   cursorItem,
   itemById,
+  joinRich,
   slideSequence,
+  sliceRich,
   type Item,
+  type RichText,
   type Slide,
+  type Span,
   type StateDocument,
 } from "@cuelith/protocol";
 
@@ -98,3 +102,43 @@ export function splitSlides(text: string): string[] {
 }
 
 export const joinSlides = (slides: readonly Slide[]): string => slides.map(slideText).join("\n\n");
+
+/** Le parole formattate di una slide (protocollo 1.21); niente se non ne ha. */
+export function slideSpans(slide: Slide): readonly Span[] | undefined {
+  const field = slide.fields["text"];
+  return field?.kind === "text" && field.spans !== undefined && field.spans.length > 0
+    ? field.spans
+    : undefined;
+}
+
+/** Il testo di una slide con le sue parole formattate. */
+export function slideRich(slide: Slide): RichText {
+  const spans = slideSpans(slide);
+  return spans === undefined ? { text: slideText(slide) } : { text: slideText(slide), spans };
+}
+
+/**
+ * Come `splitSlides`, ma ogni slide porta le sue parole formattate (ritagliate e spostate).
+ * Le slide che escono sono esattamente le stesse di `splitSlides`.
+ */
+export function splitSlidesRich(text: string, spans: readonly Span[] | undefined): RichText[] {
+  const parts: RichText[] = [];
+  const push = (from: number, to: number): void => {
+    let start = from;
+    let end = to;
+    while (start < end && /\s/.test(text.charAt(start))) start += 1;
+    while (end > start && /\s/.test(text.charAt(end - 1))) end -= 1;
+    if (end > start) parts.push(sliceRich(text, spans, start, end));
+  };
+  let from = 0;
+  for (const match of text.matchAll(/\n[ \t]*\n/g)) {
+    push(from, match.index);
+    from = match.index + match[0].length;
+  }
+  push(from, text.length);
+  return parts;
+}
+
+/** Le slide di un elemento come un solo testo (una riga vuota tra l'una e l'altra), con le parole formattate. */
+export const joinSlidesRich = (slides: readonly Slide[]): RichText =>
+  joinRich(slides.map(slideRich), "\n\n");

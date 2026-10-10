@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useConnection, useEngine, useT } from "../engine/react.js";
 import { useLibraries } from "../station/library.js";
 import { directItemId } from "../station/direct.js";
-import { itemOfEntry, roomStyleFor, slideText } from "../station/show.js";
+import { itemOfEntry, roomStyleFor, slideSpans, slideText } from "../station/show.js";
 import { itemFit } from "../station/textStyles.js";
 import { useEditItem } from "../station/editItem.js";
 import { useRun, useStation } from "../station/station.js";
@@ -205,6 +205,7 @@ export function SlidesPanel() {
                   <span className="absolute inset-0" style={{ containerType: "size" }}>
                     <SlideText
                       text={slideText(slide)}
+                      spans={slideSpans(slide)}
                       style={style}
                       fit={fit}
                       background={backgroundUrl(style, item, slide)}

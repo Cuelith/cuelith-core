@@ -2,7 +2,7 @@ import { effectiveTextStyle, type TextStyle } from "@cuelith-core/core-looks";
 import { useEffect, useState } from "react";
 import { useEngine, useT } from "../engine/react.js";
 import { roomLook } from "../station/backgrounds.js";
-import { itemOfEntry, previewSlide, slideText } from "../station/show.js";
+import { itemOfEntry, previewSlide, slideSpans, slideText } from "../station/show.js";
 import { useRun, useStation } from "../station/station.js";
 import {
   judgeStyle,
@@ -48,6 +48,7 @@ export function TextStylesPanel() {
   const shownValue = shownText === undefined ? "" : slideText(shownText);
   const fromSlide = shownValue.trim() !== "";
   const sample = fromSlide ? shownValue : t("core.textstyles.sample");
+  const sampleSpans = fromSlide && shownText !== undefined ? slideSpans(shownText) : undefined;
 
   const setActive = (style: SavedStyle | undefined) => {
     const { globalText: _removed, ...rest } = room.style;
@@ -248,6 +249,7 @@ export function TextStylesPanel() {
               armed={armed}
               note={note}
               sample={sample}
+              sampleSpans={sampleSpans}
               fromSlide={fromSlide}
               baseStyle={room.style}
               onSave={(patch) => {

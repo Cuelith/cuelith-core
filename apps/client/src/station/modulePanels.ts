@@ -11,7 +11,8 @@ export interface ModulePanel {
   readonly panelId: string;
   /** Chiave di traduzione del titolo (del modulo). */
   readonly title: string;
-  readonly placement: "side" | "center";
+  /** "editor" (protocollo 1.23): barra di strumenti in cima alla finestra degli editor. */
+  readonly placement: "side" | "center" | "editor";
   /** Pagina del pannello servita dal motore (area isolata dei moduli). */
   readonly src: string;
   /** Icona del modulo (SVG del pacchetto), se la dichiara. */

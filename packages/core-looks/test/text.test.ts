@@ -1,6 +1,7 @@
-import { TEXT_FONT_IDS } from "@cuelith/protocol";
+import { TEXT_FONT_IDS, TEXT_FONTS_WITH_ITALIC } from "@cuelith/protocol";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ROOM_STYLE } from "../src/defaults.js";
+import { isRich, layoutRich } from "../src/rich.js";
 import { FONTS, fontInfo, weightFor, weightsOffered } from "../src/fonts.js";
 import {
   FullscreenStyleSchema,
@@ -208,7 +209,7 @@ describe("righe intere (adattamento acceso)", () => {
   const slide = `Tu mi hai chiamato e sono corso da Te\n${verse}`;
 
   it("con l'adattamento le righe del testo non vanno mai a capo da sole", () => {
-    const style = { ...base, size: 150, fit: { min: 0.3 } };
+    const style = { ...base, size: 150, fit: { min: 0.1 } };
     const result = textFits(slide, style, wide, measure);
     expect(result.lines).toBe(2);
   });
@@ -219,7 +220,7 @@ describe("righe intere (adattamento acceso)", () => {
   });
 
   it("la scala fa entrare la riga piu' lunga in una riga sola", () => {
-    const style = { ...base, size: 150, fit: { min: 0.3 } };
+    const style = { ...base, size: 150, fit: { min: 0.1 } };
     const scale = fitScale([slide], style, wide, measure) ?? 0;
     expect(scale).toBeLessThan(1);
     expect(textFits(slide, style, wide, measure, { scale }).lines).toBe(2);
@@ -251,7 +252,7 @@ describe("controllo su tutte le uscite", () => {
   });
 
   it("vale il caso peggiore: la uscita stretta decide", () => {
-    const style = { ...base, size: 80, fit: { min: 0.3 } };
+    const style = { ...base, size: 80, fit: { min: 0.1 } };
     const result = checkStyle(texts, style, [wide, portrait], measure);
     expect(result.ok).toBe(true);
     expect(result.scale).toBeLessThan(1);
@@ -301,6 +302,12 @@ describe("caratteri, spessori e spaziatura", () => {
     ]);
     expect(weightFor(fontInfo("bebas-neue"), "black")).toBe(400);
     expect(weightFor(fontInfo("lora"), "black")).toBe(700);
+  });
+
+  it("l'elenco dei corsivi del protocollo dice la stessa cosa dell'elenco dei caratteri", () => {
+    expect(new Set(FONTS.filter((font) => font.italic).map((font) => font.id))).toEqual(
+      new Set(TEXT_FONTS_WITH_ITALIC),
+    );
   });
 
   it("i tre caratteri di sempre ci sono ancora, e un id sconosciuto non rompe nulla", () => {
@@ -355,5 +362,95 @@ describe("modifiche dell'editor con i caratteri nuovi", () => {
   it("si somma allo stile della sala senza perdere il resto", () => {
     const effective = effectiveTextStyle(base, undefined, { font: "inter", italic: true });
     expect(effective).toMatchObject({ font: "inter", italic: true, size: base.size });
+  });
+});
+
+describe("testo con parole formattate", () => {
+  // Misura finta: 0,5 volte la dimensione per carattere; il grassetto pesa di piu'.
+  const rich = (
+    text: string,
+    spans?: { start: number; end: number; size?: number; bold?: boolean }[],
+  ) => ({
+    text,
+    spans,
+  });
+
+  it("senza formattazione dice esattamente quello che diceva prima", () => {
+    const plain = textFits("uno due tre quattro cinque", base, wide, measure);
+    const same = textFits(rich("uno due tre quattro cinque"), base, wide, measure);
+    expect(same).toEqual(plain);
+    expect(isRich(rich("a", [{ start: 0, end: 1, size: 1 }]))).toBe(false);
+  });
+
+  it("una parola piu' grande allarga la riga e la alza", () => {
+    const style: TextStyle = { ...base, size: 100, margin: 0 };
+    const small = layoutRich(rich("uno due tre"), style, 100, 10_000, measure);
+    const big = layoutRich(
+      rich("uno due tre", [{ start: 4, end: 7, size: 2 }]),
+      style,
+      100,
+      10_000,
+      measure,
+    );
+    expect(small).toHaveLength(1);
+    expect(big).toHaveLength(1);
+    expect(big[0]?.width).toBeGreaterThan(small[0]?.width ?? 0);
+    expect(big[0]?.height).toBeCloseTo(200 * 1.25);
+    expect(small[0]?.height).toBeCloseTo(100 * 1.25);
+    expect(big[0]?.runs.map((run) => run.text)).toEqual(["uno ", "due", " tre"]);
+  });
+
+  it("va a capo agli spazi, con lo stesso risultato anche con parole formattate", () => {
+    const style: TextStyle = { ...base, size: 20, margin: 0 };
+    // 10 px a carattere, 97 utili: 9 caratteri per riga.
+    const lines = layoutRich(
+      rich("uno due tre quattro cinque", [{ start: 0, end: 3, bold: true }]),
+      style,
+      20,
+      100,
+      measure,
+    );
+    expect(lines.map((line) => line.runs.map((run) => run.text).join(""))).toEqual([
+      "uno due",
+      "tre",
+      "quattro",
+      "cinque",
+    ]);
+  });
+
+  it("una parola fatta di pezzi con stili diversi resta una parola sola", () => {
+    const style: TextStyle = { ...base, size: 20, margin: 0 };
+    const lines = layoutRich(
+      rich("aaaa bbbbcccc", [{ start: 8, end: 13, bold: true }]),
+      style,
+      20,
+      100,
+      measure,
+    );
+    // "bbbbcccc" (8 lettere) entra in una riga da 9: non si spezza tra "bbbb" e "cccc".
+    expect(lines.map((line) => line.runs.map((run) => run.text).join(""))).toEqual([
+      "aaaa",
+      "bbbbcccc",
+    ]);
+  });
+
+  it("senza adattamento una parola molto grande puo' non entrare; con l'adattamento si rimpicciolisce", () => {
+    const style: TextStyle = { ...base, size: 80, margin: 0.05 };
+    const text = rich("Gloria a Dio nell'alto dei cieli", [{ start: 0, end: 6, size: 3 }]);
+    const plainFits = textFits("Gloria a Dio nell'alto dei cieli", style, old43, measure).fits;
+    expect(plainFits).toBe(true);
+    const big = textFits(text, { ...style, size: 200 }, old43, measure);
+    expect(big.fits).toBe(false);
+    const withFit = { ...style, size: 200, fit: { min: 0.1 } };
+    expect(fitScale([text], withFit, old43, measure)).toBeLessThan(1);
+    expect(renderScale([text], withFit, old43, measure)).toBeGreaterThan(0);
+  });
+
+  it("le righe non si spezzano con l'adattamento: la parola grande conta nella larghezza", () => {
+    const style: TextStyle = { ...base, size: 80, margin: 0, fit: { min: 1 } };
+    const line = "uno due tre quattro";
+    expect(textFits(line, style, old43, measure).fits).toBe(true);
+    const grown = rich(line, [{ start: 0, end: line.length, size: 3 }]);
+    expect(textFits(grown, style, old43, measure).fits).toBe(false);
   });
 });

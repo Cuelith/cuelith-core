@@ -17,13 +17,14 @@ import {
   cursorItem,
   itemById,
   slideSequence,
+  type RichText,
   type Item,
   type StateDocument,
   type TextStyleRecord,
 } from "@cuelith/protocol";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useConnection, useEngine } from "../engine/react.js";
-import { slideText } from "./show.js";
+import { slideRich } from "./show.js";
 
 // Stili globali del testo (decisione 0015): l'elenco salvato nel computer, le uscite su cui
 // devono entrare e il controllo dello spazio che decide se uno stile si puo' scegliere.
@@ -123,10 +124,10 @@ export function loadFonts(...faces: readonly TextFace[]): Promise<unknown> {
 }
 
 /** Testi delle slide di un elemento, nell'ordine di proiezione, senza quelle vuote. */
-export function itemTexts(item: Item): string[] {
+export function itemTexts(item: Item): RichText[] {
   return slideSequence(item)
-    .map(slideText)
-    .filter((text) => text !== "");
+    .map(slideRich)
+    .filter((rich) => rich.text !== "");
 }
 
 /**

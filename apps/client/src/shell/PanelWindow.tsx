@@ -65,6 +65,10 @@ function PanelWindowBody({
   useCueShortcuts();
   const modules = useMemo(() => new Map(panels.map((p) => [p.id, p])), [panels]);
   const panel = modules.get(panelId);
+  // Barre di strumenti dei plugin annessi (es. la formattazione): in cima all'editor, solo mentre
+  // l'editor ha un testo che le serve. Restano montate: riaccenderle e' istantaneo.
+  const strips = panels.filter((candidate) => candidate.placement === "editor");
+  const needsStrip = panel !== undefined && state?.live.richText?.owner === panel.pluginId;
   const title = panel === undefined ? undefined : t(panel.title);
   // Richiesta in corso (contesto da passare al pannello); assente = editor in attesa.
   const [opening, setOpening] = useState<{ id: number; context: unknown } | undefined>(() =>
@@ -110,6 +114,19 @@ function PanelWindowBody({
   return (
     <ModulePanelsContext.Provider value={modules}>
       <div className="flex h-full flex-col">
+        {state !== undefined && panel !== undefined && strips.length > 0 && (
+          <div
+            hidden={!needsStrip}
+            data-editor-strips=""
+            className="flex flex-none flex-col border-b border-line bg-bg-2"
+          >
+            {strips.map((strip) => (
+              <div key={strip.id} className="h-[72px]">
+                <ModulePanelFrame panel={strip} context={undefined} connect onClose={close} />
+              </div>
+            ))}
+          </div>
+        )}
         {state !== undefined && panel !== undefined && (
           <ModulePanelFrame
             key={frameKey}

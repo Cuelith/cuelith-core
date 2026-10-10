@@ -15,7 +15,9 @@ import {
   type Feed,
   type Look,
   type OutputConfig,
+  type RichText,
   type Slide,
+  type Span,
   type StateDocument,
   type Timer,
 } from "@cuelith/protocol";
@@ -34,9 +36,11 @@ export type Frame =
       /** Velo scuro sopra l'immagine, 0..0.9, perche' il testo resti leggibile. */
       readonly dim: number;
       readonly text: string | undefined;
+      /** Parole formattate del testo (protocollo 1.21); assente = testo semplice. */
+      readonly spans: readonly Span[] | undefined;
       readonly style: TextStyle;
       /** Testi di tutte le slide dell'elemento in onda: l'adattamento e' uguale per tutte. */
-      readonly fitTexts: readonly string[];
+      readonly fitTexts: readonly RichText[];
       readonly message: string | undefined;
       /** Riga dei crediti (prima o ultima slide, se l'elemento li prevede). */
       readonly credits: string | undefined;
@@ -46,7 +50,7 @@ export type Frame =
       readonly background: string;
       readonly text: string | undefined;
       readonly style: TextStyle;
-      readonly fitTexts: readonly string[];
+      readonly fitTexts: readonly RichText[];
       readonly next: string | undefined;
       readonly clock: boolean;
       readonly message: string | undefined;
@@ -89,6 +93,15 @@ const textOf = (slide: Slide | undefined): string | undefined => {
   return value === undefined || value === "" ? undefined : value;
 };
 
+/** Il testo della slide con le sue parole formattate (se ne ha). */
+const richOf = (slide: Slide | undefined): RichText | undefined => {
+  const field = slide?.fields["text"];
+  if (field === undefined || field.kind !== "text" || field.value === "") return undefined;
+  return field.spans === undefined || field.spans.length === 0
+    ? { text: field.value }
+    : { text: field.value, spans: field.spans };
+};
+
 /** Slide in onda e prossima, dal layer del contenuto e dall'anteprima. */
 function presentation(doc: StateDocument) {
   const content = doc.live.layers.content;
@@ -112,7 +125,10 @@ function presentation(doc: StateDocument) {
   const fitTexts =
     item === undefined
       ? []
-      : sequence.map((slide) => slide.fields["text"]?.value ?? "").filter((text) => text !== "");
+      : sequence.flatMap((slide) => {
+          const rich = richOf(slide);
+          return rich === undefined ? [] : [rich];
+        });
   return {
     onAir,
     item,
@@ -127,6 +143,11 @@ function presentation(doc: StateDocument) {
 }
 
 /** Messaggio dell'uscita (protocollo 1.7), altrimenti quello generale, se il look lo mostra. */
+/** Le parole formattate del testo in onda; con la formattazione tolta dallo stile globale non cambia niente. */
+function spansOf(slide: Slide | undefined): readonly Span[] | undefined {
+  return richOf(slide)?.spans;
+}
+
 function messageOf(doc: StateDocument, look: Look, outputId: string): string | undefined {
   if (!look.layers.includes("message")) return undefined;
   const own = doc.live.outputs[outputId]?.message;
@@ -185,6 +206,7 @@ export function describeOutput(doc: StateDocument, outputId: string): OutputView
         image,
         dim: style.data.background.dim ?? 0,
         text: bareBackground ? undefined : text,
+        spans: bareBackground ? undefined : spansOf(onAir),
         // Lo stile globale scelto vince; senza, lo stile del look con le modifiche dell'editor.
         style: effectiveTextStyle(style.data.text, style.data.globalText?.text, item?.textStyle),
         fitTexts,
