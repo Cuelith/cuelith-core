@@ -1,11 +1,5 @@
-import type { FullscreenStyle } from "@cuelith-core/core-looks";
+import { fontInfo, weightFor, type FullscreenStyle } from "@cuelith-core/core-looks";
 import type { CSSProperties } from "react";
-
-const FONT: Record<FullscreenStyle["text"]["font"], string> = {
-  display: "var(--cl-display)",
-  body: "var(--cl-body)",
-  mono: "var(--cl-mono)",
-};
 
 /**
  * Testo di una slide disegnato con lo stile del look, in scala: le misure
@@ -36,18 +30,23 @@ export function SlideText({
     style === undefined
       ? {}
       : {
-          fontFamily: FONT[style.text.font],
+          fontFamily: `"${fontInfo(style.text.font).family}", var(--cl-body)`,
           // La dimensione ottica del carattere dipende dai pixel: in un riquadro piccolo le lettere
           // si allargherebbero e il testo uscirebbe dal bordo. Si fissa a quella dell'uscita.
           fontVariationSettings: `"opsz" ${String(
             Math.min(144, Math.max(9, style.text.size * fit)),
           )}`,
           fontOpticalSizing: "none",
+          // Solo spessori e corsivi veri: niente lettere inventate dal browser, diverse da quelle delle uscite.
+          fontSynthesis: "none",
+          fontStyle:
+            style.text.italic === true && fontInfo(style.text.font).italic ? "italic" : "normal",
+          letterSpacing: `${String(style.text.letterSpacing ?? 0)}em`,
           fontSize: `calc(${String(style.text.size * fit)} / 1080 * 100cqh)`,
           color: style.text.color,
           textAlign: style.text.align,
           lineHeight: style.text.lineHeight ?? 1.25,
-          fontWeight: style.text.weight === "bold" ? 700 : 400,
+          fontWeight: weightFor(fontInfo(style.text.font), style.text.weight),
           textTransform: style.text.uppercase === true ? "uppercase" : "none",
           padding: `calc(${String(style.text.margin)} * 100cqmin)`,
           ...(style.text.outline === undefined || style.text.outline.width === 0
@@ -64,9 +63,13 @@ export function SlideText({
         };
   return (
     <div
-      className={`absolute inset-0 flex items-center justify-center ${
-        style?.text.fit === undefined ? "whitespace-pre-line" : "whitespace-pre"
-      }`}
+      className={`absolute inset-0 flex justify-center ${
+        style?.text.vAlign === "top"
+          ? "items-start"
+          : style?.text.vAlign === "bottom"
+            ? "items-end"
+            : "items-center"
+      } ${style?.text.fit === undefined ? "whitespace-pre-line" : "whitespace-pre"}`}
       style={css}
     >
       {background !== undefined && (

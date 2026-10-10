@@ -1,4 +1,12 @@
-import { checkStyle, creditsReserve, effectiveTextStyle } from "@cuelith-core/core-looks";
+import {
+  FONT_GROUPS,
+  FONTS,
+  checkStyle,
+  creditsReserve,
+  effectiveTextStyle,
+  fontInfo,
+  weightsOffered,
+} from "@cuelith-core/core-looks";
 import {
   ATTACHMENT_ROLES,
   AUTHOR_ROLES,
@@ -18,7 +26,7 @@ import {
 } from "../station/credits.js";
 import { useLibraryTags } from "../station/library.js";
 import { joinSlides, roomStyle, splitSlides } from "../station/show.js";
-import { measure, roomOutputs } from "../station/textStyles.js";
+import { measure, roomOutputs, useFontsVersion } from "../station/textStyles.js";
 import { useRun, useStation, type EditorRequest } from "../station/station.js";
 import { Button } from "../ui/Button.js";
 import { FieldLabel, INPUT } from "../ui/Dialogs.js";
@@ -740,9 +748,11 @@ function TextStyleEditor({
   onChange: (value: TextOverride | undefined) => void;
 }) {
   const t = useT();
+  useFontsVersion();
   const { state } = useEngine();
   const base = state === undefined ? undefined : roomStyle(state);
   const override = value ?? {};
+  const effectiveFont = fontInfo(override.font ?? base?.text.font ?? "display");
   const update = (patch: Partial<Record<keyof TextOverride, unknown>>) => {
     const merged = Object.fromEntries(
       Object.entries({ ...override, ...patch }).filter(([, entry]) => entry !== undefined),
@@ -795,10 +805,14 @@ function TextStyleEditor({
             className={SELECT}
           >
             <option value="">{t("core.editor.style.default")}</option>
-            {(["display", "body", "mono"] as const).map((font) => (
-              <option key={font} value={font}>
-                {t(`core.textstyles.font.${font}`)}
-              </option>
+            {FONT_GROUPS.map((group) => (
+              <optgroup key={group} label={t(`core.textstyles.fontGroup.${group}`)}>
+                {FONTS.filter((font) => font.group === group).map((font) => (
+                  <option key={font.id} value={font.id}>
+                    {font.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </Field>
@@ -833,7 +847,7 @@ function TextStyleEditor({
             className={INPUT}
           />
         </Field>
-        <Field label={t("core.textstyles.bold")}>
+        <Field label={t("core.textstyles.weight")}>
           <select
             value={override.weight ?? ""}
             onChange={(event) => {
@@ -842,8 +856,28 @@ function TextStyleEditor({
             className={SELECT}
           >
             <option value="">{t("core.editor.style.default")}</option>
-            <option value="bold">{t("core.textstyles.bold")}</option>
-            <option value="normal">—</option>
+            {weightsOffered(effectiveFont).map((id) => (
+              <option key={id} value={id}>
+                {t(`core.textstyles.weight.${id}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t("core.textstyles.italic")}>
+          <select
+            value={override.italic === undefined ? "" : String(override.italic)}
+            disabled={!effectiveFont.italic}
+            title={effectiveFont.italic ? undefined : t("core.textstyles.italicNo")}
+            onChange={(event) => {
+              update({
+                italic: event.target.value === "" ? undefined : event.target.value === "true",
+              });
+            }}
+            className={SELECT}
+          >
+            <option value="">{t("core.editor.style.default")}</option>
+            <option value="true">{t("core.textstyles.italic")}</option>
+            <option value="false">—</option>
           </select>
         </Field>
         <Field label={t("core.textstyles.uppercase")}>
@@ -892,7 +926,10 @@ function TextStyleEditor({
             className="relative aspect-video overflow-hidden rounded-md border border-line bg-screen"
             style={{ containerType: "size" }}
           >
-            <SlideText text={sample === "" ? "Aa" : sample} style={previewStyle} />
+            <SlideText
+              text={sample === "" ? t("core.textstyles.sample") : sample}
+              style={previewStyle}
+            />
           </div>
         </div>
         <Button

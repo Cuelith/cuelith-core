@@ -1,18 +1,20 @@
-import { effectiveTextStyle, type FullscreenStyle, type TextStyle } from "@cuelith-core/core-looks";
-import { slideSequence } from "@cuelith/protocol";
-import { useEffect, useRef, useState } from "react";
+import { effectiveTextStyle, type TextStyle } from "@cuelith-core/core-looks";
+import { useEffect, useState } from "react";
 import { useEngine, useT } from "../engine/react.js";
 import { roomLook } from "../station/backgrounds.js";
-import { itemOfEntry } from "../station/show.js";
+import { itemOfEntry, previewSlide, slideText } from "../station/show.js";
 import { useRun, useStation } from "../station/station.js";
-import { judgeStyle, loadFonts, useTextStyles, type SavedStyle } from "../station/textStyles.js";
+import {
+  judgeStyle,
+  loadFonts,
+  useFontsVersion,
+  useTextStyles,
+  type SavedStyle,
+} from "../station/textStyles.js";
 import { ModalDialog } from "../ui/Dialogs.js";
 import { HScroll } from "../ui/HScroll.js";
 import { Panel } from "../ui/Panel.js";
-import { SlideText } from "../ui/SlideText.js";
-
-const FIELD =
-  "rounded-md border border-line-2 bg-bg px-1.5 py-0.5 text-xs text-fg disabled:opacity-50";
+import { StyleEditor } from "./StyleEditor.js";
 
 /**
  * Stili globali del testo (decisione 0015), sotto gli sfondi. Sono tuoi: li crei da quello che
@@ -27,6 +29,7 @@ export function TextStylesPanel() {
   const { state } = useEngine();
   const { selectedEntryId } = useStation();
   const styles = useTextStyles();
+  useFontsVersion();
   const [editing, setEditing] = useState<string | undefined>();
   const [note, setNote] = useState<string | undefined>();
   const [armed, setArmed] = useState(false);
@@ -40,6 +43,11 @@ export function TextStylesPanel() {
   const selected = itemOfEntry(state, selectedEntryId);
   const activeId = room.style.globalText?.id;
   const edited = styles.find((style) => style.id === editing);
+  // L'esempio nell'editor: il testo della slide in anteprima; se non ce n'e' una, un testo di prova nella lingua in uso.
+  const shownText = previewSlide(state)?.slide;
+  const shownValue = shownText === undefined ? "" : slideText(shownText);
+  const fromSlide = shownValue.trim() !== "";
+  const sample = fromSlide ? shownValue : t("core.textstyles.sample");
 
   const setActive = (style: SavedStyle | undefined) => {
     const { globalText: _removed, ...rest } = room.style;
@@ -225,6 +233,7 @@ export function TextStylesPanel() {
 
       {edited !== undefined && (
         <ModalDialog
+          huge
           title={t("core.textstyles.editing", { name: edited.name })}
           onClose={() => {
             setEditing(undefined);
@@ -238,11 +247,8 @@ export function TextStylesPanel() {
               style={edited}
               armed={armed}
               note={note}
-              sample={
-                selected === undefined
-                  ? ""
-                  : (slideSequence(selected)[0]?.fields["text"]?.value ?? "")
-              }
+              sample={sample}
+              fromSlide={fromSlide}
               baseStyle={room.style}
               onSave={(patch) => {
                 save(edited, patch);
@@ -257,359 +263,5 @@ export function TextStylesPanel() {
         </ModalDialog>
       )}
     </Panel>
-  );
-}
-
-/** Form di un solo stile: i cambiamenti si applicano subito (con un attimo di pausa mentre si scrive). */
-function StyleEditor({
-  style,
-  armed,
-  note,
-  sample,
-  baseStyle,
-  onSave,
-  onDelete,
-  onClose,
-}: {
-  style: SavedStyle;
-  armed: boolean;
-  note: string | undefined;
-  sample: string;
-  baseStyle: FullscreenStyle;
-  onSave: (patch: { name?: string; text?: TextStyle }) => void;
-  onDelete: () => void;
-  onClose: () => void;
-}) {
-  const t = useT();
-  const [name, setName] = useState(style.name);
-  const [text, setText] = useState<TextStyle>(style.style);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(
-    () => () => {
-      if (timer.current !== undefined) clearTimeout(timer.current);
-    },
-    [],
-  );
-  const later = (patch: { name?: string; text?: TextStyle }) => {
-    if (timer.current !== undefined) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      onSave(patch);
-    }, 250);
-  };
-  const change = (patch: Partial<TextStyle>) => {
-    const next = { ...text, ...patch };
-    setText(next);
-    later({ text: next });
-  };
-  const num = (value: string, fallback: number) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && value.trim() !== "" ? parsed : fallback;
-  };
-
-  return (
-    <div className="flex flex-col gap-3 px-5 py-4">
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-muted">
-        <label className="col-span-2 flex flex-col gap-1">
-          {t("core.textstyles.name")}
-          <input
-            value={name}
-            maxLength={60}
-            onChange={(event) => {
-              setName(event.target.value);
-              if (event.target.value.trim() !== "") later({ name: event.target.value.trim() });
-            }}
-            className={FIELD}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          {t("core.textstyles.font")}
-          <select
-            value={text.font}
-            onChange={(event) => {
-              change({ font: event.target.value as TextStyle["font"] });
-            }}
-            className={FIELD}
-          >
-            {(["display", "body", "mono"] as const).map((font) => (
-              <option key={font} value={font}>
-                {t(`core.textstyles.font.${font}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          {t("core.textstyles.size")}
-          <input
-            type="number"
-            min={8}
-            max={400}
-            value={text.size}
-            onChange={(event) => {
-              change({ size: Math.min(400, Math.max(8, num(event.target.value, text.size))) });
-            }}
-            className={FIELD}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          {t("core.textstyles.lineHeight")}
-          <input
-            type="number"
-            step={0.05}
-            min={0.8}
-            max={2.5}
-            value={text.lineHeight ?? 1.25}
-            onChange={(event) => {
-              change({
-                lineHeight: Math.min(
-                  2.5,
-                  Math.max(0.8, num(event.target.value, text.lineHeight ?? 1.25)),
-                ),
-              });
-            }}
-            className={FIELD}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          {t("core.textstyles.align")}
-          <select
-            value={text.align}
-            onChange={(event) => {
-              change({ align: event.target.value as TextStyle["align"] });
-            }}
-            className={FIELD}
-          >
-            {(["left", "center", "right"] as const).map((align) => (
-              <option key={align} value={align}>
-                {t(`core.textstyles.align.${align}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          {t("core.textstyles.color")}
-          <input
-            type="color"
-            value={text.color}
-            onChange={(event) => {
-              change({ color: event.target.value.toUpperCase() });
-            }}
-            className="h-6 w-full rounded-md border border-line-2 bg-bg"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          {t("core.textstyles.margin")}
-          <input
-            type="number"
-            step={1}
-            min={0}
-            max={40}
-            value={Math.round(text.margin * 100)}
-            onChange={(event) => {
-              change({
-                margin: Math.min(40, Math.max(0, num(event.target.value, text.margin * 100))) / 100,
-              });
-            }}
-            className={FIELD}
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={text.weight === "bold"}
-            onChange={(event) => {
-              change({ weight: event.target.checked ? "bold" : "normal" });
-            }}
-          />
-          {t("core.textstyles.bold")}
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={text.uppercase === true}
-            onChange={(event) => {
-              change({ uppercase: event.target.checked });
-            }}
-          />
-          {t("core.textstyles.uppercase")}
-        </label>
-        <label className="col-span-2 flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={text.outline !== undefined}
-            onChange={(event) => {
-              const { outline: _removed, ...rest } = text;
-              const next: TextStyle = event.target.checked
-                ? { ...rest, outline: { width: 3, color: "#000000" } }
-                : rest;
-              setText(next);
-              later({ text: next });
-            }}
-          />
-          {t("core.textstyles.outline")}
-          {text.outline !== undefined && (
-            <span className="ml-auto flex items-center gap-1">
-              <input
-                type="number"
-                min={0}
-                max={20}
-                aria-label={t("core.textstyles.outlineWidth")}
-                value={text.outline.width}
-                onChange={(event) => {
-                  change({
-                    outline: {
-                      color: text.outline?.color ?? "#000000",
-                      width: Math.min(20, Math.max(0, num(event.target.value, 3))),
-                    },
-                  });
-                }}
-                className={`${FIELD} w-14`}
-              />
-              <input
-                type="color"
-                aria-label={t("core.textstyles.outlineColor")}
-                value={text.outline.color}
-                onChange={(event) => {
-                  change({
-                    outline: {
-                      width: text.outline?.width ?? 3,
-                      color: event.target.value.toUpperCase(),
-                    },
-                  });
-                }}
-                className="h-6 w-10 rounded-md border border-line-2 bg-bg"
-              />
-            </span>
-          )}
-        </label>
-        <label className="col-span-2 flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={text.shadow !== undefined}
-            onChange={(event) => {
-              const { shadow: _removed, ...rest } = text;
-              const next: TextStyle = event.target.checked
-                ? { ...rest, shadow: { offset: 4, blur: 6, color: "#000000" } }
-                : rest;
-              setText(next);
-              later({ text: next });
-            }}
-          />
-          {t("core.textstyles.shadow")}
-          {text.shadow !== undefined && (
-            <span className="ml-auto flex items-center gap-1">
-              <input
-                type="number"
-                min={0}
-                max={30}
-                aria-label={t("core.textstyles.shadowOffset")}
-                value={text.shadow.offset}
-                onChange={(event) => {
-                  change({
-                    shadow: {
-                      blur: text.shadow?.blur ?? 6,
-                      color: text.shadow?.color ?? "#000000",
-                      offset: Math.min(30, Math.max(0, num(event.target.value, 4))),
-                    },
-                  });
-                }}
-                className={`${FIELD} w-14`}
-              />
-              <input
-                type="number"
-                min={0}
-                max={30}
-                aria-label={t("core.textstyles.shadowBlur")}
-                value={text.shadow.blur}
-                onChange={(event) => {
-                  change({
-                    shadow: {
-                      offset: text.shadow?.offset ?? 4,
-                      color: text.shadow?.color ?? "#000000",
-                      blur: Math.min(30, Math.max(0, num(event.target.value, 6))),
-                    },
-                  });
-                }}
-                className={`${FIELD} w-14`}
-              />
-              <input
-                type="color"
-                aria-label={t("core.textstyles.shadowColor")}
-                value={text.shadow.color}
-                onChange={(event) => {
-                  change({
-                    shadow: {
-                      offset: text.shadow?.offset ?? 4,
-                      blur: text.shadow?.blur ?? 6,
-                      color: event.target.value.toUpperCase(),
-                    },
-                  });
-                }}
-                className="h-6 w-10 rounded-md border border-line-2 bg-bg"
-              />
-            </span>
-          )}
-        </label>
-        <label className="col-span-2 flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={text.fit !== undefined}
-            onChange={(event) => {
-              const { fit: _removed, ...rest } = text;
-              const next: TextStyle = event.target.checked ? { ...rest, fit: { min: 0.6 } } : rest;
-              setText(next);
-              later({ text: next });
-            }}
-          />
-          {t("core.textstyles.fit")}
-          {text.fit !== undefined && (
-            <span className="ml-auto flex items-center gap-1">
-              {t("core.textstyles.fitMin")}
-              <input
-                type="number"
-                min={30}
-                max={100}
-                value={Math.round(text.fit.min * 100)}
-                onChange={(event) => {
-                  change({
-                    fit: { min: Math.min(100, Math.max(30, num(event.target.value, 60))) / 100 },
-                  });
-                }}
-                className={`${FIELD} w-14`}
-              />
-              %
-            </span>
-          )}
-        </label>
-      </div>
-      {note !== undefined && (
-        <p role="alert" className="text-xs text-live-soft">
-          {note}
-        </p>
-      )}
-      <div
-        role="img"
-        aria-label={t("core.editor.style.preview")}
-        className="relative aspect-video w-full max-w-sm overflow-hidden rounded-md border border-line bg-screen"
-        style={{ containerType: "size" }}
-      >
-        <SlideText text={sample === "" ? "Aa" : sample} style={{ ...baseStyle, text }} />
-      </div>
-      <div className="flex justify-between">
-        <button
-          type="button"
-          onClick={onDelete}
-          className="rounded-md border border-line-2 px-3 py-1 text-xs text-live-soft hover:border-live"
-        >
-          {armed ? t("core.textstyles.deleteConfirm") : t("core.textstyles.delete")}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md border border-line-2 px-3 py-1 text-xs text-fg hover:border-muted"
-        >
-          {t("core.action.close")}
-        </button>
-      </div>
-    </div>
   );
 }

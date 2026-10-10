@@ -14,6 +14,7 @@
   "dependencies": {
     "@cuelith-core/core-looks": "workspace:*",
     "@cuelith-core/engine-client": "workspace:*",
+    "@cuelith-core/show-fonts": "workspace:*",
     "@cuelith/protocol": "link:../../../cuelith-sdk/packages/protocol",
     "@cuelith/ui": "link:../../../cuelith-sdk/packages/ui",
     "pixi.js": "8.21.0"

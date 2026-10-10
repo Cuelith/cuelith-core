@@ -1,3 +1,4 @@
+import { TextFontSchema, TextWeightSchema } from "@cuelith/protocol";
 import { z } from "zod";
 
 // Stili dei template di look del nucleo (cap. 07 e 22). Il campo `style` di
@@ -13,7 +14,7 @@ const Transition = z.strictObject({
 // Tutto cio' che segue "margin" e' facoltativo: uno stile scritto prima (o senza) questi campi
 // resta valido e si disegna come sempre (decisione 0015).
 export const TextStyleSchema = z.strictObject({
-  font: z.enum(["display", "body", "mono"]),
+  font: TextFontSchema,
   /** Dimensione del testo in pixel su un'uscita alta 1080 pixel; scala con l'uscita. */
   size: z.number().min(8).max(400),
   color: Color,
@@ -22,7 +23,13 @@ export const TextStyleSchema = z.strictObject({
   margin: z.number().min(0).max(0.4),
   /** Interlinea come multiplo della dimensione (predefinita 1,25). */
   lineHeight: z.number().min(0.8).max(2.5).optional(),
-  weight: z.enum(["normal", "bold"]).optional(),
+  /** Spessore (dal protocollo 1.20; "normal" e "bold" sono quelli di prima). */
+  weight: TextWeightSchema.optional(),
+  italic: z.boolean().optional(),
+  /** Spaziatura tra le lettere, in frazioni della dimensione (0 = normale). */
+  letterSpacing: z.number().min(-0.1).max(0.5).optional(),
+  /** Dove sta il blocco di testo nello schermo (predefinito: al centro). */
+  vAlign: z.enum(["top", "middle", "bottom"]).optional(),
   uppercase: z.boolean().optional(),
   /**
    * Adattamento automatico: se una slide non entra, il testo si rimpicciolisce fino a

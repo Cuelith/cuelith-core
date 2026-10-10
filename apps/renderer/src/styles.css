@@ -1,5 +1,6 @@
 /* Font inclusi nel pacchetto (cap. 17): le uscite funzionano senza internet. */
 @import "@cuelith/ui/fonts.css";
+@import "@cuelith-core/show-fonts/fonts.css";
 
 html,
 body,

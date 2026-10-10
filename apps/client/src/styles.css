@@ -1,6 +1,8 @@
 @import "tailwindcss";
 /* Font e token del linguaggio visivo (cap. 17), inclusi nel pacchetto: nessuna risorsa esterna. */
 @import "@cuelith/ui/fonts.css";
+/* I caratteri del testo proiettato, inclusi nel programma. */
+@import "@cuelith-core/show-fonts/fonts.css";
 @import "@cuelith/ui/tokens.css";
 
 @theme inline {

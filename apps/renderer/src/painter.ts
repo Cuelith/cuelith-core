@@ -4,11 +4,14 @@ import { GifSource, GifSprite } from "pixi.js/gif";
 import {
   canvasMeasure,
   creditsReserve,
+  cssFont,
+  fontInfo,
   renderScale,
+  weightFor,
   type MeasureText,
 } from "@cuelith-core/core-looks";
 import { formatTimer, timerPhase, timerRemaining } from "@cuelith/protocol";
-import type { Frame, OutputView, TextStyle } from "./frame.js";
+import type { Frame, OutputView } from "./frame.js";
 
 /** Misura del testo con i caratteri veri, su un canvas che non si vede (creato alla prima richiesta). */
 let measureCache: MeasureText | undefined;
@@ -22,20 +25,22 @@ function measure(): MeasureText {
   return measureCache;
 }
 
-const FONT: Record<TextStyle["font"], string> = {
-  display: "Fraunces Variable",
-  body: "Schibsted Grotesk Variable",
-  mono: "JetBrains Mono Variable",
+/** Caratteri fissi dell'interfaccia delle uscite (orologio, conto alla rovescia, crediti, avvisi). */
+const FONT = {
+  body: fontInfo("body").family,
+  mono: fontInfo("mono").family,
 };
 const MUTED = "#A9ADB4";
 /** Oltre questo tempo un'immagine di sfondo non blocca piu' il cambio di slide. */
 const IMAGE_TIMEOUT_MS = 4000;
 const BAND = "#0B0C0E";
 
-/** Font inclusi nel pacchetto: vanno caricati prima di disegnare testo su canvas. */
+/** Font dell'interfaccia delle uscite: vanno caricati prima di disegnare testo su canvas. */
 export async function loadFonts(): Promise<void> {
   await Promise.all(
-    Object.values(FONT).map((family) => document.fonts.load(`48px '${family}'`).catch(() => [])),
+    [cssFont({ font: "body" }, 48), cssFont({ font: "mono", weight: "bold" }, 48)].map((font) =>
+      document.fonts.load(font).catch(() => []),
+    ),
   );
 }
 
@@ -77,6 +82,7 @@ export class Painter {
   readonly #loading = new Map<string, Promise<void>>();
   /** Cresce a ogni nuovo stato: un'immagine arrivata tardi non sovrascrive uno stato piu' nuovo. */
   #ticket = 0;
+  #fonts = new Set<string>();
   #current: Container | undefined;
   #leaving: Container | undefined;
   #fade = { elapsed: 0, duration: 0 };
@@ -114,6 +120,27 @@ export class Painter {
     const ticket = ++this.#ticket;
     // Freeze: l'immagine resta quella di prima (il blackout vale comunque).
     if (view === undefined || view.freeze) return;
+    // Il carattere della slide deve essere pronto prima di disegnare e di misurare: altrimenti le
+    // righe verrebbero spezzate con la misura di un carattere di ripiego. I gia' usati sono subito pronti.
+    if (view.frame.kind === "black") {
+      this.#prepare(view, ticket);
+      return;
+    }
+    const font = cssFont(view.frame.style, 48);
+    if (this.#fonts.has(font)) {
+      this.#prepare(view, ticket);
+      return;
+    }
+    void document.fonts
+      .load(font)
+      .catch(() => [])
+      .then(() => {
+        this.#fonts.add(font);
+        if (ticket === this.#ticket) this.#prepare(view, ticket);
+      });
+  }
+
+  #prepare(view: OutputView, ticket: number): void {
     // La prossima slide avra' bisogno di queste immagini: si caricano adesso.
     for (const url of view.preload) void this.#load(url);
     const image = view.frame.kind === "fullscreen" ? view.frame.image : undefined;
@@ -298,18 +325,27 @@ export class Painter {
     this.#textInfo = JSON.stringify({
       size: Math.round(size * 10) / 10,
       lineHeight: frame.style.lineHeight ?? 1.25,
-      bold: frame.style.weight === "bold",
+      bold: weightFor(fontInfo(frame.style.font), frame.style.weight) >= 600,
+      weight: weightFor(fontInfo(frame.style.font), frame.style.weight),
+      italic: frame.style.italic === true && fontInfo(frame.style.font).italic,
+      letterSpacing: frame.style.letterSpacing ?? 0,
+      vAlign: frame.style.vAlign ?? "middle",
+      font: frame.style.font,
       uppercase: frame.style.uppercase === true,
       color: frame.style.color,
       outline: frame.style.outline?.width ?? 0,
       shadow: frame.style.shadow?.offset ?? 0,
     });
+    const face = fontInfo(frame.style.font);
     const textStyle = (fontSize: number, color: string, wrap: number) => ({
-      fontFamily: FONT[frame.style.font],
+      fontFamily: face.family,
       fontSize,
       fill: color,
       align: frame.style.align,
-      fontWeight: frame.style.weight === "bold" ? ("700" as const) : ("400" as const),
+      fontWeight: String(weightFor(face, frame.style.weight)) as "400",
+      fontStyle:
+        frame.style.italic === true && face.italic ? ("italic" as const) : ("normal" as const),
+      letterSpacing: (frame.style.letterSpacing ?? 0) * fontSize,
       // Con l'adattamento le righe restano intere: si rimpicciolisce, non si spezza.
       wordWrap: frame.style.fit === undefined,
       wordWrapWidth: wrap,
@@ -345,8 +381,12 @@ export class Painter {
           style: textStyle(size, frame.style.color, w - 2 * margin),
         });
         const ax = frame.style.align === "left" ? 0 : frame.style.align === "right" ? 1 : 0.5;
-        text.anchor.set(ax, 0.5);
-        text.position.set(ax === 0 ? margin : ax === 1 ? w - margin : w / 2, h / 2);
+        // In alto, al centro (come sempre) o in basso, sopra la fascia dei crediti se c'e'.
+        const ay = frame.style.vAlign === "top" ? 0 : frame.style.vAlign === "bottom" ? 1 : 0.5;
+        const band = creditsReserve(h, frame.credits !== undefined) / 2;
+        const y = ay === 0 ? margin : ay === 1 ? h - margin - band : h / 2;
+        text.anchor.set(ax, ay);
+        text.position.set(ax === 0 ? margin : ax === 1 ? w - margin : w / 2, y);
         layer.addChild(text);
       }
     } else {

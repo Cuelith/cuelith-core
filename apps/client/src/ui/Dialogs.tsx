@@ -5,17 +5,23 @@ import { Button } from "./Button.js";
 const DIALOG =
   "m-auto w-[min(460px,calc(100vw-32px))] rounded-xl border border-line-2 bg-bg-2 p-0 text-fg backdrop:bg-black/60";
 
+const DIALOG_HUGE =
+  "m-auto w-[min(960px,calc(100vw-32px))] rounded-xl border border-line-2 bg-bg-2 p-0 text-fg backdrop:bg-black/60";
+
 /** Finestra modale che si apre al montaggio; Esc o chiusura chiamano onClose. */
 export function ModalDialog({
   title,
   onClose,
   children,
   wide = false,
+  huge = false,
 }: {
   title: string;
   onClose: () => void;
   children: (close: () => void) => ReactNode;
   wide?: boolean;
+  /** Per le finestre con molti controlli e un'anteprima accanto. */
+  huge?: boolean;
 }) {
   // L'elemento sta nello stato (non in un ref): "close" si puo' passare ai figli.
   const [element, setElement] = useState<HTMLDialogElement | null>(null);
@@ -35,7 +41,7 @@ export function ModalDialog({
         if (event.target === event.currentTarget) onClose();
       }}
       aria-labelledby={titleId}
-      className={wide ? DIALOG.replace("460px", "720px") : DIALOG}
+      className={huge ? DIALOG_HUGE : wide ? DIALOG.replace("460px", "720px") : DIALOG}
     >
       <h2 id={titleId} className="border-b border-line px-5 py-4 text-base font-semibold">
         {title}

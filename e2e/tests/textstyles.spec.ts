@@ -17,6 +17,11 @@ interface Shown {
   color: string;
   outline: number;
   shadow: number;
+  weight: number;
+  italic: boolean;
+  letterSpacing: number;
+  vAlign: string;
+  font: string;
 }
 
 /** Quanto il testo di ogni riquadro (programma, anteprima) esce dallo spazio utile: deve essere 0. */
@@ -59,7 +64,7 @@ test("stili del testo: editor, stile globale che lo sostituisce, adattamento e b
   let editor = station.getByRole("dialog", { name: "Modifica testo" });
   await editor.getByRole("tab", { name: "Stile" }).click();
   await editor.getByLabel("Dimensione %").fill("150");
-  await editor.getByLabel("Grassetto").selectOption("bold");
+  await editor.getByLabel("Spessore").selectOption("bold");
   await editor.getByRole("button", { name: "Salva" }).click();
   await expect(editor).toBeHidden();
   await expect.poll(async () => (await shown(projector)).size).toBeCloseTo(base.size * 1.5, 0);
@@ -72,7 +77,7 @@ test("stili del testo: editor, stile globale che lo sostituisce, adattamento e b
   await expect(form).toBeVisible();
   await form.getByLabel("Dimensione", { exact: true }).fill("144");
   await form.getByLabel("Maiuscolo").check();
-  await form.getByLabel("Grassetto").uncheck();
+  await form.getByLabel("Spessore").selectOption("normal");
   await form.getByLabel("Bordo", { exact: true }).check();
   await form.getByLabel("Ombra", { exact: true }).check();
   await station.waitForTimeout(400);
@@ -187,5 +192,92 @@ test("stili del testo: editor, stile globale che lo sostituisce, adattamento e b
   await expect(editing.getByRole("alert")).toContainText("non entra");
   await editing.getByRole("button", { name: "Annulla" }).click();
   await expect(editing).toBeHidden();
+  expect(problems).toEqual([]);
+});
+
+test("editor degli stili: tanti caratteri veri, spessore e corsivo solo se esistono, esempio dalla slide", async ({
+  running,
+}) => {
+  test.setTimeout(180_000);
+  const { station, problems } = running;
+  await createText(station, "Salmo", ["Il Signore e' il mio pastore", "non manco di nulla"]);
+  await addOutput(station, "Proiettore", "Sala");
+  const projector = await outputWindow(running, "Proiettore");
+  await station.keyboard.press("Enter");
+  await expect(projector.locator("body")).toHaveAttribute(
+    "data-text",
+    "Il Signore e' il mio pastore",
+  );
+
+  const styles = station.getByRole("region", { name: "Stili del testo" });
+  await styles.getByRole("button", { name: "Nuovo stile dallo stato attuale" }).click();
+  const form = station.getByRole("dialog", { name: "Stile Stile 1" });
+
+  // L'esempio e' il testo della slide in anteprima (qui c'e': la seconda slide e' ancora li').
+  const preview = form.getByTestId("style-preview");
+  await expect(preview).toContainText(/Signore|manco/);
+  await expect(form.getByText("Anteprima con il testo della slide in anteprima.")).toBeVisible();
+
+  // Cinque famiglie, tanti caratteri; ognuno si presenta con il suo stesso carattere.
+  const fonts = form.getByRole("listbox", { name: "Carattere" });
+  await expect(fonts.getByRole("option")).toHaveCount(7);
+  await form.getByRole("tab", { name: "Titoli" }).click();
+  await expect(fonts.getByRole("option")).toHaveCount(5);
+  await form.getByRole("tab", { name: "Senza grazie" }).click();
+  await expect(fonts.getByRole("option")).toHaveCount(10);
+
+  // Bebas Neue ha un solo spessore e nessun corsivo: non si offrono quelli finti.
+  await form.getByRole("tab", { name: "Titoli" }).click();
+  await fonts.getByRole("option", { name: /Bebas Neue/ }).click();
+  const weights = form.getByLabel("Spessore");
+  await expect(weights.locator("option")).toHaveCount(1);
+  await expect(form.getByLabel("Corsivo")).toBeDisabled();
+
+  // Lora: spessori veri e corsivo vero; spaziatura e posizione arrivano alle uscite.
+  await form.getByRole("tab", { name: "Con grazie" }).click();
+  await fonts.getByRole("option", { name: /Lora/ }).click();
+  await expect(form.getByLabel("Corsivo")).toBeEnabled();
+  await form.getByLabel("Corsivo").check();
+  await form.getByLabel("Spessore").selectOption("semibold");
+  await form.getByLabel("Spaziatura lettere %").fill("8");
+  await form.getByRole("radio", { name: "In basso" }).click();
+  await station.waitForTimeout(600);
+  await station.screenshot({ path: path.join(screenshotsDir, "stili-testo-editor.png") });
+  await form.getByRole("button", { name: "Chiudi" }).click();
+  await expect(form).toBeHidden();
+  await styles.getByRole("button", { name: "Stile 1", exact: true }).click();
+  await expect
+    .poll(async () => {
+      const now = await shown(projector);
+      return [now.font, now.weight, now.italic, now.letterSpacing, now.vAlign].join("|");
+    })
+    .toBe("lora|600|true|0.08|bottom");
+  // Il carattere e' davvero caricato nell'uscita e il testo non esce dallo spazio.
+  expect(
+    await projector.evaluate(() => document.fonts.check('italic 600 40px "Lora Variable"')),
+  ).toBe(true);
+  expect(await overflow(station)).toEqual(expect.arrayContaining([0]));
+  await station.screenshot({ path: path.join(screenshotsDir, "stili-testo-caratteri.png") });
+
+  expect(problems).toEqual([]);
+});
+
+test("editor degli stili senza slide in anteprima: testo di prova nella lingua in uso, righe di lunghezze diverse", async ({
+  running,
+}) => {
+  const { station, problems } = running;
+  const styles = station.getByRole("region", { name: "Stili del testo" });
+  await styles.getByRole("button", { name: "Nuovo stile dallo stato attuale" }).click();
+  const form = station.getByRole("dialog", { name: "Stile Stile 1" });
+  const preview = form.getByTestId("style-preview");
+  await expect(preview).toContainText("Strade di sera");
+  await expect(preview).toContainText("ogni finestra accesa");
+  await expect(
+    form.getByText("Nessuna slide in anteprima: questo è un testo di prova", { exact: false }),
+  ).toBeVisible();
+  const lines = await preview.evaluate((box) =>
+    box.textContent.split(String.fromCharCode(10)).map((line) => line.length),
+  );
+  expect(new Set(lines).size).toBeGreaterThanOrEqual(3);
   expect(problems).toEqual([]);
 });

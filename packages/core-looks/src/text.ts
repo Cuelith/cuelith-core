@@ -1,3 +1,4 @@
+import { fontInfo, weightFor } from "./fonts.js";
 import type { TextOverride, TextStyle } from "./styles.js";
 
 // Stile effettivo del testo e controllo dello spazio (decisione 0015). Codice puro,
@@ -35,12 +36,8 @@ export function effectiveTextStyle(
 }
 
 /** Quanto e' larga una riga: la fornisce chi disegna (canvas, DOM...). */
-export type MeasureText = (
-  text: string,
-  fontSizePx: number,
-  weight: "normal" | "bold",
-  font: TextStyle["font"],
-) => number;
+export type TextFace = Pick<TextStyle, "font" | "weight" | "italic" | "letterSpacing">;
+export type MeasureText = (text: string, fontSizePx: number, face: TextFace) => number;
 
 export interface OutputBox {
   readonly width: number;
@@ -74,8 +71,7 @@ export function wrapLines(
   style: TextStyle,
   measure: MeasureText,
 ): string[] {
-  const weight = style.weight ?? "normal";
-  const width = (value: string): number => measure(value, fontSizePx, weight, style.font);
+  const width = (value: string): number => measure(value, fontSizePx, style);
   const limit = maxWidth * WIDTH_SAFETY;
   const lines: string[] = [];
   for (const paragraph of shown(text, style).split("\n")) {
@@ -126,10 +122,9 @@ export function textFits(
       : shown(text, style).split("\n");
   const height = lines.length * px * (style.lineHeight ?? DEFAULT_LINE_HEIGHT);
   // Con l'adattamento le righe del testo restano intere: se una non entra in larghezza, non entra.
-  const weight = style.weight ?? "normal";
   const wide =
     style.fit !== undefined &&
-    lines.some((line) => measure(line, px, weight, style.font) > area.width * WIDTH_SAFETY);
+    lines.some((line) => measure(line, px, style) > area.width * WIDTH_SAFETY);
   return { fits: !wide && height <= area.height, lines: lines.length, height };
 }
 
@@ -229,24 +224,32 @@ export function checkStyle(
   return { ok: failures.length === 0, scale, failures };
 }
 
-/** I caratteri inclusi nel programma, per nome: gli stessi nelle uscite e nell'anteprima. */
-export const FONT_FAMILIES: Readonly<Record<TextStyle["font"], string>> = {
-  display: "Fraunces Variable",
-  body: "Schibsted Grotesk Variable",
-  mono: "JetBrains Mono Variable",
-};
+/** Il carattere come lo scrive CSS e il canvas: corsivo, spessore vero, dimensione, famiglia. */
+export function cssFont(face: TextFace, fontSizePx: number): string {
+  const info = fontInfo(face.font);
+  const italic = face.italic === true && info.italic ? "italic " : "";
+  return `${italic}${String(weightFor(info, face.weight))} ${String(fontSizePx)}px "${info.family}"`;
+}
 
 /** Quel che serve a misurare del contesto 2D di un canvas (cosi' il pacchetto non dipende dal DOM). */
 export interface MeasuringContext {
   font: string;
+  /** Spaziatura tra le lettere come testo CSS (es. "2px"), se il contesto la conosce. */
+  letterSpacing?: string;
   measureText(text: string): { width: number };
 }
 
 /** Misura reale delle righe con i caratteri veri, su un canvas fornito da chi disegna. */
 export function canvasMeasure(context: MeasuringContext): MeasureText {
-  return (text, fontSizePx, weight, font) => {
-    context.font = `${weight === "bold" ? "700" : "400"} ${String(fontSizePx)}px "${FONT_FAMILIES[font]}"`;
-    return context.measureText(text).width;
+  return (text, fontSizePx, face) => {
+    context.font = cssFont(face, fontSizePx);
+    // Senza il supporto del contesto, si aggiunge a mano la spaziatura (una per lettera).
+    const spacing = (face.letterSpacing ?? 0) * fontSizePx;
+    if ("letterSpacing" in context) {
+      context.letterSpacing = `${String(spacing)}px`;
+      return context.measureText(text).width;
+    }
+    return context.measureText(text).width + spacing * text.length;
   };
 }
 

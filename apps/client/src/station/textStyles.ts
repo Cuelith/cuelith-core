@@ -2,14 +2,15 @@ import {
   canvasMeasure,
   checkStyle,
   creditsReserve,
+  cssFont,
   renderScale,
-  FONT_FAMILIES,
   FullscreenStyleSchema,
   type FullscreenStyle,
   TextStyleSchema,
   type MeasureText,
   type OutputBox,
   type StyleCheck,
+  type TextFace,
   type TextStyle,
 } from "@cuelith-core/core-looks";
 import {
@@ -20,7 +21,7 @@ import {
   type StateDocument,
   type TextStyleRecord,
 } from "@cuelith/protocol";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useConnection, useEngine } from "../engine/react.js";
 import { slideText } from "./show.js";
 
@@ -67,21 +68,58 @@ let measureCache: MeasureText | undefined;
 export function measure(): MeasureText {
   if (measureCache === undefined) {
     const context = document.createElement("canvas").getContext("2d");
-    measureCache = canvasMeasure(
+    const inner = canvasMeasure(
       context ?? { font: "", measureText: (text: string) => ({ width: text.length * 20 }) },
     );
+    // Un carattere mai usato si carica adesso (la misura di questa volta e' di ripiego);
+    // quando arriva, chi usa useFontsVersion() si ridisegna e misura giusto.
+    measureCache = (text, size, face) => {
+      requestFont(face);
+      return inner(text, size, face);
+    };
   }
   return measureCache;
 }
 
-/** I caratteri vanno caricati prima di misurare, altrimenti la misura e' quella di un carattere di ripiego. */
-export function loadFonts(): Promise<unknown> {
-  return Promise.all(
-    Object.values(FONT_FAMILIES).flatMap((family) => [
-      document.fonts.load(`400 48px "${family}"`).catch(() => []),
-      document.fonts.load(`700 48px "${family}"`).catch(() => []),
-    ]),
+const requested = new Set<string>();
+const fontListeners = new Set<() => void>();
+let fontsVersion = 0;
+
+/** Chiede il caricamento di un carattere, una volta sola. */
+export function requestFont(face: TextFace): void {
+  const key = cssFont(face, 48);
+  if (requested.has(key)) return;
+  requested.add(key);
+  if (typeof document === "undefined" || !("fonts" in document)) return;
+  void document.fonts
+    .load(key)
+    .catch(() => [])
+    .then(() => {
+      fontsVersion += 1;
+      for (const listener of fontListeners) listener();
+    });
+}
+
+/** Cambia ogni volta che finisce di caricarsi un carattere: serve a rifare le misure. */
+export function useFontsVersion(): number {
+  return useSyncExternalStore(
+    (listener) => {
+      fontListeners.add(listener);
+      return () => fontListeners.delete(listener);
+    },
+    () => fontsVersion,
   );
+}
+
+/**
+ * I caratteri vanno caricati prima di misurare, altrimenti la misura e' quella di un carattere di
+ * ripiego. Si caricano solo quelli che servono (gli altri restano su disco finche' non si scelgono).
+ */
+export function loadFonts(...faces: readonly TextFace[]): Promise<unknown> {
+  const wanted: readonly TextFace[] =
+    faces.length > 0 ? faces : [{ font: "display" }, { font: "body" }];
+  for (const face of wanted) requestFont(face);
+  return Promise.all(wanted.map((face) => document.fonts.load(cssFont(face, 48)).catch(() => [])));
 }
 
 /** Testi delle slide di un elemento, nell'ordine di proiezione, senza quelle vuote. */

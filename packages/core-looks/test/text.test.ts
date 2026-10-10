@@ -1,8 +1,16 @@
+import { TEXT_FONT_IDS } from "@cuelith/protocol";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_ROOM_STYLE } from "../src/defaults.js";
-import { FullscreenStyleSchema, TextOverrideSchema, type TextStyle } from "../src/styles.js";
+import { FONTS, fontInfo, weightFor, weightsOffered } from "../src/fonts.js";
+import {
+  FullscreenStyleSchema,
+  TextOverrideSchema,
+  TextStyleSchema,
+  type TextStyle,
+} from "../src/styles.js";
 import {
   checkStyle,
+  cssFont,
   effectiveTextStyle,
   fitScale,
   renderScale,
@@ -13,8 +21,9 @@ import {
 } from "../src/text.js";
 
 // Misura finta e prevedibile: ogni carattere e' largo 0,5 volte la dimensione (grassetto: 0,6).
-const measure: MeasureText = (text, size, weight) =>
-  text.length * size * (weight === "bold" ? 0.6 : 0.5);
+const measure: MeasureText = (text, size, face) =>
+  text.length * size * (face.weight === "bold" ? 0.6 : 0.5) +
+  text.length * size * (face.letterSpacing ?? 0);
 
 const base: TextStyle = { ...DEFAULT_ROOM_STYLE.text, size: 80, margin: 0.05 };
 const wide: OutputBox = { width: 1920, height: 1080, name: "Sala" };
@@ -117,7 +126,7 @@ describe("a capo e spazio", () => {
   it("spezza una parola piu' lunga della riga invece di uscire dai bordi", () => {
     const lines = wrapLines("supercalifragilistichespiralidoso", 100, 20, base, measure);
     expect(lines.length).toBeGreaterThan(1);
-    expect(lines.every((line) => measure(line, 20, "normal", "display") <= 100)).toBe(true);
+    expect(lines.every((line) => measure(line, 20, base) <= 100)).toBe(true);
     expect(lines.join("")).toBe("supercalifragilistichespiralidoso");
   });
 
@@ -265,5 +274,86 @@ describe("controllo su tutte le uscite", () => {
     expect(result.failures.length).toBeGreaterThan(0);
     expect(result.failures.some((f) => f.output === "Verticale")).toBe(true);
     expect(result.failures.every((f) => f.slide >= 0 && f.slide < 2)).toBe(true);
+  });
+});
+
+describe("caratteri, spessori e spaziatura", () => {
+  it("ogni carattere ha nome, famiglia e un spessore normale", () => {
+    expect(FONTS.length).toBeGreaterThanOrEqual(20);
+    expect(new Set(FONTS.map((font) => font.id)).size).toBe(FONTS.length);
+    expect(new Set(FONTS.map((font) => font.id))).toEqual(new Set(TEXT_FONT_IDS));
+    for (const font of FONTS) {
+      expect(weightsOffered(font)).toContain("normal");
+      expect(font.family.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("lo spessore finto non si offre: un carattere con un solo peso offre solo quello", () => {
+    expect(weightsOffered(fontInfo("bebas-neue"))).toEqual(["normal"]);
+    expect(weightsOffered(fontInfo("ibm-plex-mono"))).toEqual(["normal", "bold"]);
+    expect(weightsOffered(fontInfo("inter"))).toEqual([
+      "light",
+      "normal",
+      "medium",
+      "semibold",
+      "bold",
+      "black",
+    ]);
+    expect(weightFor(fontInfo("bebas-neue"), "black")).toBe(400);
+    expect(weightFor(fontInfo("lora"), "black")).toBe(700);
+  });
+
+  it("i tre caratteri di sempre ci sono ancora, e un id sconosciuto non rompe nulla", () => {
+    expect(fontInfo("display").family).toBe("Fraunces Variable");
+    expect(fontInfo("body").family).toBe("Schibsted Grotesk Variable");
+    expect(fontInfo("mono").family).toBe("JetBrains Mono Variable");
+    expect(fontInfo("non-esiste").id).toBe("display");
+  });
+
+  it("il corsivo si scrive solo se il carattere ne ha uno vero", () => {
+    expect(cssFont({ font: "lora", italic: true }, 40)).toBe('italic 400 40px "Lora Variable"');
+    expect(cssFont({ font: "body", italic: true }, 40)).toBe(
+      '400 40px "Schibsted Grotesk Variable"',
+    );
+  });
+
+  it("la spaziatura tra le lettere allarga la riga e il controllo dello spazio ne tiene conto", () => {
+    const tight = textFits(
+      "uno due tre quattro cinque",
+      { ...base, fit: { min: 1 } },
+      old43,
+      measure,
+    );
+    const loose = textFits(
+      "uno due tre quattro cinque",
+      { ...base, fit: { min: 1 }, letterSpacing: 0.4 },
+      old43,
+      measure,
+    );
+    expect(tight.fits).toBe(true);
+    expect(loose.fits).toBe(false);
+  });
+
+  it("gli stili scritti prima (grassetto/normale, solo tre caratteri) restano validi", () => {
+    const parsed = TextStyleSchema.parse({ ...base, weight: "bold", font: "mono" });
+    expect(parsed.italic).toBeUndefined();
+    expect(parsed.vAlign).toBeUndefined();
+  });
+});
+
+describe("modifiche dell'editor con i caratteri nuovi", () => {
+  it("accetta caratteri, spessori e corsivo; rifiuta quelli che non esistono", () => {
+    expect(TextOverrideSchema.parse({ font: "lora", weight: "semibold", italic: true })).toEqual({
+      font: "lora",
+      weight: "semibold",
+      italic: true,
+    });
+    expect(() => TextOverrideSchema.parse({ font: "comic" })).toThrow();
+    expect(() => TextOverrideSchema.parse({ weight: "heavy" })).toThrow();
+  });
+
+  it("si somma allo stile della sala senza perdere il resto", () => {
+    const effective = effectiveTextStyle(base, undefined, { font: "inter", italic: true });
+    expect(effective).toMatchObject({ font: "inter", italic: true, size: base.size });
   });
 });
