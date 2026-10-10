@@ -141,7 +141,8 @@ async function install(station: Page, app: ElectronApplication, file: string): P
   const window = station.getByRole("dialog", { name: "Plugin" });
   await window.getByRole("tab", { name: "Installati" }).click();
   await window.getByRole("button", { name: "Installa da file…" }).click();
-  await window.getByRole("button", { name: "Chiudi" }).click();
+  // «Chiudi»: gli avvisi di installazione possono coprire il pulsante, quindi si preme senza il controllo del puntatore.
+  await window.getByRole("button", { name: "Chiudi" }).dispatchEvent("click");
   await expect(window).toBeHidden();
 }
 
@@ -192,6 +193,20 @@ test("formattazione come plugin annesso: dall'editor di un plugin alle parole fo
   await format.getByLabel("Dimensione").selectOption("1.5");
   await expect.poll(adopted(out)).toEqual([{ start: 3, end: 10, size: 1.5, bold: true }]);
 
+  // Bordo medio e ombra leggera sullo stesso tratto: arrivano all'editor come nuove parole formattate.
+  await format.getByRole("combobox", { name: /Bordo/ }).selectOption("medium");
+  await format.getByRole("combobox", { name: /Ombra/ }).selectOption("light");
+  await expect.poll(adopted(out)).toEqual([
+    {
+      start: 3,
+      end: 10,
+      size: 1.5,
+      bold: true,
+      outline: { width: 4, color: "#000000" },
+      shadow: { offset: 3, blur: 4, color: "#000000" },
+    },
+  ]);
+
   // Il Lora ha il corsivo vero.
   await expect(format.getByRole("button", { name: "Corsivo" })).toBeEnabled();
 
@@ -222,7 +237,9 @@ test("Brani con la formattazione: le parole formattate dal plugin annesso arriva
   const page = await shownPanelWindow(app, "cuelith.songs.editor");
   const editor = page.frameLocator('[data-module-panel="cuelith.songs.editor"]');
   await editor.getByLabel("Titolo").fill("Santo");
+  await editor.getByRole("tab", { name: "Autori e crediti" }).click();
   await editor.getByRole("button", { name: "Autore sconosciuto" }).click();
+  await editor.getByRole("tab", { name: "Testo", exact: true }).click();
   const text = editor.getByLabel("Testo della sezione V1");
   await text.fill(["[G]Santo, [D]santo", "[---]", "santo il Signore"].join("\n"));
 
@@ -235,6 +252,7 @@ test("Brani con la formattazione: le parole formattate dal plugin annesso arriva
   await expect(format.getByText("5 caratteri selezionati.")).toBeVisible();
   await format.getByLabel("Dimensione").selectOption("2");
   await format.getByRole("button", { name: "Grassetto" }).click();
+  await format.getByRole("combobox", { name: /Bordo/ }).selectOption("medium");
 
   // L'anteprima dell'editor («Cosa vede il pubblico») mostra la parola grande, senza accordi.
   const preview = editor.getByRole("region", { name: "Cosa vede il pubblico" });
@@ -255,6 +273,7 @@ test("Brani con la formattazione: le parole formattate dal plugin annesso arriva
   const preview2 = station.getByRole("region", { name: "Anteprima" });
   await expect(preview2.locator("span[style*='font-size: 200%']")).toHaveText("santo");
   await expect(preview2.locator("span[style*='font-weight']")).toHaveText("santo");
+  await expect(preview2.locator("span[style*='text-stroke']")).toHaveText("santo");
   // In onda: il testo senza accordi e, sull'uscita, la parola grande.
   await station.keyboard.press("Enter");
   const program = station.getByRole("region", { name: "Programma" });

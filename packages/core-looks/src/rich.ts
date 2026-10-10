@@ -1,4 +1,11 @@
-import { cleanSpans, segmentsOf, type RichText, type Segment } from "@cuelith/protocol";
+import {
+  cleanSpans,
+  segmentsOf,
+  type RichText,
+  type Segment,
+  type SpanOutline,
+  type SpanShadow,
+} from "@cuelith/protocol";
 import type { TextStyle } from "./styles.js";
 import type { MeasureText, TextFace } from "./text.js";
 
@@ -25,6 +32,9 @@ export interface Run {
   readonly face: TextFace;
   /** Colore del pezzo; `undefined` = quello dello stile. */
   readonly color: string | undefined;
+  /** Bordo e ombra di questo pezzo (della parola formattata); `undefined` = quelli dello stile. */
+  readonly outline: SpanOutline | undefined;
+  readonly shadow: SpanShadow | undefined;
   readonly width: number;
 }
 
@@ -46,6 +56,8 @@ interface Piece {
   readonly px: number;
   readonly face: TextFace;
   readonly color: string | undefined;
+  readonly outline: SpanOutline | undefined;
+  readonly shadow: SpanShadow | undefined;
 }
 
 const upper = (text: string, style: TextStyle): string =>
@@ -58,12 +70,21 @@ function pieceOf(segment: Segment, text: string, style: TextStyle, basePx: numbe
     italic: segment.italic ?? style.italic,
     letterSpacing: style.letterSpacing,
   };
-  return { text, px: basePx * (segment.size ?? 1), face, color: segment.color };
+  return {
+    text,
+    px: basePx * (segment.size ?? 1),
+    face,
+    color: segment.color,
+    outline: segment.outline,
+    shadow: segment.shadow,
+  };
 }
 
 const sameLook = (a: Piece, b: Piece): boolean =>
   a.px === b.px &&
   a.color === b.color &&
+  JSON.stringify(a.outline) === JSON.stringify(b.outline) &&
+  JSON.stringify(a.shadow) === JSON.stringify(b.shadow) &&
   a.face.weight === b.face.weight &&
   a.face.italic === b.face.italic;
 

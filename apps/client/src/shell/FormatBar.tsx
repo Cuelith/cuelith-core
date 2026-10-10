@@ -1,6 +1,15 @@
 import { fontInfo, type FullscreenStyle } from "@cuelith-core/core-looks";
-import { styleRange, type Span } from "@cuelith/protocol";
-import type { RefObject } from "react";
+import {
+  OUTLINE_PRESETS,
+  SHADOW_PRESETS,
+  outlinePresetOf,
+  shadowPresetOf,
+  styleRange,
+  type OutlinePreset,
+  type ShadowPreset,
+  type Span,
+} from "@cuelith/protocol";
+import { useState, type RefObject } from "react";
 import { useT } from "../engine/react.js";
 
 const BUTTON =
@@ -32,6 +41,8 @@ export function FormatBar({
   onChange: (spans: Span[]) => void;
 }) {
   const t = useT();
+  // Colori scelti per il bordo e l'ombra (si applicano quando si sceglie lo spessore).
+  const [edge, setEdge] = useState("#000000");
   const has = selection.end > selection.start;
   const italic = fontInfo(font).italic;
   const apply = (change: Parameters<typeof styleRange>[4]): void => {
@@ -55,6 +66,11 @@ export function FormatBar({
     const found = spans.find((span) => span.start <= selection.start && selection.start < span.end);
     return found?.size ?? 1;
   })();
+  const spanHere = spans.find(
+    (span) => span.start <= selection.start && selection.start < span.end,
+  );
+  const outlineHere: OutlinePreset | "none" = outlinePresetOf(spanHere?.outline) ?? "none";
+  const shadowHere: ShadowPreset | "none" = shadowPresetOf(spanHere?.shadow) ?? "none";
   const keep = (event: { preventDefault: () => void }): void => {
     // I pulsanti non tolgono la selezione alla casella di testo.
     event.preventDefault();
@@ -130,12 +146,76 @@ export function FormatBar({
           className="h-6 w-9 rounded-md border border-line-2 bg-bg disabled:opacity-40"
         />
       </label>
+      <label className="flex items-center gap-1.5 text-xs text-muted">
+        {t("core.editor.format.outline")}
+        <select
+          value={outlineHere}
+          disabled={!has}
+          onChange={(event) => {
+            const preset = event.target.value as OutlinePreset | "none";
+            apply({
+              outline: preset === "none" ? null : { width: OUTLINE_PRESETS[preset], color: edge },
+            });
+          }}
+          className="rounded-md border border-line-2 bg-bg px-1.5 py-0.5 text-xs text-fg disabled:opacity-40"
+        >
+          <option value="none">{t("core.editor.format.none")}</option>
+          {(Object.keys(OUTLINE_PRESETS) as OutlinePreset[]).map((preset) => (
+            <option key={preset} value={preset}>
+              {t(`core.editor.format.outline.${preset}`)}
+            </option>
+          ))}
+        </select>
+        <input
+          type="color"
+          aria-label={t("core.editor.format.outlineColor")}
+          value={edge}
+          disabled={!has}
+          onChange={(event) => {
+            setEdge(event.target.value.toUpperCase());
+            if (outlineHere !== "none") {
+              apply({
+                outline: { width: OUTLINE_PRESETS[outlineHere], color: event.target.value },
+              });
+            }
+          }}
+          className="h-6 w-9 rounded-md border border-line-2 bg-bg disabled:opacity-40"
+        />
+      </label>
+      <label className="flex items-center gap-1.5 text-xs text-muted">
+        {t("core.editor.format.shadow")}
+        <select
+          value={shadowHere}
+          disabled={!has}
+          onChange={(event) => {
+            const preset = event.target.value as ShadowPreset | "none";
+            apply({
+              shadow: preset === "none" ? null : { ...SHADOW_PRESETS[preset], color: "#000000" },
+            });
+          }}
+          className="rounded-md border border-line-2 bg-bg px-1.5 py-0.5 text-xs text-fg disabled:opacity-40"
+        >
+          <option value="none">{t("core.editor.format.shadow.none")}</option>
+          {(Object.keys(SHADOW_PRESETS) as ShadowPreset[]).map((preset) => (
+            <option key={preset} value={preset}>
+              {t(`core.editor.format.shadow.${preset}`)}
+            </option>
+          ))}
+        </select>
+      </label>
       <button
         type="button"
         disabled={!has}
         onMouseDown={keep}
         onClick={() => {
-          apply({ size: null, bold: false, italic: false, color: null });
+          apply({
+            size: null,
+            bold: false,
+            italic: false,
+            color: null,
+            outline: null,
+            shadow: null,
+          });
         }}
         className={`${BUTTON} ${OFF}`}
       >

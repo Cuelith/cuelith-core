@@ -106,6 +106,18 @@ export function SlideText({
                   // Come sulle uscite: il corsivo solo se il carattere ne ha uno vero.
                   ...(segment.italic === true && info.italic ? { fontStyle: "italic" } : {}),
                   ...(segment.color === undefined ? {} : { color: segment.color }),
+                  // Bordo e ombra della parola: valgono al posto di quelli dello stile (misure in pixel su un'uscita alta 1080).
+                  ...(segment.outline === undefined
+                    ? {}
+                    : {
+                        WebkitTextStroke: `calc(${String(segment.outline.width * fit)} / 1080 * 100cqh) ${segment.outline.color}`,
+                        paintOrder: "stroke fill",
+                      }),
+                  ...(segment.shadow === undefined
+                    ? {}
+                    : {
+                        textShadow: `0 calc(${String(segment.shadow.offset * fit)} / 1080 * 100cqh) calc(${String(segment.shadow.blur * fit)} / 1080 * 100cqh) ${segment.shadow.color}`,
+                      }),
                 };
                 return Object.keys(look).length === 0 ? (
                   segment.text

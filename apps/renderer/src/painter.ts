@@ -328,9 +328,9 @@ export class Painter {
         : style.vAlign === "bottom"
           ? h - margin - band - block
           : (h - block) / 2;
-    const outline =
+    const styleOutline =
       style.outline === undefined || style.outline.width === 0 ? undefined : style.outline;
-    const shadow = style.shadow;
+    const styleShadow = style.shadow;
     let y = top;
     for (const line of lines) {
       const x0 =
@@ -346,6 +346,9 @@ export class Painter {
       const baseline = y + (line.height - (ascent + metrics.fontBoundingBoxDescent)) / 2 + ascent;
       let x = x0;
       for (const run of line.runs) {
+        // Una parola formattata puo' avere il suo bordo e la sua ombra: valgono al posto di quelli dello stile.
+        const outline = run.outline ?? styleOutline;
+        const shadow = run.shadow ?? styleShadow;
         context.font = cssFont(run.face, run.px);
         context.letterSpacing = `${String((run.face.letterSpacing ?? 0) * run.px)}px`;
         const spill = (on: boolean): void => {

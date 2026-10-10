@@ -141,6 +141,13 @@ async function closeEditor(app: ElectronApplication, editor: FrameLocator): Prom
   }
 }
 
+/** L'editor ha le schede Testo, Autori e crediti, Altri dati: si apre quella che serve. */
+async function openTab(editor: FrameLocator, name: string): Promise<void> {
+  await clickUntil(editor.getByRole("tab", { name }), () =>
+    expect(editor.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true", SOON),
+  );
+}
+
 /** Aggiunge una sezione dalla fila «+ Verse», «+ Chorus»... */
 async function addSection(editor: FrameLocator, kind: string, id: string): Promise<void> {
   await clickUntil(editor.getByRole("button", { name: `+ ${kind}` }), () =>
@@ -179,11 +186,13 @@ test("modulo Brani: nuovo brano nell'editor, scaletta, tasti delle sezioni, impo
   await expect(issues).toContainText("Manca il testo");
 
   await editor.getByLabel("Titolo").fill("Santo");
-  // Autore sconosciuto con un clic.
+  // Gli autori stanno nella scheda «Autori e crediti»: autore sconosciuto con un clic.
+  await openTab(editor, "Autori e crediti");
   await clickUntil(editor.getByRole("button", { name: "Autore sconosciuto" }), () =>
     expect(editor.getByLabel("Autore 1", { exact: true })).toHaveValue("Autore sconosciuto", SOON),
   );
   await editor.getByLabel("Autore 1", { exact: true }).fill("Tradizionale");
+  await openTab(editor, "Testo");
   await editor.getByLabel("Testo della sezione V1").fill("Santo, santo\n[---]\nsanto il Signore");
   await addSection(editor, "Chorus", "C1");
   await editor.getByLabel("Testo della sezione C1").fill("[G]Osanna, [D]osanna");
@@ -321,7 +330,9 @@ test("scheda Brani: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C
     "Others",
   ]);
   await editor.getByLabel("Titolo").fill("Glorioso giorno");
+  await openTab(editor, "Autori e crediti");
   await editor.getByLabel("Autore 1", { exact: true }).fill("Autore");
+  await openTab(editor, "Testo");
   await editor.getByLabel("Testo della sezione V1").fill("Strofa uno");
   await addSection(editor, "Verse", "V2");
   await editor.getByLabel("Testo della sezione V2").fill("Strofa due");
@@ -397,12 +408,14 @@ test("scheda Brani: selezione e barra fissa; fuori scaletta; tasti V1 V2 C1 V3 C
   // Piu' brani selezionati (Ctrl+clic): «In scaletta» li aggiunge tutti, nell'ordine scelto.
   const second = await editorOpenedBy(app, side.getByRole("button", { name: "+ Nuovo brano" }));
   await second.editor.getByLabel("Titolo").fill("Alba");
+  await openTab(second.editor, "Autori e crediti");
   await clickUntil(second.editor.getByRole("button", { name: "Autore sconosciuto" }), () =>
     expect(second.editor.getByLabel("Autore 1", { exact: true })).toHaveValue(
       "Autore sconosciuto",
       SOON,
     ),
   );
+  await openTab(second.editor, "Testo");
   await second.editor.getByLabel("Testo della sezione V1").fill("Luce");
   await clickUntil(second.editor.getByRole("button", { name: "Salva", exact: true }), () =>
     expect(second.page.getByText("«Alba» salvato.")).toBeVisible({ timeout: 6000 }),

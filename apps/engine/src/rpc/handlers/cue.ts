@@ -151,6 +151,8 @@ export const cueHandlers: HandlerMap = {
         ...(change.bold === undefined ? {} : { bold: change.bold }),
         ...(change.italic === undefined ? {} : { italic: change.italic }),
         ...(change.color === undefined ? {} : { color: change.color }),
+        ...(change.outline === undefined ? {} : { outline: change.outline }),
+        ...(change.shadow === undefined ? {} : { shadow: change.shadow }),
       });
       if (spans.length === 0) delete current.spans;
       else current.spans = spans;
