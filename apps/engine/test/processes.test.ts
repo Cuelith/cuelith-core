@@ -150,7 +150,14 @@ async function start(timings = FAST) {
   const until = async (check: () => Promise<boolean>, timeoutMs = 45_000) => {
     const begin = Date.now();
     while (!(await check())) {
-      if (Date.now() - begin > timeoutMs) throw new Error("condizione non verificata in tempo");
+      if (Date.now() - begin > timeoutMs) {
+        // Con lo stato del plugin e il suo processo: su una macchina lenta serve a capire cosa mancava.
+        const now = await status().catch(() => undefined);
+        const pid = engine.context.supervisor.pid(ID);
+        throw new Error(
+          `condizione non verificata in tempo (stato ${JSON.stringify(now)}, pid ${String(pid)})`,
+        );
+      }
       await new Promise((r) => setTimeout(r, 20));
     }
   };
