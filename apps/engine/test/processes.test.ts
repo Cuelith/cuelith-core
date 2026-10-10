@@ -175,9 +175,16 @@ afterEach(async () => {
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0);
-    return true;
   } catch {
     return false;
+  }
+  // Su Linux un processo morto che nessuno ha ancora "raccolto" (zombie, tipico dei contenitori
+  // senza un init che lo faccia) risponde ancora a kill(pid, 0): non e' vivo.
+  try {
+    const stat = readFileSync(`/proc/${String(pid)}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(") ") + 2, stat.lastIndexOf(") ") + 3) !== "Z";
+  } catch {
+    return true;
   }
 };
 
